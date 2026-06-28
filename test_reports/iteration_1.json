@@ -1,0 +1,58 @@
+{
+  "summary": "Backend pytest 19/19 passed against EXPO_PUBLIC_BACKEND_URL (auth demo/email/me, exercises 25-item library + 404, onboarding+plan persistence, today/start/log-set/complete, progress summary, coach Claude streaming SSE with delta+done, today-insight, weekly-report, billing dev-mark-premium + stripe placeholder 400 + subscription). Frontend mobile flow tested at 390x844: login screen renders all 4 sign-in buttons with correct testIDs; demo sign-in stores token but DOES NOT auto-navigate from /login (CRITICAL UX BUG — user is stuck on login screen even though authenticated; only progresses after manual navigation to '/'). After manual nav, onboarding 5 steps complete cleanly, home renders with real Claude AI insight + streak + week/all-time counters + tab bar, Coach tab streams Claude responses in chat bubbles (verified streaming worked), Progress shows empty PR/trends state with proper empty illustrations, Profile shows plan summary + Redo onboarding + Sign out + Apex Premium upsell, Subscribe screen shows £9.99 + perks + Start Premium CTA. Backend log shows transient 'Budget has been exceeded! Current cost: 0.0, Max budget: 0.0' from LiteLLM once (later requests succeeded via fallback path; risk for AI flows). Deprecated React Native style 'shadow*' and 'props.pointerEvents' warnings observed in console.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/coach/today-insight", "issue": "Returned 500 once in logs because EMERGENT_LLM_KEY budget exceeded ('Max budget: 0.0'); endpoint has graceful fallback string but the upstream key state may be unstable for AI flows (coach chat / insight / weekly report)."},
+      {"endpoint": "POST /api/billing/create-checkout", "issue": "Returns 400 with placeholder STRIPE_API_KEY (expected). UI fallback to /api/billing/dev/mark-premium not verified through UI in this run."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "login.tsx", "issue": "After signInAsDemo / email sign-in success the user remains on /login forever. Token is persisted and /auth/me works, but no router.replace is invoked. Only by manually navigating to '/' does index.tsx redirect to /onboarding or /(tabs). High-impact UX bug — users will think the Demo / Email button is broken.", "testID": "demo-signin-button, email-continue-button", "priority": "HIGH"},
+      {"component": "(tabs)/_layout.tsx", "issue": "Tab bar items lack testIDs tab-coach / tab-progress / tab-profile. Tabs work via text label but block reliable automated mobile UI testing.", "testID": "tab-home, tab-coach, tab-progress, tab-profile", "priority": "MEDIUM"},
+      {"component": "(tabs)/index.tsx (home)", "issue": "Expected testIDs start-workout-button and streak-value not found on rest-day path. Streak number rendered but not addressable via testID.", "testID": "start-workout-button, streak-value", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Login → home", "issue": "Authentication completes (POST /api/auth/demo/login 200 + token stored) but UI does not navigate away from /login. Root cause: login.tsx does not subscribe to user state or trigger router.replace after sign-in.", "affected_testIDs": ["demo-signin-button", "email-continue-button", "apple-signin-button"]}
+    ],
+    "design_issues": [
+      {"screen": "all", "issues": ["Console: 'shadow*' style props deprecated (use boxShadow)", "Console: 'props.pointerEvents' deprecated (use style.pointerEvents)"]}
+    ],
+    "react_native_issues": [
+      {"component": "expo packages", "issue": "react-native-keyboard-controller@1.18.6 installed but expo expected 1.18.5 — minor version drift warning at Metro startup."},
+      {"component": "styles", "issue": "Deprecated shadow* StyleSheet props used across components — should migrate to boxShadow per RN web latest. Reference: console warnings emitted on every screen render."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/test_apex_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "FIX login.tsx: after signInAsDemo / onContinueEmail success, navigate via expo-router useRouter().replace('/') (or watch user state via useEffect to redirect). Apply same pattern after web Google session exchange that lands back on /login.",
+    "Add testIDs to (tabs)/_layout.tsx Tabs.Screen options: tab-home / tab-coach / tab-progress / tab-profile to enable automated tab navigation.",
+    "Add testIDs: start-workout-button (home + workout screen), streak-value (home + progress), workout-set-log-button, weight-stepper-plus/minus, rest-timer, exercise-detail-tips on respective screens.",
+    "Confirm EMERGENT_LLM_KEY budget. Logs showed 'Budget has been exceeded! Current cost: 0.0, Max budget: 0.0' once. Coach chat then recovered, suggesting transient quota — monitor and request budget increase if needed for AI insight / weekly report endpoints.",
+    "Migrate StyleSheet shadow* props to boxShadow to silence React Native web deprecation warnings.",
+    "Verify Subscribe screen's Stripe-fail fallback: tapping Start Premium with placeholder Stripe key should call /api/billing/dev/mark-premium and mark user premium (not verified end-to-end through UI in this iteration)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is a single ~1100-line module; consider splitting routers (auth, workouts, coach, billing) as it grows.",
+    "Auth: /auth/google/session passes through any session_token that Emergent returns; ensure expires_at from emergent provider is preserved rather than defaulting to +7d (currently hard-coded).",
+    "/coach/chat builds prior history list but never actually replays it into the LlmChat — the for-loop is a no-op (history[:-1] does nothing). Multi-turn memory therefore relies only on the system message snapshot, not the real chat history beyond the current message.",
+    "weekly-report extracts JSON with brittle string slicing; consider using a more robust JSON extractor and a Pydantic model for shape validation."
+  ],
+  "updated_files": [
+    "/app/backend/tests/conftest.py (new)",
+    "/app/backend/tests/test_apex_backend.py (new)",
+    "/app/test_reports/pytest/pytest_results.xml (new)",
+    "/app/test_reports/iteration_1.json (new)"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "~75% — auth UI navigation broken, otherwise screens & integrations work"},
+  "seed_data_creation": "Fresh demo users created per test run via /api/auth/demo/login (demo_*@apexai.app). One workout completed in pytest flow to seed PR/streak data. Test data is auto-isolated by user_id; no manual cleanup required for sandbox.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend is solid — keep reusing /app/backend/tests/test_apex_backend.py as regression suite. Frontend login navigation bug is the main blocker; once fixed, retest Workout Execution UI (set logging stepper, rest timer, complete) and Subscribe → dev-mark-premium UI fallback. Today is rest day in current schedule (Sunday day_index 7); use 'Train anyway →' CTA on home to reach the workout execution screen.",
+  "rca_of_issue": "Login navigation: login.tsx calls signInAsDemo() which sets user state in AuthContext and persists token, but the screen never re-evaluates routing because (a) there is no useEffect watching `user` to call router.replace, and (b) root layout has no auth guard. Result: user is authenticated but visually stuck on /login. Reproduction: visit /login → tap Demo button → URL remains /login indefinitely. Token confirmed stored in localStorage and GET /api/auth/me returns user. Fix: in login.tsx add `useEffect(() => { if (user) router.replace('/'); }, [user])` OR navigate explicitly inside onPress handlers after await signInAsDemo()."
+}
