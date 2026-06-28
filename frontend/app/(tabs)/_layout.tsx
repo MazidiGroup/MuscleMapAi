@@ -30,6 +30,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: "Home",
+          tabBarButtonTestID: "tab-home",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "home" : "home-outline"} size={22} color={color} />
           ),
@@ -39,6 +40,7 @@ export default function TabsLayout() {
         name="coach"
         options={{
           title: "Coach",
+          tabBarButtonTestID: "tab-coach",
           tabBarIcon: ({ color, focused }) => (
             <View>
               <Ionicons name={focused ? "sparkles" : "sparkles-outline"} size={22} color={color} />
@@ -50,6 +52,7 @@ export default function TabsLayout() {
         name="progress"
         options={{
           title: "Progress",
+          tabBarButtonTestID: "tab-progress",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "stats-chart" : "stats-chart-outline"} size={22} color={color} />
           ),
@@ -59,6 +62,7 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: "Profile",
+          tabBarButtonTestID: "tab-profile",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person" : "person-outline"} size={22} color={color} />
           ),

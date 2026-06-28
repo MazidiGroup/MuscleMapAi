@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -13,15 +13,25 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { useRouter } from "expo-router";
 
 import { useAuth } from "@/src/auth-context";
 import { COLORS, FONT, RADIUS, SPACING, IMAGES } from "@/src/theme";
 
 export default function Login() {
-  const { signInWithGoogle, signInAsDemo, refresh } = useAuth();
+  const router = useRouter();
+  const { user, signInWithGoogle, signInAsDemo, refresh } = useAuth();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
+
+  // After successful sign-in, navigate based on user state
+  useEffect(() => {
+    if (user) {
+      if (user.onboarded) router.replace("/(tabs)");
+      else router.replace("/onboarding");
+    }
+  }, [user, router]);
 
   const onGoogle = async () => {
     setBusy(true);

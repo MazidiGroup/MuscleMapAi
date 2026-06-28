@@ -127,9 +127,9 @@ class TestWorkoutFlow:
             "exercise_id": first_ex,
             "set_data": {"set_number": 1, "weight": 60.0, "reps": 8, "completed": True},
         }
-        l = api_client.post(f"{BASE_URL}/api/workouts/log-set", json=log_payload, headers=auth_session["headers"])
-        assert l.status_code == 200, l.text
-        logged = l.json()
+        log_resp = api_client.post(f"{BASE_URL}/api/workouts/log-set", json=log_payload, headers=auth_session["headers"])
+        assert log_resp.status_code == 200, log_resp.text
+        logged = log_resp.json()
         target_ex = next(e for e in logged["exercises"] if e["exercise_id"] == first_ex)
         assert len(target_ex["sets"]) == 1
         assert target_ex["sets"][0]["weight"] == 60.0
