@@ -347,6 +347,289 @@ async def get_exercise(exercise_id: str):
     return ex
 
 
+# ------------------ Body Intelligence ------------------
+# Map muscle names from exercise library → canonical muscle groups
+MUSCLE_GROUP_MAP: Dict[str, str] = {
+    "Chest": "chest", "Upper Chest": "chest",
+    "Back": "back", "Lats": "back", "Upper Back": "back", "Mid Back": "back", "Lower Back": "back", "Posterior Chain": "back",
+    "Shoulders": "shoulders", "Side Delts": "shoulders", "Rear Delts": "shoulders",
+    "Biceps": "arms", "Triceps": "arms",
+    "Core": "core", "Abs": "core", "Hip Flexors": "core",
+    "Glutes": "glutes",
+    "Quads": "quads",
+    "Hamstrings": "hamstrings",
+    "Calves": "calves",
+}
+
+CANONICAL_GROUPS = ["chest", "back", "shoulders", "arms", "core", "glutes", "quads", "hamstrings", "calves"]
+
+# Ideal weekly set targets per muscle group (industry-standard hypertrophy guidelines, 10-20 sets/week)
+IDEAL_WEEKLY_SETS = {
+    "chest": 14, "back": 16, "shoulders": 14, "arms": 12,
+    "core": 10, "glutes": 12, "quads": 14, "hamstrings": 12, "calves": 10,
+}
+
+
+def _classify_activation(pct: float) -> str:
+    """pct = sets_done / ideal_sets * 100. green=well trained, yellow=underused, red=very underused."""
+    if pct >= 70:
+        return "green"
+    if pct >= 35:
+        return "yellow"
+    return "red"
+
+
+async def _compute_muscle_activation(user_id: str, days: int = 7) -> Dict[str, Any]:
+    """Returns per-muscle-group activation in the last N days."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    workouts = await db.workouts.find(
+        {"user_id": user_id, "completed": True, "completed_at": {"$gte": since}},
+        {"_id": 0},
+    ).sort("completed_at", -1).to_list(50)
+
+    sets_by_group: Dict[str, int] = {g: 0 for g in CANONICAL_GROUPS}
+    for w in workouts:
+        for ex in w.get("exercises", []):
+            ex_def = next((e for e in EXERCISE_LIBRARY if e["id"] == ex["exercise_id"]), None)
+            if not ex_def:
+                continue
+            num_sets = len(ex.get("sets", []))
+            for muscle in ex_def.get("muscles", []):
+                group = MUSCLE_GROUP_MAP.get(muscle)
+                if group:
+                    sets_by_group[group] += num_sets
+
+    muscle_groups = []
+    for g in CANONICAL_GROUPS:
+        ideal = IDEAL_WEEKLY_SETS[g]
+        sets = sets_by_group[g]
+        pct = min(100, (sets / ideal) * 100) if ideal > 0 else 0
+        muscle_groups.append({
+            "id": g,
+            "name": g.capitalize(),
+            "sets_done": sets,
+            "ideal_sets": ideal,
+            "activation_pct": round(pct),
+            "status": _classify_activation(pct),
+        })
+
+    # Overall balance — average of all groups, weighted to penalise red groups more
+    if muscle_groups:
+        avg = sum(g["activation_pct"] for g in muscle_groups) / len(muscle_groups)
+        # Penalty for any red groups
+        red_count = sum(1 for g in muscle_groups if g["status"] == "red")
+        balance_pct = max(0, min(100, round(avg - (red_count * 5))))
+    else:
+        balance_pct = 0
+
+    if balance_pct >= 80:
+        balance_label = "Excellent — keep it up!"
+    elif balance_pct >= 60:
+        balance_label = "Good — keep it up!"
+    elif balance_pct >= 40:
+        balance_label = "Imbalanced — focus on weak areas"
+    else:
+        balance_label = "Get training to see your map"
+
+    return {
+        "muscle_groups": muscle_groups,
+        "balance_pct": balance_pct,
+        "balance_label": balance_label,
+        "workouts_counted": len(workouts),
+    }
+
+
+@api_router.get("/body/intelligence")
+async def body_intelligence(user=Depends(get_current_user)):
+    """Returns muscle activation map for the body model."""
+    current = await _compute_muscle_activation(user["user_id"], days=7)
+
+    # Last logged workout impact
+    last = await db.workouts.find_one(
+        {"user_id": user["user_id"], "completed": True},
+        {"_id": 0},
+        sort=[("completed_at", -1)],
+    )
+    last_impact: Dict[str, Any] = {"workout_name": None, "primary": [], "secondary": []}
+    if last:
+        last_impact["workout_name"] = last.get("name")
+        primary_groups: set = set()
+        secondary_groups: set = set()
+        for ex in last.get("exercises", []):
+            ex_def = next((e for e in EXERCISE_LIBRARY if e["id"] == ex["exercise_id"]), None)
+            if not ex_def:
+                continue
+            muscles = ex_def.get("muscles", [])
+            for i, m in enumerate(muscles):
+                g = MUSCLE_GROUP_MAP.get(m)
+                if g:
+                    if i == 0:
+                        primary_groups.add(g)
+                    else:
+                        secondary_groups.add(g)
+        last_impact["primary"] = list(primary_groups)
+        last_impact["secondary"] = list(secondary_groups - primary_groups)
+
+    # Identify lagging muscles (red + yellow, sorted by lowest activation)
+    lagging = sorted(
+        [g for g in current["muscle_groups"] if g["status"] in ("red", "yellow")],
+        key=lambda g: g["activation_pct"],
+    )[:4]
+
+    return {
+        **current,
+        "last_impact": last_impact,
+        "lagging": lagging,
+    }
+
+
+@api_router.get("/body/trend")
+async def body_trend(user=Depends(get_current_user)):
+    """Returns weekly balance score for the last 8 weeks."""
+    today = datetime.now(timezone.utc).date()
+    weeks = []
+    for i in range(8):
+        week_start = today - timedelta(days=today.weekday() + 7 * (7 - i))
+        # snapshot balance for that 7-day window
+        ws_dt = datetime(week_start.year, week_start.month, week_start.day, tzinfo=timezone.utc)
+        we_dt = ws_dt + timedelta(days=7)
+        workouts = await db.workouts.find(
+            {"user_id": user["user_id"], "completed": True,
+             "completed_at": {"$gte": ws_dt, "$lt": we_dt}},
+            {"_id": 0},
+        ).to_list(20)
+        sets_by_group: Dict[str, int] = {g: 0 for g in CANONICAL_GROUPS}
+        for w in workouts:
+            for ex in w.get("exercises", []):
+                ex_def = next((e for e in EXERCISE_LIBRARY if e["id"] == ex["exercise_id"]), None)
+                if not ex_def:
+                    continue
+                num_sets = len(ex.get("sets", []))
+                for muscle in ex_def.get("muscles", []):
+                    group = MUSCLE_GROUP_MAP.get(muscle)
+                    if group:
+                        sets_by_group[group] += num_sets
+        if sets_by_group:
+            pcts = [min(100, (sets_by_group[g] / IDEAL_WEEKLY_SETS[g]) * 100) for g in CANONICAL_GROUPS]
+            balance = round(sum(pcts) / len(pcts))
+        else:
+            balance = 0
+        weeks.append({"week": i + 1, "label": f"W{i + 1}", "balance_pct": balance})
+
+    first_nonzero = next((w["balance_pct"] for w in weeks if w["balance_pct"] > 0), 0)
+    latest = weeks[-1]["balance_pct"]
+    improvement = latest - first_nonzero if first_nonzero else 0
+
+    # Streak: consecutive weeks with balance > 30
+    streak = 0
+    for w in reversed(weeks):
+        if w["balance_pct"] > 30:
+            streak += 1
+        else:
+            break
+
+    if latest >= 75:
+        rating = "Excellent"
+    elif latest >= 50:
+        rating = "Steady"
+    elif latest >= 25:
+        rating = "Building"
+    else:
+        rating = "Start"
+
+    return {"weeks": weeks, "improvement": improvement, "streak": streak, "rating": rating}
+
+
+@api_router.get("/body/muscle/{group_id}")
+async def muscle_detail(group_id: str, user=Depends(get_current_user)):
+    """Detail panel for a specific muscle group."""
+    if group_id not in CANONICAL_GROUPS:
+        raise HTTPException(status_code=404, detail="Muscle group not found")
+
+    current = await _compute_muscle_activation(user["user_id"], days=7)
+    group = next((g for g in current["muscle_groups"] if g["id"] == group_id), None)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    # Suggest 3 exercises that hit this muscle
+    suggestions = []
+    for e in EXERCISE_LIBRARY:
+        for m in e.get("muscles", []):
+            if MUSCLE_GROUP_MAP.get(m) == group_id:
+                suggestions.append({"id": e["id"], "name": e["name"]})
+                break
+        if len(suggestions) >= 3:
+            break
+
+    # Tip from AI logic
+    if group["status"] == "red":
+        tip = f"Your {group['name'].lower()} are very underused. Add 8-12 sets this week to reach the ideal range of {IDEAL_WEEKLY_SETS[group_id]} sets."
+    elif group["status"] == "yellow":
+        tip = f"Your {group['name'].lower()} could use 4-6 more sets this week to reach the ideal range."
+    else:
+        tip = f"Your {group['name'].lower()} are well-trained. Maintain {IDEAL_WEEKLY_SETS[group_id]} sets/week for continued growth."
+
+    return {
+        **group,
+        "ideal_range": f"{int(IDEAL_WEEKLY_SETS[group_id] * 0.7)}–{IDEAL_WEEKLY_SETS[group_id]} sets/week",
+        "ideal_pct_range": "70%–100%",
+        "tip": tip,
+        "suggested_exercises": suggestions[:3],
+    }
+
+
+@api_router.post("/body/generate-focus-workout")
+async def generate_focus_workout(user=Depends(get_current_user)):
+    """Creates a workout targeting the user's lagging muscle groups."""
+    intel = await _compute_muscle_activation(user["user_id"], days=7)
+    lagging_ids = [g["id"] for g in intel["muscle_groups"] if g["status"] in ("red", "yellow")][:3]
+    if not lagging_ids:
+        # everything's balanced — pick the lowest 2
+        sorted_groups = sorted(intel["muscle_groups"], key=lambda g: g["activation_pct"])
+        lagging_ids = [g["id"] for g in sorted_groups[:2]]
+
+    # Pick 2 exercises per lagging group
+    chosen_exercises = []
+    seen = set()
+    for gid in lagging_ids:
+        count = 0
+        for e in EXERCISE_LIBRARY:
+            if count >= 2:
+                break
+            if e["id"] in seen:
+                continue
+            for m in e.get("muscles", []):
+                if MUSCLE_GROUP_MAP.get(m) == gid:
+                    chosen_exercises.append({"exercise_id": e["id"], "target_sets": 3, "target_reps": "8-12"})
+                    seen.add(e["id"])
+                    count += 1
+                    break
+
+    workout_id = f"wkt_{uuid.uuid4().hex[:10]}"
+    workout_exercises = [{
+        "exercise_id": e["exercise_id"],
+        "target_sets": e["target_sets"],
+        "target_reps": e["target_reps"],
+        "sets": [],
+    } for e in chosen_exercises]
+
+    focus_names = ", ".join(g.capitalize() for g in lagging_ids)
+    doc = {
+        "workout_id": workout_id,
+        "user_id": user["user_id"],
+        "plan_id": "focus",
+        "day": 0,
+        "name": f"Focus — {focus_names}",
+        "muscle_focus": focus_names,
+        "exercises": workout_exercises,
+        "completed": False,
+        "created_at": datetime.now(timezone.utc),
+    }
+    await db.workouts.insert_one(dict(doc))
+    doc["created_at"] = doc["created_at"].isoformat()
+    return doc
+
+
 # ------------------ Workout Plan Templates ------------------
 def build_template_plan(goal: str, experience: str, frequency: int, equipment: List[str]) -> List[Dict[str, Any]]:
     """Build a 7-day workout plan template based on user profile."""
@@ -953,12 +1236,16 @@ async def todays_insight(user=Depends(get_current_user)):
         logger.warning(f"insight fallback: {e}")
         text = "Show up today. Consistency compounds — every set you log is a future PR."
 
-    await db.daily_insights.insert_one({
-        "user_id": user["user_id"],
-        "date": today,
-        "insight": text,
-        "created_at": datetime.now(timezone.utc),
-    })
+    try:
+        await db.daily_insights.insert_one({
+            "user_id": user["user_id"],
+            "date": today,
+            "insight": text,
+            "created_at": datetime.now(timezone.utc),
+        })
+    except Exception:
+        # Race condition: another concurrent request already inserted today's insight. Safe to ignore.
+        pass
     return {"insight": text}
 
 

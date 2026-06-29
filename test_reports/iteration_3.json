@@ -1,0 +1,48 @@
+{
+  "summary": "Body Intelligence feature E2E verified. Backend: 14/14 new pytest cases in /app/backend/tests/test_body_intelligence.py pass against the public preview URL — /api/body/intelligence (auth gating, 9 canonical muscle groups, activation+status, balance_pct with -5%/red penalty, lagging[]), /api/body/trend (8-week array + improvement/streak/rating), /api/body/muscle/{id} (404 for unknown, ideal_range + AI tip + suggested_exercises for each of 9 groups), /api/body/generate-focus-workout (creates workout doc with workout_id, no duplicate exercise_ids — carry-over React-key bug fix verified at backend layer), classification thresholds (>=70 green, 35-69 yellow, <35 red) confirmed by logging 6 sets of bench-press and observing chest jump from red→yellow, workout activation feed verified (4 sets logged ⇒ sets_done>=4 across mapped groups + last_impact.workout_name populated), and the /coach/today-insight DuplicateKey 500 regression is FIXED — second call no longer 500s. Iteration-2 regression suite also still green (28/28). Frontend (Expo web, 390x844): demo signin → onboarding (now using new goal-/exp-/freq-/equip-/onboarding-finish testIDs) → tab-body all reachable for the first time. Body screen renders ALL required testIDs: body-screen, body-legend, body-diagram, body-view-toggle, view-front/back/side, overall-balance, muscle-groups-panel + 9/9 group-row-* rows, balance-chart, focus-recommendation, generate-focus-workout-btn. View toggle switches diagram cleanly. Tapping group-row-chest opens muscle-detail-modal with title 'Chest', activation %, ideal range '9–14 sets/week', Apex Coach AI tip card, and 3 suggested exercises (suggested-ex-0 visible). Clicking Generate focus workout fires POST /api/body/generate-focus-workout and navigates to /workout/wkt_* — full integration end-to-end verified. workout-impact section is correctly hidden for fresh user with no completed workouts (as spec'd). One minor backend gap: /api/body/muscle/{id} only returns 1 suggested exercise for 'calves' (library has just calf-raise) and 2 for 'core' instead of the spec'd 3 — main agent should broaden the exercise library or relax spec.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/body/muscle/calves", "issue": "suggested_exercises returns only 1 item (calf-raise) instead of spec'd 3 — EXERCISE_LIBRARY contains only one calves exercise. Either add 2 more (e.g., seated-calf-raise, single-leg-calf-raise) or document that ≤3 may be returned."},
+      {"endpoint": "GET /api/body/muscle/core", "issue": "Likely returns <3 because cable-crunch's 'Abs' muscle is not in MUSCLE_GROUP_MAP (only 'Core' is). Add 'Abs': 'core' to MUSCLE_GROUP_MAP or include compound lifts (squat/OHP/swing) as fallback suggestions."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "body", "issues": ["Console emits repeating 'Unknown event handler property onResponderGrant/Move/Release/...' warnings from BodyDiagram SVG — RN-web does not implement the touch responder system on raw SVG nodes. Functionally harmless (taps still register via Pressable wrappers) but pollutes console.", "Carry-over: 'shadow*' style props and 'props.pointerEvents' deprecation warnings still present (not new)."]}
+    ],
+    "react_native_issues": [
+      {"component": "react-native-keyboard-controller", "issue": "Still pinned at 1.18.6 vs Expo expected 1.18.5. Reference: /var/log/supervisor/expo.err.log (repeats every Metro start)."},
+      {"component": "StyleSheet shadow* props", "issue": "Deprecated shadow* props in use across components — should migrate to boxShadow for RN-web. Reference: console warnings on every screen render."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_body_intelligence.py",
+    "/app/backend/tests/test_apex_backend.py",
+    "/app/test_reports/pytest/pytest_body.xml"
+  ],
+  "action_items": [
+    "Backend: extend EXERCISE_LIBRARY (or MUSCLE_GROUP_MAP) so /body/muscle/calves and /body/muscle/core return 3 suggested_exercises — currently calves returns 1 and core likely returns 2 because 'Abs' is not mapped to 'core'.",
+    "Frontend: BodyDiagram SVG emits onResponder* unknown-handler warnings on web. Wrap touch logic in a Pressable parent (already done for taps) and ensure no responder props are spread onto raw SVG elements when Platform.OS === 'web'.",
+    "Carry-over: align react-native-keyboard-controller to 1.18.5 and migrate shadow* styles to boxShadow."
+  ],
+  "critical_code_review_comments": [
+    "server.py grew to 1512 lines — still a single module. After body endpoints, this really needs to be split into routers (auth, plan, workouts, coach, billing, body) before more features land.",
+    "/body/generate-focus-workout uses a `seen` set + nested for-loops to avoid duplicate exercise_ids — good, fixes the carry-over React duplicate-key warning. Verified at backend.",
+    "/body/muscle/{id} suggestion loop breaks on first match per exercise then checks `if len(suggestions) >= 3`. For sparse groups (calves) this terminates early with fewer than 3. Consider falling back to compound exercises that hit the muscle as secondary, or expanding the library.",
+    "/_compute_muscle_activation re-fetches the full EXERCISE_LIBRARY linearly for every set logged — fine at <100 exercises, but build an in-memory dict {id: ex} at module load to keep complexity in check as the library grows."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_body_intelligence.py (new, 14 tests)",
+    "/app/test_reports/pytest/pytest_body.xml (new)",
+    "/app/test_reports/iteration_3.json (new)"
+  ],
+  "success_rate": {"backend": "100% (14/14 new body tests + iter-2 28/28 still green)", "frontend": "100% on every priority Body Intelligence testID (15/15 components + 9/9 group rows + modal + focus workout navigation)"},
+  "seed_data_creation": "Per-test demo users created via /api/auth/demo/login. One demo user onboarded via UI (build_muscle/intermediate/4x/barbell+dumbbell) to seed plan and test Body flow. One bench-press workout completed (6 sets) in pytest to verify activation thresholds. No manual cleanup required — all data scoped by user_id.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Body Intelligence backend + frontend feature is GREEN end-to-end. Regression suites: /app/backend/tests/test_apex_backend.py (28 iter-2 tests) and /app/backend/tests/test_body_intelligence.py (14 new). Onboarding testIDs (goal-*, exp-*, freq-*, equip-*, onboarding-next, onboarding-finish) and tab testIDs (tab-home/coach/body/progress/profile) are now PRESENT — the iter-2 frontend testing blocker is RESOLVED. Future flows can reach (tabs) reliably by: demo-signin-button → goal-build_muscle → onboarding-next → exp-intermediate → onboarding-next → freq-4 → onboarding-next → equip-barbell + equip-dumbbell → onboarding-next → onboarding-finish → tab-{body,home,coach,progress,profile}. Only outstanding minor issues: calves/core suggested_exercises<3 and SVG-responder console warnings on Body screen.",
+  "rca_of_issue": "Coach today-insight DuplicateKey 500 (iter-2 carry-over) — RCA: daily_insights collection has a unique index on (user_id, date_str); on the second call within the same day the insert raised DuplicateKeyError. Mitigation now confirmed: server returns 200 with the existing insight (verified by TestCarryoverFixes::test_today_insight_no_500_on_duplicate which calls the endpoint twice and asserts status 200 on the second call)."
+}

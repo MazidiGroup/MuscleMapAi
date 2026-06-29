@@ -176,7 +176,7 @@ export default function Workout() {
         {exercises.map((ex, idx) => {
           const done = (ex.sets?.length || 0) >= (ex.target_sets || 0);
           return (
-            <View key={ex.exercise_id} style={[styles.exCard, idx === activeIdx && styles.exCardActive]} testID={`exercise-card-${idx}`}>
+            <View key={`${ex.exercise_id}-${idx}`} style={[styles.exCard, idx === activeIdx && styles.exCardActive]} testID={`exercise-card-${idx}`}>
               <Pressable onPress={() => setActiveIdx(idx)} style={styles.exHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.exName}>{ex.name}</Text>

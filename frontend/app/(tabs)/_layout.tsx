@@ -49,6 +49,16 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="body"
+        options={{
+          title: "Body",
+          tabBarButtonTestID: "tab-body",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "body" : "body-outline"} size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="progress"
         options={{
           title: "Progress",
