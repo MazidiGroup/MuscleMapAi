@@ -49,7 +49,7 @@ export default function ExploreScreen() {
       />
 
       {/* header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+      <View style={[styles.header, { paddingTop: insets.top + 8, pointerEvents: "box-none" }]}>
         <View>
           <Text style={styles.h1}>Explore Anatomy</Text>
           <Text style={styles.sub}>Tap a muscle to identify it · drag to rotate</Text>

@@ -35,13 +35,13 @@ export default function WorkoutScreen() {
     <View style={styles.root}>
       <AnatomyViewer mode="workout" primary={selected.primary} secondary={selected.secondary} />
 
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+      <View style={[styles.header, { paddingTop: insets.top + 8, pointerEvents: "box-none" }]}>
         <Text style={styles.h1}>Workout Mode</Text>
         <Text style={styles.sub}>See exactly which muscles fire</Text>
       </View>
 
       {/* legend */}
-      <View style={[styles.legend, { top: insets.top + 8 }]} pointerEvents="none">
+      <View style={[styles.legend, { top: insets.top + 8, pointerEvents: "none" }]}>
         <View style={styles.legendRow}>
           <View style={[styles.dot, { backgroundColor: T.primary }]} />
           <Text style={styles.legendText}>Primary</Text>

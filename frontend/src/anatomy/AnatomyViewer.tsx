@@ -191,7 +191,7 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
       </View>
 
       {/* control buttons */}
-      <View style={styles.controls} pointerEvents="box-none">
+      <View style={[styles.controls, { pointerEvents: "box-none" }]}>
         <TouchableOpacity style={styles.ctrlBtn} onPress={() => engineRef.current?.zoom(0.82)} testID="zoom-in-btn">
           <Ionicons name="add" size={22} color="#E6F0FF" />
         </TouchableOpacity>
@@ -211,7 +211,7 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
       </View>
 
       {!ready && !error && (
-        <View style={styles.overlay} pointerEvents="none">
+        <View style={[styles.overlay, { pointerEvents: "none" }]}>
           <ActivityIndicator color="#34C7FF" size="large" />
           <Text style={styles.overlayText}>Loading anatomy model…</Text>
         </View>
