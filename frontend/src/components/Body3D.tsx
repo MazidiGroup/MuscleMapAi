@@ -6,10 +6,10 @@ import { MuscleMap, MuscleStatus } from "./BodyDiagram";
 
 // Four pre-rendered photorealistic anatomy angles
 const ANATOMY: { key: string; angleDeg: number; src: any }[] = [
-  { key: "front", angleDeg: 0, src: require("../../assets/anatomy/front.png") },
-  { key: "tquarter", angleDeg: 45, src: require("../../assets/anatomy/tquarter.png") },
-  { key: "side", angleDeg: 90, src: require("../../assets/anatomy/side.png") },
-  { key: "back", angleDeg: 180, src: require("../../assets/anatomy/back.png") },
+  { key: "front", angleDeg: 0, src: require("../../assets/anatomy/front.jpg") },
+  { key: "tquarter", angleDeg: 45, src: require("../../assets/anatomy/tquarter.jpg") },
+  { key: "side", angleDeg: 90, src: require("../../assets/anatomy/side.jpg") },
+  { key: "back", angleDeg: 180, src: require("../../assets/anatomy/back.jpg") },
 ];
 
 const STATUS_COLOR: Record<MuscleStatus, string> = {
