@@ -18,6 +18,7 @@ import Svg, { Polyline, Line, Circle as SvgCircle, Defs, LinearGradient as SvgGr
 import { COLORS, RADIUS, SPACING } from "@/src/theme";
 import { apiGet, apiPost } from "@/src/api";
 import { BodyDiagram, MuscleMap, MuscleStatus } from "@/src/components/BodyDiagram";
+import { Body3D } from "@/src/components/Body3D";
 
 type Group = {
   id: string;
@@ -129,7 +130,7 @@ export default function BodyScreen() {
           />
           <View style={styles.bodyRow}>
             <View style={styles.bodyView} testID="body-diagram">
-              <BodyDiagram view={view} muscles={muscleMap} onPressMuscle={openMuscleDetail} size={220} />
+              <Body3D muscles={muscleMap} size={220} viewSnap={view} />
             </View>
             <View style={styles.viewToggle} testID="body-view-toggle">
               {(["front", "back", "side"] as const).map((v) => (
@@ -146,6 +147,7 @@ export default function BodyScreen() {
               ))}
             </View>
           </View>
+          <Text style={styles.dragHint} testID="drag-hint">↻ Drag to rotate · pinch to zoom</Text>
 
           {/* Overall balance */}
           <View style={styles.balanceWrap} testID="overall-balance">
@@ -426,6 +428,7 @@ const styles = StyleSheet.create({
   bodyCard: { padding: SPACING.lg, borderRadius: RADIUS.xl, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, overflow: "hidden" },
   bodyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   bodyView: { flex: 1, alignItems: "center" },
+  dragHint: { color: COLORS.textTertiary, fontSize: 11, textAlign: "center", marginTop: 6, fontWeight: "500", letterSpacing: 0.5 },
   viewToggle: { gap: 8, marginLeft: 8 },
   toggleBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceElevated, minWidth: 64, alignItems: "center" },
   toggleBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
