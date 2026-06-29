@@ -3,7 +3,7 @@ Apex AI - AI Gym Companion - Backend
 FastAPI + MongoDB + Claude Sonnet 4.5 + Stripe + Emergent Google Auth
 """
 from fastapi import FastAPI, APIRouter, HTTPException, Header, Request, Depends
-from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse, FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -1490,6 +1490,24 @@ async def restore_purchases(user=Depends(get_current_user)):
 @api_router.get("/")
 async def root():
     return {"app": "Apex AI", "ok": True}
+
+
+# ------------------ Anatomy Model ------------------
+STATIC_DIR = ROOT_DIR / "static"
+
+
+@api_router.get("/anatomy/model")
+async def anatomy_model():
+    """Serve the Ecorche anatomy GLB model (skeleton + muscles + morph targets)."""
+    path = STATIC_DIR / "models" / "ecorche.glb"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Model not found")
+    return FileResponse(
+        str(path),
+        media_type="model/gltf-binary",
+        filename="ecorche.glb",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 # ------------------ Indexes ------------------

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Apex AI",
+    "name": "Anatomy Trainer",
     "slug": "apex-ai",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -35,7 +35,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#000000"
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true

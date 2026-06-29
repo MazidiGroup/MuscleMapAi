@@ -101,3 +101,76 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+## user_problem_statement: |
+  Rebuild the app into a "Fitness Anatomy Trainer" — a mobile + web 3D skeletal & muscular
+  anatomy learning app using an imported Ecorche FBX model (converted to GLB). Features:
+  3D viewer (rotate/zoom/pan), tap-to-identify muscles, hierarchical anatomy explorer
+  (isolate/hide systems & regions), Shrunken Muscle View via morph targets, Workout Mode
+  (exercise -> highlighted primary/secondary muscles), Muscle Info reference DB. Replaces Apex AI.
+
+## backend:
+##   - task: "Serve GLB anatomy model"
+##     implemented: true
+##     working: "NA"
+##     file: "backend/server.py"
+##     priority: "high"
+##     needs_retesting: true
+##     status_history:
+##         -working: "NA"
+##         -agent: "main"
+##         -comment: "GET /api/anatomy/model serves static ecorche.glb (5.6MB). Verified 200 locally + via proxy."
+
+## frontend:
+##   - task: "3D Anatomy Viewer (load/render/rotate/zoom/reset)"
+##     implemented: true
+##     working: "NA"
+##     file: "src/anatomy/AnatomyViewer.tsx, src/anatomy/engine.ts"
+##     priority: "high"
+##     needs_retesting: true
+##   - task: "Explore: hierarchy explorer isolate + hide systems + Show Full Body"
+##     implemented: true
+##     working: "NA"
+##     file: "app/(tabs)/explore.tsx"
+##     priority: "high"
+##     needs_retesting: true
+##   - task: "Explore: tap muscle -> detail sheet"
+##     implemented: true
+##     working: "NA"
+##     file: "src/anatomy/MuscleSheet.tsx"
+##     priority: "high"
+##     needs_retesting: true
+##   - task: "Shrunken Muscle View slider/buttons (morph targets)"
+##     implemented: true
+##     working: "NA"
+##     file: "src/anatomy/ScrubSlider.tsx, engine.ts"
+##     priority: "medium"
+##     needs_retesting: true
+##   - task: "Workout Mode: exercise selection highlights muscles"
+##     implemented: true
+##     working: "NA"
+##     file: "app/(tabs)/workout.tsx"
+##     priority: "high"
+##     needs_retesting: true
+##   - task: "Muscle Info: search + list + modal detail"
+##     implemented: true
+##     working: "NA"
+##     file: "app/(tabs)/info.tsx"
+##     priority: "medium"
+##     needs_retesting: true
+
+## metadata:
+##   created_by: "main_agent"
+##   version: "2.0"
+##   test_sequence: 0
+
+## test_plan:
+##   current_focus:
+##     - "3D Anatomy Viewer"
+##     - "Explore hierarchy explorer"
+##     - "Workout Mode highlight"
+##   test_all: true
+##   test_priority: "high_first"
+
+## agent_communication:
+##     -agent: "main"
+##     -message: "Rebuilt app as Fitness Anatomy Trainer. 3D model renders on web (verified via screenshot). Please test all anatomy flows on web. No auth/login. Tabs: Explore, Workout, Muscle Info, Settings."

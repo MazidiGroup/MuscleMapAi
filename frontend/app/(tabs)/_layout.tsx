@@ -1,86 +1,55 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Platform, View, StyleSheet } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Platform } from "react-native";
 
-import { COLORS } from "@/src/theme";
+import { T } from "@/src/anatomy/ui";
 
 export default function TabsLayout() {
-  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textTertiary,
-        tabBarShowLabel: true,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginBottom: Platform.OS === "ios" ? 0 : 4 },
+        tabBarActiveTintColor: T.accent,
+        tabBarInactiveTintColor: T.textFaint,
         tabBarStyle: {
-          backgroundColor: COLORS.bg,
-          borderTopColor: COLORS.border,
+          backgroundColor: "#0A0F18",
+          borderTopColor: T.border,
           borderTopWidth: 1,
-          height: 60 + insets.bottom,
-          paddingBottom: insets.bottom,
-          paddingTop: 8,
+          height: Platform.OS === "ios" ? 86 : 64,
+          paddingTop: 6,
+          paddingBottom: Platform.OS === "ios" ? 28 : 8,
         },
-        sceneStyle: { backgroundColor: COLORS.bg },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="explore"
         options={{
-          title: "Home",
-          tabBarButtonTestID: "tab-home",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={22} color={color} />
-          ),
+          title: "Explore",
+          tabBarIcon: ({ color, size }) => <Ionicons name="cube-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="coach"
+        name="workout"
         options={{
-          title: "Coach",
-          tabBarButtonTestID: "tab-coach",
-          tabBarIcon: ({ color, focused }) => (
-            <View>
-              <Ionicons name={focused ? "sparkles" : "sparkles-outline"} size={22} color={color} />
-            </View>
-          ),
+          title: "Workout",
+          tabBarIcon: ({ color, size }) => <Ionicons name="barbell-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="body"
+        name="info"
         options={{
-          title: "Body",
-          tabBarButtonTestID: "tab-body",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "body" : "body-outline"} size={22} color={color} />
-          ),
+          title: "Muscle Info",
+          tabBarIcon: ({ color, size }) => <Ionicons name="book-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="progress"
+        name="settings"
         options={{
-          title: "Progress",
-          tabBarButtonTestID: "tab-progress",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "stats-chart" : "stats-chart-outline"} size={22} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarButtonTestID: "tab-profile",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={22} color={color} />
-          ),
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => <Ionicons name="settings-outline" size={size} color={color} />,
         }}
       />
     </Tabs>
   );
 }
-
-// dummy export-free style to satisfy linter if needed
-const _ = StyleSheet.create({ x: {} });
