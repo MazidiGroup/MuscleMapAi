@@ -48,7 +48,7 @@ export async function apiPost<T = any>(path: string, body: any = {}): Promise<T>
 export async function streamCoach(
   message: string,
   onDelta: (delta: string) => void,
-  onDone: () => void,
+  onDone: (info?: { gated?: boolean }) => void,
   onError: (err: string) => void,
 ) {
   const headers = await authHeaders();
@@ -59,12 +59,14 @@ export async function streamCoach(
       body: JSON.stringify({ message }),
     });
     if (!res.ok || !res.body) {
-      onError(`stream failed: ${res.status}`);
+      onError('network');
       return;
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let gated = false;
+    let failed = false;
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const { done, value } = await reader.read();
@@ -79,15 +81,24 @@ export async function streamCoach(
         try {
           const obj = JSON.parse(json);
           if (obj.delta) onDelta(obj.delta);
-          if (obj.done) onDone();
+          if (obj.gated) gated = true;
+          if (obj.failed) failed = true;
+          if (obj.done) {
+            onDone({ gated });
+            return;
+          }
           if (obj.error) onError(obj.error);
         } catch {
           // ignore parse errors
         }
       }
     }
-    onDone();
+    if (failed) {
+      onError('failed');
+    } else {
+      onDone({ gated });
+    }
   } catch (e: any) {
-    onError(e?.message || 'stream error');
+    onError(e?.message || 'network');
   }
 }

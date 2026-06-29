@@ -12,11 +12,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import { COLORS, RADIUS, SPACING } from "@/src/theme";
 import { apiGet, streamCoach } from "@/src/api";
+import { useAuth } from "@/src/auth-context";
+import { ThinkingDots } from "@/src/components/ThinkingDots";
 
-type Msg = { role: "user" | "assistant"; content: string; id: string };
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  id: string;
+  status?: "streaming" | "done" | "failed" | "gated";
+};
 
 const SUGGESTIONS = [
   "I only have 30 minutes today",
@@ -26,10 +34,13 @@ const SUGGESTIONS = [
 ];
 
 export default function Coach() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const lastSent = useRef<string>("");
 
   const load = useCallback(async () => {
     try {
@@ -38,11 +49,12 @@ export default function Coach() {
         out.messages.map((m: any, i: number) => ({
           role: m.role,
           content: m.content,
-          id: `m_${i}`,
+          id: `m_${i}_${Date.now()}`,
+          status: "done",
         })),
       );
-    } catch (e) {
-      console.warn(e);
+    } catch {
+      // Silently fail - chat history will simply be empty
     }
   }, []);
 
@@ -54,8 +66,9 @@ export default function Coach() {
     const text = (overrideText ?? input).trim();
     if (!text || streaming) return;
     setInput("");
-    const userMsg: Msg = { role: "user", content: text, id: `u_${Date.now()}` };
-    const aiMsg: Msg = { role: "assistant", content: "", id: `a_${Date.now()}` };
+    lastSent.current = text;
+    const userMsg: Msg = { role: "user", content: text, id: `u_${Date.now()}`, status: "done" };
+    const aiMsg: Msg = { role: "assistant", content: "", id: `a_${Date.now()}`, status: "streaming" };
     setMessages((m) => [...m, userMsg, aiMsg]);
     setStreaming(true);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
@@ -67,20 +80,33 @@ export default function Coach() {
           const copy = [...m];
           const last = copy[copy.length - 1];
           if (last && last.role === "assistant") {
-            copy[copy.length - 1] = { ...last, content: last.content + delta };
+            copy[copy.length - 1] = { ...last, content: last.content + delta, status: "streaming" };
           }
           return copy;
         });
         scrollRef.current?.scrollToEnd({ animated: false });
       },
-      () => setStreaming(false),
-      (err) => {
-        console.warn("stream err", err);
+      (info) => {
         setMessages((m) => {
           const copy = [...m];
           const last = copy[copy.length - 1];
-          if (last && last.role === "assistant" && !last.content) {
-            copy[copy.length - 1] = { ...last, content: "Sorry, I had a hiccup. Try again." };
+          if (last && last.role === "assistant") {
+            copy[copy.length - 1] = { ...last, status: info?.gated ? "gated" : "done" };
+          }
+          return copy;
+        });
+        setStreaming(false);
+      },
+      () => {
+        setMessages((m) => {
+          const copy = [...m];
+          const last = copy[copy.length - 1];
+          if (last && last.role === "assistant") {
+            copy[copy.length - 1] = {
+              ...last,
+              content: last.content || "",
+              status: "failed",
+            };
           }
           return copy;
         });
@@ -89,12 +115,32 @@ export default function Coach() {
     );
   };
 
+  const retry = () => {
+    // Remove the last failed assistant message + retry the user message
+    setMessages((m) => {
+      const copy = [...m];
+      // Pop trailing failed assistant
+      if (copy[copy.length - 1]?.status === "failed") copy.pop();
+      // Pop the user message — we'll re-send it
+      const lastUser = copy[copy.length - 1];
+      if (lastUser?.role === "user") {
+        copy.pop();
+        setTimeout(() => send(lastUser.content), 100);
+      } else if (lastSent.current) {
+        setTimeout(() => send(lastSent.current), 100);
+      }
+      return copy;
+    });
+  };
+
   return (
     <SafeAreaView style={styles.root} edges={["top"]} testID="coach-screen">
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Apex</Text>
-          <Text style={styles.subtitle}>Your AI strength coach</Text>
+          <Text style={styles.subtitle}>
+            {user?.is_premium ? "Premium · Unlimited" : "Your AI strength coach"}
+          </Text>
         </View>
         <View style={styles.statusDot} />
       </View>
@@ -121,20 +167,56 @@ export default function Coach() {
             </View>
           )}
 
-          {messages.map((m) => (
-            <View
-              key={m.id}
-              testID={`message-${m.role}`}
-              style={[styles.bubble, m.role === "user" ? styles.bubbleUser : styles.bubbleAI]}
-            >
-              {m.role === "assistant" && (
-                <Text style={styles.aiLabel}>APEX</Text>
-              )}
-              <Text style={m.role === "user" ? styles.bubbleUserText : styles.bubbleAIText}>
-                {m.content || (streaming ? "Thinking…" : "")}
-              </Text>
-            </View>
-          ))}
+          {messages.map((m, i) => {
+            const isLast = i === messages.length - 1;
+            const showDots = m.role === "assistant" && m.status === "streaming" && !m.content;
+            const showFailed = m.role === "assistant" && m.status === "failed";
+            const showGated = m.role === "assistant" && m.status === "gated";
+            return (
+              <View
+                key={m.id}
+                testID={`message-${m.role}`}
+                style={[styles.bubble, m.role === "user" ? styles.bubbleUser : styles.bubbleAI]}
+              >
+                {m.role === "assistant" && <Text style={styles.aiLabel}>APEX</Text>}
+                {showDots ? (
+                  <ThinkingDots />
+                ) : showFailed ? (
+                  <View>
+                    <Text style={styles.errorText} testID="coach-error">
+                      I&apos;m having trouble reaching the coach right now. Please try again in a moment.
+                    </Text>
+                    {isLast && !streaming && (
+                      <Pressable
+                        testID="coach-retry-button"
+                        onPress={retry}
+                        style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.8 }]}
+                      >
+                        <Ionicons name="refresh" size={14} color={COLORS.primary} />
+                        <Text style={styles.retryText}>Retry</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                ) : showGated ? (
+                  <View>
+                    <Text style={m.role === "user" ? styles.bubbleUserText : styles.bubbleAIText}>{m.content}</Text>
+                    <Pressable
+                      testID="upgrade-from-gated"
+                      onPress={() => router.push("/subscribe")}
+                      style={[styles.retryBtn, { marginTop: 10 }]}
+                    >
+                      <Ionicons name="diamond" size={14} color={COLORS.primary} />
+                      <Text style={styles.retryText}>Upgrade to Premium</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Text style={m.role === "user" ? styles.bubbleUserText : styles.bubbleAIText}>
+                    {m.content}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
 
           {messages.length === 0 && (
             <View style={styles.suggestions}>
@@ -157,10 +239,11 @@ export default function Coach() {
             testID="coach-input"
             value={input}
             onChangeText={setInput}
-            placeholder="Ask anything…"
+            placeholder={streaming ? "Coach is thinking…" : "Ask anything…"}
             placeholderTextColor={COLORS.textTertiary}
             style={styles.input}
             multiline
+            editable={!streaming}
             onSubmitEditing={() => send()}
             blurOnSubmit
           />
@@ -187,7 +270,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: SPACING["2xl"], paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   title: { color: COLORS.text, fontSize: 24, fontWeight: "700", letterSpacing: -0.5 },
   subtitle: { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
-  statusDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.success, shadowColor: COLORS.success, shadowOpacity: 0.6, shadowRadius: 4 },
+  statusDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.success },
   scroll: { padding: SPACING["2xl"], paddingBottom: 100 },
   empty: { alignItems: "center", paddingVertical: SPACING["3xl"] },
   emptyIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(10,132,255,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 16 },
@@ -199,6 +282,9 @@ const styles = StyleSheet.create({
   bubbleUserText: { color: COLORS.text, fontSize: 15, lineHeight: 22 },
   bubbleAIText: { color: COLORS.text, fontSize: 15, lineHeight: 22 },
   aiLabel: { color: COLORS.primary, fontSize: 10, fontWeight: "700", letterSpacing: 2, marginBottom: 4 },
+  errorText: { color: COLORS.textSecondary, fontSize: 14, lineHeight: 21, fontStyle: "italic" },
+  retryBtn: { flexDirection: "row", gap: 6, alignItems: "center", marginTop: 10, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: "rgba(10,132,255,0.10)", borderRadius: 999, alignSelf: "flex-start", borderWidth: 1, borderColor: COLORS.primary },
+  retryText: { color: COLORS.primary, fontSize: 12, fontWeight: "700" },
   suggestions: { marginTop: SPACING.xl, gap: 10 },
   suggestionChip: { paddingVertical: 12, paddingHorizontal: 16, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 999 },
   suggestionText: { color: COLORS.text, fontSize: 14 },

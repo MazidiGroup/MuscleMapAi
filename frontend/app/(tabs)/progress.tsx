@@ -6,18 +6,24 @@ import { useFocusEffect } from "expo-router";
 
 import { COLORS, RADIUS, SPACING } from "@/src/theme";
 import { apiGet } from "@/src/api";
+import { useAuth } from "@/src/auth-context";
+import { WeeklyPlanner } from "@/src/components/WeeklyPlanner";
+import { PremiumLock } from "@/src/components/PremiumLock";
 
 export default function Progress() {
+  const { user } = useAuth();
   const [data, setData] = useState<any>({});
+  const [week, setWeek] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const p = await apiGet("/progress/summary");
+      const [p, w] = await Promise.all([apiGet("/progress/summary"), apiGet("/plan/week")]);
       setData(p);
-    } catch (e) {
-      console.warn(e);
+      setWeek(w.week || []);
+    } catch {
+      // ignore
     } finally {
       setLoading(false);
     }
@@ -48,6 +54,13 @@ export default function Progress() {
         <Text style={styles.title}>Progress</Text>
         <Text style={styles.sub}>Your strength journey, visualised.</Text>
 
+        {week.length > 0 && (
+          <View style={styles.weekBlock} testID="progress-weekly-planner">
+            <Text style={styles.sectionTitle}>This week</Text>
+            <WeeklyPlanner week={week} variant="expanded" />
+          </View>
+        )}
+
         <View style={styles.statsGrid}>
           <View style={styles.statCard} testID="progress-stat-total">
             <Text style={styles.statValue}>{data.total_workouts || 0}</Text>
@@ -67,7 +80,7 @@ export default function Progress() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Personal Records</Text>
+        <Text style={styles.sectionTitle}>Personal Records {!user?.is_premium && <Text style={styles.lockedDot}> · top 3 free</Text>}</Text>
         {(data.prs || []).length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="trophy-outline" size={28} color={COLORS.textTertiary} />
@@ -75,7 +88,7 @@ export default function Progress() {
           </View>
         ) : (
           <View style={styles.prList}>
-            {data.prs.map((pr: any, i: number) => (
+            {(user?.is_premium ? data.prs : data.prs.slice(0, 3)).map((pr: any, i: number) => (
               <View key={pr.exercise_id} style={styles.prRow} testID={`pr-row-${i}`}>
                 <View style={styles.prRank}>
                   <Text style={styles.prRankText}>{i + 1}</Text>
@@ -87,6 +100,11 @@ export default function Progress() {
                 <Text style={styles.prWeight}>{pr.weight}{data.units || "kg"}</Text>
               </View>
             ))}
+            {!user?.is_premium && data.prs.length > 3 && (
+              <View style={{ padding: 12 }}>
+                <PremiumLock title={`+${data.prs.length - 3} more PRs locked`} subtitle="Premium unlocks full PR dashboard" testID="pr-lock" />
+              </View>
+            )}
           </View>
         )}
 
@@ -155,4 +173,6 @@ const styles = StyleSheet.create({
   trendFoot: { flexDirection: "row", justifyContent: "space-between", marginTop: 10 },
   trendLatest: { color: COLORS.textSecondary, fontSize: 12 },
   trendChange: { color: COLORS.primary, fontSize: 12, fontWeight: "600" },
+  weekBlock: { marginBottom: SPACING.xl },
+  lockedDot: { color: COLORS.textTertiary, fontSize: 12, fontWeight: "400" },
 });

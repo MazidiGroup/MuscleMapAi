@@ -17,6 +17,8 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { COLORS, FONT, IMAGES, RADIUS, SPACING } from "@/src/theme";
 import { apiGet, apiPost } from "@/src/api";
 import { useAuth } from "@/src/auth-context";
+import { WeeklyPlanner } from "@/src/components/WeeklyPlanner";
+import { SkeletonHomeScreen } from "@/src/components/Skeleton";
 
 export default function Home() {
   const router = useRouter();
@@ -27,20 +29,23 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [progress, setProgress] = useState<any>({});
+  const [week, setWeek] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     try {
-      const [w, p] = await Promise.all([
+      const [w, p, wk] = await Promise.all([
         apiGet("/workouts/today"),
         apiGet("/progress/summary"),
+        apiGet("/plan/week"),
       ]);
       setWorkout(w.workout);
       setRestDay(!!w.rest_day);
       setProgress(p);
+      setWeek(wk.week || []);
       // fire-and-forget for insight
       apiPost("/coach/today-insight", {}).then((res: any) => setInsight(res.insight)).catch(() => {});
-    } catch (e) {
-      console.warn(e);
+    } catch {
+      // ignore
     } finally {
       setLoading(false);
     }
@@ -66,11 +71,7 @@ export default function Home() {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loader} testID="home-loading">
-        <ActivityIndicator color={COLORS.primary} />
-      </View>
-    );
+    return <SkeletonHomeScreen />;
   }
 
   return (
@@ -102,6 +103,19 @@ export default function Home() {
             {insight || "Loading your coaching insight…"}
           </Text>
         </View>
+
+        {/* Weekly planner */}
+        {week.length > 0 && (
+          <View style={styles.weekSection} testID="home-weekly-planner">
+            <View style={styles.weekHeader}>
+              <Text style={styles.sectionLabel}>THIS WEEK</Text>
+              <Pressable onPress={() => router.push("/(tabs)/progress")} testID="see-week-link">
+                <Text style={styles.linkText}>See all →</Text>
+              </Pressable>
+            </View>
+            <WeeklyPlanner week={week} />
+          </View>
+        )}
 
         {/* Today's workout card */}
         {workout && !restDay ? (
@@ -216,4 +230,8 @@ const styles = StyleSheet.create({
   coachSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
   reportRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 4 },
   reportText: { flex: 1, color: COLORS.text, fontSize: 14, fontWeight: "500" },
+  weekSection: { marginBottom: SPACING.xl },
+  weekHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  sectionLabel: { color: COLORS.textTertiary, fontSize: 11, fontWeight: "700", letterSpacing: 2 },
+  linkText: { color: COLORS.primary, fontSize: 12, fontWeight: "600" },
 });

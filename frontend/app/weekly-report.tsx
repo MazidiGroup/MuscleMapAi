@@ -6,25 +6,57 @@ import { useRouter } from "expo-router";
 
 import { COLORS, RADIUS, SPACING } from "@/src/theme";
 import { apiPost } from "@/src/api";
+import { useAuth } from "@/src/auth-context";
+import { PremiumLock } from "@/src/components/PremiumLock";
 
 export default function WeeklyReport() {
   const router = useRouter();
+  const { user } = useAuth();
   const [report, setReport] = useState<any>(null);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user?.is_premium) {
+      setLoading(false);
+      return;
+    }
     apiPost("/coach/weekly-report", {})
       .then((res: any) => {
         setReport(res.report);
         setCount(res.workouts_this_week);
       })
-      .catch(console.warn)
+      .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [user]);
 
   if (loading) {
     return <View style={styles.loader}><ActivityIndicator color={COLORS.primary} /><Text style={styles.loadText}>Apex is reviewing your week…</Text></View>;
+  }
+
+  if (!user?.is_premium) {
+    return (
+      <SafeAreaView style={styles.root} edges={["top", "bottom"]} testID="weekly-report-screen">
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} hitSlop={12} testID="report-back">
+            <Ionicons name="chevron-back" size={26} color={COLORS.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Weekly report</Text>
+          <View style={{ width: 26 }} />
+        </View>
+        <View style={styles.lockedContent}>
+          <View style={styles.lockedIconWrap}>
+            <Ionicons name="lock-closed" size={28} color={COLORS.primary} />
+          </View>
+          <Text style={styles.lockedTitle}>Weekly Coach Reports{"\n"}are a Premium feature</Text>
+          <Text style={styles.lockedSub}>
+            Apex analyses every session, highlights what you crushed,{"\n"}what's holding you back, and adapts next week's plan.
+          </Text>
+          <View style={{ height: 24, width: "100%" }} />
+          <PremiumLock title="Unlock Weekly Coach Report" subtitle="From £6.66/month with annual" testID="report-premium-lock" />
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -114,4 +146,8 @@ const styles = StyleSheet.create({
   bulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.textSecondary, marginTop: 8 },
   bulletText: { flex: 1, color: COLORS.text, fontSize: 14, lineHeight: 21 },
   bodyText: { color: COLORS.text, fontSize: 14, lineHeight: 21 },
+  lockedContent: { flex: 1, padding: SPACING["2xl"], alignItems: "center", justifyContent: "flex-start", paddingTop: SPACING["4xl"] },
+  lockedIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: "rgba(10,132,255,0.12)", borderWidth: 1, borderColor: COLORS.primary, alignItems: "center", justifyContent: "center", marginBottom: SPACING.xl },
+  lockedTitle: { color: COLORS.text, fontSize: 24, fontWeight: "700", textAlign: "center", lineHeight: 30 },
+  lockedSub: { color: COLORS.textSecondary, fontSize: 14, textAlign: "center", marginTop: 12, lineHeight: 21 },
 });

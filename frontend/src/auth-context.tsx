@@ -18,6 +18,9 @@ type User = {
   injuries?: string;
   units?: 'kg' | 'lbs';
   streak?: number;
+  is_premium?: boolean;
+  subscription_tier?: string | null;
+  subscription_interval?: 'month' | 'year' | null;
 };
 
 type AuthState = {

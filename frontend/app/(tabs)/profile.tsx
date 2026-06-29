@@ -80,6 +80,22 @@ export default function Profile() {
           <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
         </Pressable>
 
+        {isPremium && (
+          <Pressable
+            style={styles.row}
+            onPress={async () => {
+              const { apiPost } = await import("@/src/api");
+              await apiPost("/billing/cancel", {});
+              await load();
+            }}
+            testID="cancel-subscription-btn"
+          >
+            <Ionicons name="close-circle-outline" size={20} color={COLORS.warning} />
+            <Text style={[styles.rowText, { color: COLORS.warning }]}>Cancel subscription</Text>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
+          </Pressable>
+        )}
+
         <Pressable style={[styles.row, { borderBottomWidth: 0 }]} onPress={signOut} testID="signout-btn">
           <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
           <Text style={[styles.rowText, { color: COLORS.danger }]}>Sign out</Text>

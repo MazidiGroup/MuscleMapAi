@@ -1,0 +1,57 @@
+{
+  "summary": "Backend pytest 28/28 passed against EXPO_PUBLIC_BACKEND_URL — every priority-fix endpoint verified: /auth/me returns is_premium+subscription_tier+subscription_interval, /plan/week returns 7-day structure with status/exercise_count/workout_id and exactly one 'today' day, /billing/create-checkout accepts interval=month|year, /billing/dev/mark-premium stores interval and reflects in /auth/me, /billing/cancel marks status=canceled, /billing/restore returns restored=true|false correctly, /coach/chat streams Claude with delta+done OR emits {failed:true} on graceful failure (NEVER raw API error), free user is gated after 5 chats/day with {gated:true} marker, premium user never gated, conversation memory persists across calls via /coach/messages. Frontend mobile 390x844: Login screen renders, all 4 sign-in testIDs present and demo-signin-button triggers /api/auth/demo/login + auto-navigates to /onboarding (iter-1 'stuck on /login' for demo flow APPEARS PARTIALLY FIXED). Subscribe screen FULLY PASSES priority checks: testID interval-month + interval-year + restore-purchases present, 'SAVE 33%' badge visible, £79.99/yr default CTA, toggling to monthly switches CTA to £9.99/mo. Weekly Report screen as free user shows testID report-premium-lock with 'Weekly Coach Reports are a Premium feature' heading — confirmed. HOWEVER: I could not validate home WeeklyPlanner, Coach thinking-dots/error/header-premium-unlimited, Progress WeeklyPlanner/pr-lock, Profile cancel-subscription-btn, or weekly-report premium unlock from the UI — the agent could not pass through the 5-step UI onboarding because the onboarding option cards (Build muscle / Lose fat / Get stronger / Stay fit, then experience / frequency / equipment / injuries) have NO testIDs to programmatically select. Multiple attempts to bypass onboarding by writing the auth token directly to web storage failed because AuthContext.api.ts uses @react-native-async-storage which on web is backed by IndexedDB (JSON-serialised), so localStorage injection does not hydrate user state, and re-navigating to '/' redirects back to /login. This is essentially the iteration-1 login-navigation bug surfacing for any non-button-driven flow. Backend warnings observed once in logs: 'LiteLLM completion()' calls succeeded; no 'Budget exceeded' this run.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/billing/create-checkout", "issue": "Returns 400 with placeholder STRIPE_API_KEY (expected behaviour — frontend should fall back to /api/billing/dev/mark-premium). Real Stripe path not exercised in preview."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "app/onboarding.tsx", "issue": "Onboarding option cards (goal/experience/frequency/equipment/injuries) have no testIDs. Blocks automated onboarding completion and therefore blocks regression testing of all post-onboarding screens (home, coach, progress, profile, weekly-report unlock).", "testID": "onboarding-goal-*, onboarding-experience-*, onboarding-frequency-*, onboarding-equipment-*, onboarding-continue-button, onboarding-generate-plan-button", "priority": "HIGH"},
+      {"component": "app/(tabs)/_layout.tsx", "issue": "Tab bar still lacks testIDs tab-home / tab-coach / tab-progress / tab-profile (carry-over from iteration 1). Cannot reliably navigate between tabs in automated tests.", "testID": "tab-home, tab-coach, tab-progress, tab-profile", "priority": "HIGH"},
+      {"component": "app/index.tsx / root layout", "issue": "Visiting '/' with a valid auth token persisted in storage but NOT triggered via the demo button (e.g., on refresh, deep-link, or after a hot reload) redirects to /login. Root index does not appear to wait/re-evaluate auth hydration before redirecting. Confirmed by reload-after-store-token test: token is in IDB but page lands on /login. Same root-cause family as iteration-1 login bug.", "testID": "n/a", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Post-onboarding home/coach/progress/profile UI", "issue": "Could not be exercised in this iteration because UI onboarding lacks testIDs and storage-injection workaround fails (AsyncStorage on web uses IndexedDB, not localStorage). Backend equivalents verified via pytest, but UI integration (thinking-dots, coach-error, coach-retry-button, home-weekly-planner with TODAY highlighting, progress-weekly-planner, pr-lock, cancel-subscription-btn, weekly-report unlock for premium) remains UNVERIFIED through UI.", "affected_testIDs": ["home-weekly-planner", "progress-weekly-planner", "pr-lock", "thinking-dots", "coach-error", "coach-retry-button", "cancel-subscription-btn", "report-premium-lock (unlock case)", "skeleton-home"]}
+    ],
+    "design_issues": [
+      {"screen": "all", "issues": ["Console: 'shadow*' style props deprecated (use boxShadow) — same as iter 1", "Console: 'props.pointerEvents' deprecated (use style.pointerEvents) — same as iter 1"]}
+    ],
+    "react_native_issues": [
+      {"component": "react-native-keyboard-controller", "issue": "Installed 1.18.6, Expo expected 1.18.5 — drift warning emitted on every Metro start. Reference: /var/log/supervisor/expo.err.log"},
+      {"component": "styles", "issue": "Deprecated shadow* StyleSheet props still in use across components. Should migrate to boxShadow per RN web latest. Reference: console warnings on every screen render."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/test_apex_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "ADD testIDs to onboarding option cards in /app/frontend/app/onboarding.tsx so automated tests can complete onboarding: onboarding-goal-build_muscle, onboarding-goal-lose_fat, onboarding-goal-get_stronger, onboarding-goal-stay_fit, onboarding-exp-beginner/intermediate/advanced, onboarding-freq-{1..7}, onboarding-equip-{barbell,dumbbell,cable,...}, onboarding-injuries-input, onboarding-continue-button, onboarding-generate-plan-button.",
+    "ADD testIDs to (tabs)/_layout.tsx Tabs.Screen options: tab-home / tab-coach / tab-progress / tab-profile (still missing — carry-over from iter 1).",
+    "FIX root index/auth guard so that an authenticated user landing on '/' is routed to /(tabs) instead of /login when the auth token exists in storage (after waiting for AuthContext hydration). Add an isHydrating boolean and gate redirects until it's false.",
+    "All other priority fixes (retry logic, friendly errors, weekly planner backend, premium gating, annual price, AI memory) are verified working at the API layer. Main agent should self-verify the corresponding UI elements (thinking-dots animation, coach-error w/ retry, home-weekly-planner with TODAY highlighting, progress-weekly-planner, pr-lock, cancel-subscription-btn, weekly-report unlock) after adding the onboarding+tab testIDs above.",
+    "Migrate StyleSheet shadow* props to boxShadow to silence RN-web deprecation warnings (carry-over).",
+    "Align react-native-keyboard-controller to 1.18.5 to match Expo expectation (carry-over)."
+  ],
+  "critical_code_review_comments": [
+    "server.py now 1225 lines — still single module. Consider splitting routers (auth, plan, workouts, coach, billing) before adding more endpoints.",
+    "/coach/chat now correctly injects last-8-turns into the system prompt as a memory block. Good — addresses the iteration-1 'history loop was a no-op' finding.",
+    "Coach chat retry loop catches all exceptions but always emits the same {failed: true} marker without an error code/category — fine for UX (no raw errors), but consider logging a richer breadcrumb on the server for ops visibility (only the last_err string is logged today, with no attempt index in the final log line).",
+    "/billing/dev/mark-premium expects CreateCheckoutRequest payload — make sure the FE always sends a body with interval; otherwise this will 422.",
+    "/billing/cancel does not call Stripe; it only flips status to 'canceled' in our DB. Fine for sandbox but document that production must also call stripe.Subscription.modify(cancel_at_period_end=true)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_apex_backend.py (expanded from 19 -> 28 tests for new endpoints + memory + gating + interval)",
+    "/app/test_reports/pytest/pytest_results.xml (re-generated)",
+    "/app/test_reports/iteration_2.json (new)"
+  ],
+  "success_rate": {"backend": "100% (28/28)", "frontend": "~55% — Login + Subscribe + WeeklyReport(free-lock) verified; Home/Coach/Progress/Profile post-onboarding UNVERIFIED due to onboarding testID gap + auth-hydration redirect"},
+  "seed_data_creation": "Fresh demo users created per test run via /api/auth/demo/login (demo_*@apexai.app). One workout completed in pytest flow to seed PR/streak/coach-message data. One user marked premium via /api/billing/dev/mark-premium {interval:'year'} to verify cancel/restore paths. All data auto-scoped by user_id; no manual cleanup needed.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite at /app/backend/tests/test_apex_backend.py — 28 tests covering ALL priority fixes (auth/me premium fields, plan/week, coach chat retry/memory/gating, billing interval/cancel/restore). Reuse it. To unblock FRONTEND testing of post-onboarding screens: (1) ask main agent to add the testIDs listed in action_items, (2) add testIDs to (tabs)/_layout.tsx tabs, (3) confirm '/' redirect waits for auth hydration. Once those are in, this script flow will be unblocked: click [data-testid=demo-signin-button] -> select onboarding options via [data-testid=onboarding-goal-build_muscle] etc -> click [data-testid=onboarding-generate-plan-button] -> navigate via [data-testid=tab-*] to validate home-weekly-planner, day-card-*, thinking-dots, coach-error, progress-weekly-planner, pr-lock, cancel-subscription-btn, report-premium-lock unlock.",
+  "rca_of_issue": "ROOT CAUSE OF FRONTEND TEST BLOCKING: The Expo app uses @react-native-async-storage/async-storage on web, which is backed by IndexedDB and JSON-serialises values. Therefore the standard testing technique of localStorage.setItem('apex.session_token','sess_...') does not hydrate the AuthContext. Combined with the still-unfixed iteration-1 issue that the root index redirects to /login as soon as AuthContext.user is null (without first awaiting hydration), an automated test that bypasses onboarding via API can never reach the (tabs) screens. The mitigation is twofold and OWNED BY MAIN AGENT: (a) add testIDs to onboarding option cards so the script can complete the UI flow, and (b) make root-index guard wait for AuthContext.isHydrating to be false before redirecting. Independently confirmed: backend supplies everything correctly (28/28 pytest, including newly added tests for interval billing, retry/gating/memory, plan/week)."
+}

@@ -98,6 +98,7 @@ class ChatRequest(BaseModel):
 class CreateCheckoutRequest(BaseModel):
     success_url: Optional[str] = None
     cancel_url: Optional[str] = None
+    interval: Literal['month', 'year'] = 'month'
 
 
 # ------------------ Auth ------------------
@@ -187,6 +188,10 @@ async def create_google_session(payload: GoogleSessionRequest):
 async def me(user=Depends(get_current_user)):
     user["created_at"] = user["created_at"].isoformat() if isinstance(user.get("created_at"), datetime) else user.get("created_at")
     user["last_login"] = user["last_login"].isoformat() if isinstance(user.get("last_login"), datetime) else user.get("last_login")
+    sub = await db.subscriptions.find_one({"user_id": user["user_id"], "status": "active"}, {"_id": 0})
+    user["is_premium"] = sub is not None
+    user["subscription_tier"] = sub.get("tier") if sub else None
+    user["subscription_interval"] = sub.get("interval") if sub else None
     return user
 
 
@@ -467,6 +472,69 @@ async def active_plan(user=Depends(get_current_user)):
     if isinstance(plan.get("created_at"), datetime):
         plan["created_at"] = plan["created_at"].isoformat()
     return {"plan": plan}
+
+
+@api_router.get("/plan/week")
+async def weekly_plan(user=Depends(get_current_user)):
+    """Returns a 7-day week (Mon..Sun) with status per day: today/completed/missed/upcoming/rest."""
+    plan = await db.plans.find_one({"user_id": user["user_id"], "active": True}, {"_id": 0})
+    if not plan:
+        return {"week": [], "today_index": today_day_index()}
+
+    today_dt = datetime.now(timezone.utc).date()
+    today_weekday = today_dt.weekday() + 1  # 1..7 (Mon=1)
+    # Find Monday of this week
+    monday = today_dt - timedelta(days=today_weekday - 1)
+
+    # Get all completed workouts for this week
+    week_start_dt = datetime(monday.year, monday.month, monday.day, tzinfo=timezone.utc)
+    week_end_dt = week_start_dt + timedelta(days=7)
+    workouts_cursor = db.workouts.find({
+        "user_id": user["user_id"],
+        "completed": True,
+        "completed_at": {"$gte": week_start_dt, "$lt": week_end_dt},
+    }, {"_id": 0})
+    completed_by_day: Dict[int, Any] = {}
+    async for w in workouts_cursor:
+        ca = w.get("completed_at")
+        if isinstance(ca, datetime):
+            d = ca.date()
+            day_num = (d - monday).days + 1  # 1..7
+            completed_by_day[day_num] = w
+
+    days = []
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    short_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    for i in range(7):
+        day_num = i + 1
+        plan_day = next((d for d in plan["days"] if d["day"] == day_num), None)
+        date_for_day = monday + timedelta(days=i)
+        is_rest = (plan_day or {}).get("rest", False)
+        completed = day_num in completed_by_day
+
+        if completed:
+            status = "completed"
+        elif day_num == today_weekday:
+            status = "today"
+        elif day_num < today_weekday:
+            status = "rest" if is_rest else "missed"
+        else:
+            status = "rest" if is_rest else "upcoming"
+
+        days.append({
+            "day": day_num,
+            "day_name": day_names[i],
+            "day_short": short_names[i],
+            "date": date_for_day.isoformat(),
+            "name": (plan_day or {}).get("name", "Rest"),
+            "muscle_focus": (plan_day or {}).get("muscle_focus", ""),
+            "rest": is_rest,
+            "status": status,
+            "exercise_count": len((plan_day or {}).get("exercises", [])),
+            "workout_id": completed_by_day.get(day_num, {}).get("workout_id"),
+        })
+
+    return {"week": days, "today_index": today_weekday, "week_starting": monday.isoformat()}
 
 
 # ------------------ Today's Workout ------------------
@@ -753,8 +821,25 @@ Keep responses tight (under 120 words usually). Never refuse fitness questions. 
 
 @api_router.post("/coach/chat")
 async def coach_chat_stream(payload: ChatRequest, user=Depends(get_current_user)):
-    """Stream Claude response token-by-token."""
-    session_id = f"coach_{user['user_id']}"
+    """Stream Claude response token-by-token. Includes retry logic and graceful failure."""
+    # Premium gating: free users get 5 chats per day
+    sub = await db.subscriptions.find_one({"user_id": user["user_id"], "status": "active"}, {"_id": 0})
+    is_premium = sub is not None
+    if not is_premium:
+        today = datetime.now(timezone.utc).date().isoformat()
+        count = await db.coach_messages.count_documents({
+            "user_id": user["user_id"],
+            "role": "user",
+            "created_at": {"$gte": datetime.fromisoformat(today).replace(tzinfo=timezone.utc)},
+        })
+        if count >= 5:
+            gated_msg = "You've used your 5 free coach chats today. Upgrade to Premium for unlimited AI coaching."
+            async def gated():
+                yield f"data: {json.dumps({'delta': gated_msg})}\n\n"
+                yield f"data: {json.dumps({'done': True, 'gated': True})}\n\n"
+            return StreamingResponse(gated(), media_type="text/event-stream")
+
+    session_id = f"coach_{user['user_id']}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
     system_msg = await build_coach_context(user)
 
     # Save user message
@@ -765,49 +850,60 @@ async def coach_chat_stream(payload: ChatRequest, user=Depends(get_current_user)
         "created_at": datetime.now(timezone.utc),
     })
 
-    # Build history for Claude (recent turns)
+    # Build conversation context block for system prompt (last 8 turns)
     history_cursor = db.coach_messages.find(
         {"user_id": user["user_id"]},
         {"_id": 0},
-    ).sort("created_at", -1).limit(20)
+    ).sort("created_at", -1).limit(16)
     history = []
     async for m in history_cursor:
         history.append(m)
     history.reverse()
+    convo_block = ""
+    for m in history[:-1][-8:]:  # last 8 turns, exclude current
+        role_label = "USER" if m["role"] == "user" else "COACH"
+        convo_block += f"\n{role_label}: {m['content']}"
+    if convo_block:
+        system_msg += f"\n\nRECENT CONVERSATION (memory):{convo_block}"
 
     async def event_generator():
         full_text = ""
-        try:
-            chat = LlmChat(
-                api_key=EMERGENT_LLM_KEY,
-                session_id=session_id,
-                system_message=system_msg,
-            ).with_model("anthropic", CLAUDE_MODEL)
+        last_err = None
+        for attempt in range(3):  # 1 initial + 2 retries
+            try:
+                chat = LlmChat(
+                    api_key=EMERGENT_LLM_KEY,
+                    session_id=f"{session_id}_a{attempt}",
+                    system_message=system_msg,
+                ).with_model("anthropic", CLAUDE_MODEL)
 
-            # Replay prior conversation context (skip last which is current user message we just stored)
-            for m in history[:-1]:
-                if m["role"] == "user":
-                    # We need to provide context but emergentintegrations LlmChat manages its own history per session.
-                    # Instead we just include a summary in system context for now and stream new message.
-                    pass
+                async for event in chat.stream_message(UserMessage(text=payload.message)):
+                    if isinstance(event, TextDelta):
+                        full_text += event.content
+                        yield f"data: {json.dumps({'delta': event.content})}\n\n"
+                    elif isinstance(event, StreamDone):
+                        break
 
-            async for event in chat.stream_message(UserMessage(text=payload.message)):
-                if isinstance(event, TextDelta):
-                    full_text += event.content
-                    yield f"data: {json.dumps({'delta': event.content})}\n\n"
-                elif isinstance(event, StreamDone):
-                    break
+                if full_text.strip():
+                    await db.coach_messages.insert_one({
+                        "user_id": user["user_id"],
+                        "role": "assistant",
+                        "content": full_text,
+                        "created_at": datetime.now(timezone.utc),
+                    })
+                    yield f"data: {json.dumps({'done': True})}\n\n"
+                    return
+                else:
+                    last_err = "empty response"
+            except Exception as e:
+                last_err = str(e)
+                logger.warning(f"coach chat attempt {attempt + 1} failed: {e}")
+                full_text = ""  # reset for retry
+                await asyncio.sleep(0.4 * (attempt + 1))
 
-            await db.coach_messages.insert_one({
-                "user_id": user["user_id"],
-                "role": "assistant",
-                "content": full_text,
-                "created_at": datetime.now(timezone.utc),
-            })
-            yield f"data: {json.dumps({'done': True})}\n\n"
-        except Exception as e:
-            logger.exception("coach chat error")
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        # All retries failed - signal failure (frontend will show friendly message + retry)
+        logger.error(f"coach chat all retries failed for user {user['user_id']}: {last_err}")
+        yield f"data: {json.dumps({'failed': True})}\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -947,6 +1043,9 @@ async def create_checkout(payload: CreateCheckoutRequest, user=Depends(get_curre
     success_url = payload.success_url or f"{PUBLIC_WEB_APP_URL}/api/billing/redirect/success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = payload.cancel_url or f"{PUBLIC_WEB_APP_URL}/api/billing/redirect/cancel"
 
+    unit_amount = 999 if payload.interval == 'month' else 7999  # £9.99 monthly or £79.99 annually
+    product_name = "Apex AI Premium (Monthly)" if payload.interval == 'month' else "Apex AI Premium (Annual)"
+
     try:
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -955,16 +1054,16 @@ async def create_checkout(payload: CreateCheckoutRequest, user=Depends(get_curre
             line_items=[{
                 "price_data": {
                     "currency": "gbp",
-                    "unit_amount": 999,
-                    "recurring": {"interval": "month"},
+                    "unit_amount": unit_amount,
+                    "recurring": {"interval": payload.interval},
                     "product_data": {
-                        "name": "Apex AI Premium",
+                        "name": product_name,
                         "description": "Unlimited AI coaching, adaptive workouts, recovery insights.",
                     },
                 },
                 "quantity": 1,
             }],
-            metadata={"app_user_id": user["user_id"], "tier": "premium"},
+            metadata={"app_user_id": user["user_id"], "tier": "premium", "interval": payload.interval},
             success_url=success_url,
             cancel_url=cancel_url,
         )
@@ -1005,6 +1104,7 @@ async def stripe_webhook(request: Request):
                 "user_id": user_id,
                 "status": "active",
                 "tier": "premium",
+                "interval": metadata.get("interval", "month"),
                 "stripe_subscription_id": obj.get("subscription"),
                 "stripe_customer_id": obj.get("customer"),
                 "updated_at": datetime.now(timezone.utc),
@@ -1056,18 +1156,41 @@ async def billing_cancel():
 
 # Dev helper: mark current user premium (since we can't run real Stripe checkout in preview)
 @api_router.post("/billing/dev/mark-premium")
-async def mark_premium(user=Depends(get_current_user)):
+async def mark_premium(payload: CreateCheckoutRequest, user=Depends(get_current_user)):
     await db.subscriptions.update_one(
         {"user_id": user["user_id"]},
         {"$set": {
             "user_id": user["user_id"],
             "status": "active",
             "tier": "premium",
+            "interval": payload.interval,
             "updated_at": datetime.now(timezone.utc),
         }},
         upsert=True,
     )
-    return {"ok": True, "status": "active"}
+    return {"ok": True, "status": "active", "interval": payload.interval}
+
+
+@api_router.post("/billing/cancel")
+async def cancel_subscription(user=Depends(get_current_user)):
+    """Cancels (marks as canceled) the user's subscription. In production this would call Stripe to cancel at period end."""
+    await db.subscriptions.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "status": "canceled",
+            "updated_at": datetime.now(timezone.utc),
+        }},
+    )
+    return {"ok": True, "status": "canceled"}
+
+
+@api_router.post("/billing/restore")
+async def restore_purchases(user=Depends(get_current_user)):
+    """Re-check subscription status (placeholder for App Store / Google Play restore)."""
+    sub = await db.subscriptions.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    if sub and sub.get("status") == "active":
+        return {"restored": True, "status": "active", "tier": sub.get("tier")}
+    return {"restored": False, "status": "none"}
 
 
 # ------------------ Health ------------------
