@@ -1,4 +1,51 @@
-# Apex AI — V1.1 (Iteration 2)
+# Apex AI — V1.2 (Iteration 3 · Body Intelligence)
+
+## NEW: 3D Body Intelligence Tab
+
+The **core unique feature** of Apex AI — a beautiful anatomical body visualisation with AI-powered muscle balance tracking.
+
+### What was built
+- **New `/body` tab** in the bottom navigation (between Coach and Progress).
+- **Anatomical SVG body diagram** (`BodyDiagram.tsx`) — rendered as detailed muscle polygons (pecs, delts, biceps, triceps, abs, obliques, quads, hamstrings, glutes, calves, lats, traps, lower-back, forearms).
+- **Front / Back / Side view toggle** — three view buttons on the right.
+- **Colour-coded muscle status**: 🟢 Green (≥70% activation) · 🟡 Yellow (35-69%) · 🔴 Red (<35%).
+- **Overall Muscle Balance** percentage + progress bar + dynamic label ("Excellent / Good / Imbalanced / Get training").
+- **Muscle Groups panel** — all 9 canonical groups (Chest, Back, Shoulders, Arms, Core, Glutes, Quads, Hamstrings, Calves) with progress bars coloured by status.
+- **Muscle Balance Over Time chart** — 8-week SVG line graph with Improvement / Streak / Progress rating below.
+- **Last Workout Impact** — front + back body thumbnails highlighting primary (green) and secondary (yellow) muscles of the last logged workout.
+- **AI Muscle Focus Recommendation card** — lists lagging muscles with VERY LOW / LOW status tags + **"Generate focus workout" button** that creates a workout targeting weak areas and opens it immediately.
+- **Muscle Detail Modal** (bottom sheet) — opens when user taps a muscle on the body or in the list. Shows front+back mini diagrams of that muscle, activation %, ideal range (e.g. "9–14 sets/week"), AI coach tip, and 3 suggested exercises (tap → exercise detail).
+
+### Backend endpoints
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/body/intelligence` | Current muscle activation map + lagging + last workout impact |
+| `GET /api/body/trend` | 8-week balance score + improvement + streak + rating |
+| `GET /api/body/muscle/{group_id}` | Muscle detail (activation, ideal range, AI tip, 3 suggested exercises) |
+| `POST /api/body/generate-focus-workout` | Creates workout targeting lagging muscles + returns `workout_id` |
+
+### Activation math
+- Counts sets completed per muscle group (last 7 days) vs `IDEAL_WEEKLY_SETS` (industry hypertrophy targets: chest 14, back 16, shoulders 14, arms 12, core 10, glutes 12, quads 14, hamstrings 12, calves 10).
+- `activation_pct = min(100, sets_done / ideal * 100)`.
+- `balance_pct = avg(all groups) - (red_groups × 5)` (penalises imbalance).
+
+### Bug fixes in this iteration
+- Fixed `/coach/today-insight` 500 error on `DuplicateKeyError` (concurrent home loads).
+- Fixed React duplicate-key warning in workout screen when generated focus workout had duplicate exercises (now uses `${exercise_id}-${idx}`).
+- Added `Abs` → `core` muscle mapping.
+- Added `Seated Calf Raise` and `Single-Leg Calf Raise` to exercise library so every muscle group has ≥3 suggested exercises.
+
+### Testing
+- **Backend**: 14/14 new tests + 28/28 regression all PASS.
+- **Frontend**: All 13 priority test IDs verified on real preview (body-screen, body-legend, body-diagram, view-front/back/side, overall-balance, muscle-groups-panel, balance-chart, focus-recommendation, generate-focus-workout-btn, muscle-detail-modal, group-row-*).
+- End-to-end: demo login → onboarding → tab-body → tap muscle → modal opens → tap exercise → exercise detail. Generate focus workout creates new workout and navigates correctly.
+
+## Carry-over from earlier iterations
+(See V1.1 PRD for full details on AI Coach retry/memory, weekly planner, premium gating, monthly/annual subscription, etc.)
+
+## Mocked / sandbox notes
+- Stripe checkout still placeholder; UI falls back to `dev/mark-premium`.
+- Body diagram is rendered via SVG (industry-standard for fitness apps). True WebGL 3D would need a custom GLB anatomy model and offer no UX benefit at V1.
 
 ## What changed in this iteration
 This iteration delivered the 7 priority fixes from user feedback.
