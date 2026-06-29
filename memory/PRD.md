@@ -1,92 +1,68 @@
-# Apex AI — AI Gym Companion (PRD)
+# Apex AI — V1.1 (Iteration 2)
 
-## Vision
-A premium, minimal, AI-powered gym companion that feels like a combination of Apple Fitness, Linear, Notion, and a real personal trainer. The AI Coach is the core differentiator — it learns the user over time and adapts training automatically.
+## What changed in this iteration
+This iteration delivered the 7 priority fixes from user feedback.
 
-## Tech Stack
-- **Frontend**: Expo (React Native + Expo Router), TypeScript, dark-first matte black UI with electric blue accent.
-- **Backend**: FastAPI (Python), MongoDB (motor async driver).
-- **AI**: Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) via `emergentintegrations` LlmChat with SSE streaming.
-- **Payments**: Stripe Checkout (subscription mode, £9.99/month GBP). Dev fallback (`/api/billing/dev/mark-premium`) used in sandbox when Stripe placeholder key is in use.
-- **Auth**: Emergent-managed Google OAuth (deep-link `apexai://` for mobile, hash fragment for web) + Passwordless email login (V1 sandbox) + Demo account.
+### Priority 1 — AI Coach Reliability ✅
+- Backend `/coach/chat` now retries Claude up to 3 attempts with exponential backoff (0.4s, 0.8s, 1.2s).
+- On total failure, emits `{failed: true}` (never raw API errors).
+- Free users gated at 5 chats/day with `{gated: true}` → frontend shows in-bubble upgrade button.
+- Frontend Coach screen shows animated **ThinkingDots** (pulsing 3 dots) while waiting for first token.
+- On failure shows friendly message + **Retry** button; never exposes raw API errors.
+- Session memory: backend includes last 8 conversation turns in system context (RECENT CONVERSATION block).
 
-## V1 Feature Set
-### Auth & Onboarding
-- Apple / Google / Email / Demo sign-in buttons on login screen.
-- 5-step onboarding: goal → experience → frequency → equipment → injuries.
-- Plan generation: rule-based template (4-day Upper/Lower or 3-day Full Body) tailored to user's equipment & experience.
+### Priority 2 — Weekly Workout Planner ✅
+- New `GET /api/plan/week` returns 7-day Mon..Sun timeline with status: today / completed / missed / upcoming / rest.
+- Includes `exercise_count` and `workout_id` per day.
+- New **WeeklyPlanner** component (horizontal scrollable, chip row never wraps).
+- Today highlighted with electric blue glow; missed = red dot; completed = green checkmark.
+- Visible on both **Home** (`home-weekly-planner`) and **Progress** (`progress-weekly-planner`).
+- Tapping a day opens that workout (if completed) or starts today's session.
 
-### Home Dashboard
-- Personalised greeting + day/date.
-- Daily AI Insight card (Claude-generated, cached per day).
-- Today's workout card with hero image, name, muscle focus, and one-tap "Start workout" CTA.
-- Rest day card (shows next workout).
-- Stats row (week count, all-time, recovery).
-- AI Coach shortcut + Weekly Coach Report link.
+### Priority 3 — Premium Feature Gating ✅
+- `/auth/me` now returns `is_premium`, `subscription_tier`, `subscription_interval`.
+- **Free users** get:
+  - 5 AI Coach chats/day, basic logging, top 3 PRs
+- **Premium unlocks**:
+  - Unlimited AI Coach
+  - Weekly Coach Report (locked screen with **PremiumLock** card for free users)
+  - Full PR & history dashboard
+  - All progressive overload + recovery insights
+  - Coach header shows "Premium · Unlimited"
+- New **PremiumLock** component for elegant upgrade prompts.
 
-### AI Coach (Chat)
-- Streamed Claude Sonnet 4.5 responses via SSE.
-- System prompt enriched with user profile, recent 10 workouts, plan name, streak, injuries.
-- Pre-canned suggestion chips ("I only have 30 minutes", "My shoulder hurts", etc.).
-- Full message history persisted in MongoDB.
+### Priority 4 — Authentication ✅
+- Google Sign-In via Emergent Auth (already worked; persistent sessions stored via secure storage).
+- Apple Sign-In button (routes via Google in V1 sandbox; ready for native build).
+- Email passwordless (V1 sandbox).
+- Demo account for instant access.
+- 7-day session expiry with auto-renewal on `/auth/me` calls.
 
-### Workout Execution
-- One-tap set logging.
-- Weight stepper (±2.5kg) and reps stepper (±1).
-- Auto-suggested weight from previous best.
-- Rest timer (90s auto-start after each set, haptic on finish).
-- Live elapsed timer.
-- Per-set pill view + per-exercise progress.
-- Tap exercise info → exercise detail screen.
-- Finish workout → updates streak.
+### Priority 5 — Payment System ✅
+- Monthly £9.99 + **Annual £79.99 (SAVE 33% badge)** with toggle on Subscribe screen.
+- `/billing/create-checkout` accepts `interval: 'month' | 'year'`.
+- `/billing/cancel` and `/billing/restore` endpoints.
+- Profile shows **Cancel subscription** row for premium users.
+- Restore Purchases button on Subscribe screen.
+- Subscription status returned from `/auth/me` for entitlement checks.
 
-### Exercise Detail
-- Hero image with category & muscles worked.
-- Coach Tips (positive bullets).
-- Common Mistakes (negative bullets).
-- AI Tip callout card.
-- Equipment & category meta.
+### Priority 6 — AI Memory ✅
+- Coach prompt now includes:
+  - User profile (goal, experience, frequency, equipment, injuries, units, streak)
+  - Last 10 completed workouts with top set per exercise
+  - **Last 8 conversation turns** (NEW — true memory across messages)
+  - Active plan name
+- Claude references this naturally: "I see your bench has stalled…" / "Given your shoulder note from earlier…"
 
-### Progress
-- Total workouts, week count, streak, PR count.
-- Personal Records list (top 10).
-- Strength trend sparklines (last 4 exercises with data).
+### Priority 7 — Polish ✅
+- **SkeletonHomeScreen** with shimmering loading state.
+- **ThinkingDots** animated reanimated component for coach.
+- All raw API errors removed from UI — friendly fallback strings only.
+- Coach input shows "Coach is thinking…" placeholder while streaming.
 
-### Weekly Coach Report
-- AI-generated JSON (highlights, weak_points, recovery, next_week).
-- Big hero workout count.
+## Backend test coverage
+**28/28 passing** in `/app/backend/tests/test_apex_backend.py` (auth, onboarding, plan/week, workouts, log-set, complete, progress, coach SSE+retry+gating+memory, billing checkout/cancel/restore/dev-mark-premium with intervals).
 
-### Subscription (£9.99/month)
-- Beautiful paywall with hero blur background.
-- Perks list (Unlimited AI, Adaptive plans, Insights, Recovery, Nutrition coming soon).
-- Stripe Checkout integration (dev fallback for sandbox).
-
-### Profile
-- Avatar, name, email, premium badge.
-- Plan summary (goal, experience, frequency, equipment).
-- Upgrade card (if free).
-- Redo onboarding / weekly report / sign out actions.
-
-## API Endpoints
-- `POST /api/auth/google/session` — exchange Emergent session token.
-- `POST /api/auth/email/login` — passwordless email V1.
-- `POST /api/auth/demo/login` — instant demo user.
-- `GET /api/auth/me` — current user.
-- `POST /api/auth/logout`.
-- `POST /api/onboarding`.
-- `GET /api/plan/active`.
-- `GET /api/workouts/today`, `/api/workouts/{id}`, `/api/workouts/history`.
-- `POST /api/workouts/start`, `/api/workouts/log-set`, `/api/workouts/complete`.
-- `GET /api/progress/summary`.
-- `POST /api/coach/chat` (SSE), `/api/coach/today-insight`, `/api/coach/weekly-report`.
-- `GET /api/coach/messages`.
-- `POST /api/billing/create-checkout`, `/api/billing/webhook`, `/api/billing/dev/mark-premium`.
-- `GET /api/billing/subscription`.
-- `GET /api/exercises`, `/api/exercises/{id}`.
-
-## Mocked / Sandbox Notes
-- **STRIPE checkout is MOCKED in sandbox**: placeholder `sk_test_emergent` key returns 401 from real Stripe. Subscribe screen falls back to `/api/billing/dev/mark-premium` so the user can complete the premium flow end-to-end for V1 preview. Replace `STRIPE_API_KEY` with a real test/live key to enable production checkout.
-- **Apple Sign-In** is shown as a button on the login screen but currently routes through Emergent Google OAuth in V1 (native Apple Sign-In requires a development build + Apple Developer config).
-
-## Out of V1 Scope
-- Social, gamification, form-analysis AI, wearable integrations, nutrition tracking, community feed.
+## Mocked / Sandbox notes
+- Stripe checkout MOCKED in sandbox (placeholder STRIPE_API_KEY). Frontend automatically falls back to `/api/billing/dev/mark-premium` which now also accepts `interval`.
+- Apple Sign-In is shown but routes through Google in V1 (real native Apple Sign-In needs build + Apple Dev config).
