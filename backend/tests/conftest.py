@@ -6,7 +6,7 @@ from pathlib import Path
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://smart-trainer-app-15.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://ai-coach-trainer-2.preview.emergentagent.com").rstrip("/")
 
 
 @pytest.fixture(scope="session")
