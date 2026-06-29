@@ -1,11 +1,13 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import { T, GROUP_COLORS } from "./ui";
 import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS } from "./groups";
 import { getExercise } from "./exercises";
+import { addRecent, isBookmarked, toggleBookmark } from "./storageLists";
 
 type Props = {
   nodeName: string;
@@ -14,11 +16,31 @@ type Props = {
 };
 
 export function MuscleSheet({ nodeName, onClose, onExercise }: Props) {
+  const router = useRouter();
   const info = getMuscleInfo(nodeName);
   const title = info?.label || prettyName(nodeName);
   const groupKey = info?.group;
   const groupLabel = groupKey ? GYM_GROUPS[groupKey]?.label : "Anatomical structure";
   const accent = groupKey ? GROUP_COLORS[groupKey] || T.accent : T.accent;
+  const [marked, setMarked] = useState(false);
+
+  useEffect(() => {
+    addRecent(nodeName);
+    isBookmarked(nodeName).then(setMarked);
+  }, [nodeName]);
+
+  const onToggleBookmark = async () => {
+    const next = await toggleBookmark(nodeName);
+    setMarked(next);
+  };
+
+  const askCoach = () => {
+    onClose?.();
+    router.push({
+      pathname: "/(tabs)/coach",
+      params: { q: `Tell me about the ${title} — its function and the best exercises to train it.` },
+    });
+  };
 
   return (
     <View style={styles.card} testID="muscle-detail">
@@ -32,6 +54,9 @@ export function MuscleSheet({ nodeName, onClose, onExercise }: Props) {
             {title}
           </Text>
         </View>
+        <TouchableOpacity onPress={onToggleBookmark} style={styles.closeBtn} testID="muscle-bookmark">
+          <Ionicons name={marked ? "bookmark" : "bookmark-outline"} size={22} color={marked ? T.accent : T.textDim} />
+        </TouchableOpacity>
         {onClose && (
           <TouchableOpacity onPress={onClose} style={styles.closeBtn} testID="muscle-detail-close">
             <Ionicons name="close" size={22} color={T.textDim} />
@@ -78,6 +103,11 @@ export function MuscleSheet({ nodeName, onClose, onExercise }: Props) {
             </Text>
           </View>
         )}
+
+        <TouchableOpacity style={styles.askBtn} onPress={askCoach} testID="muscle-ask-coach">
+          <Ionicons name="sparkles" size={16} color={T.bg} />
+          <Text style={styles.askBtnText}>Ask Atlas about this</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -130,6 +160,17 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   exChipText: { color: T.text, fontSize: 13, fontWeight: "600" },
+  askBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: T.accent,
+    borderRadius: 12,
+    paddingVertical: 13,
+    marginTop: 16,
+  },
+  askBtnText: { color: T.bg, fontSize: 14, fontWeight: "800" },
   fallback: { flexDirection: "row", gap: 8, alignItems: "flex-start", paddingVertical: 8 },
   fallbackText: { color: T.textDim, fontSize: 14, lineHeight: 20, flex: 1 },
 });

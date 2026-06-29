@@ -1492,6 +1492,84 @@ async def root():
     return {"app": "Apex AI", "ok": True}
 
 
+# ------------------ Anatomy AI Coach (GPT-5.5) ------------------
+ANATOMY_COACH_MODEL = "gpt-5.5"
+
+COACH_SYSTEM = """You are 'Atlas', an expert anatomy & strength-training coach inside a 3D anatomy app.
+
+You help users understand human musculoskeletal anatomy and how to train it. You are warm, clear and concise.
+
+Guidelines:
+- Explain anatomy in plain, conversational language; define jargon briefly.
+- For training questions, give practical, evidence-based advice (progressive overload, technique cues, rep ranges, recovery).
+- When relevant, mention which muscles a movement targets (origin/insertion/function) and antagonist pairs.
+- Keep answers tight: usually 3-6 short sentences or a short bullet list. Avoid filler.
+- Never give medical diagnoses; for pain/injury suggest seeing a professional.
+- Stay on anatomy/fitness topics; politely redirect if asked something unrelated."""
+
+
+class CoachMsg(BaseModel):
+    role: str
+    content: str
+
+
+class CoachAskRequest(BaseModel):
+    message: str
+    history: Optional[List[CoachMsg]] = []
+    context: Optional[str] = None
+
+
+@api_router.post("/coach/ask")
+async def coach_ask(payload: CoachAskRequest):
+    """Streaming anatomy/fitness coach powered by GPT-5.5 via the Emergent key."""
+    system_msg = COACH_SYSTEM
+    if payload.context:
+        system_msg += f"\n\nCURRENT CONTEXT: The user is currently looking at: {payload.context}. Tailor your answer to this if relevant."
+
+    # Replay recent conversation as memory in the system prompt (last 8 turns).
+    history = payload.history or []
+    if history:
+        convo = ""
+        for m in history[-8:]:
+            label = "USER" if m.role == "user" else "COACH"
+            convo += f"\n{label}: {m.content}"
+        system_msg += f"\n\nRECENT CONVERSATION (memory):{convo}"
+
+    async def event_generator():
+        full = ""
+        last_err = None
+        for attempt in range(2):
+            try:
+                chat = LlmChat(
+                    api_key=EMERGENT_LLM_KEY,
+                    session_id=f"atlas_{uuid.uuid4().hex[:10]}",
+                    system_message=system_msg,
+                ).with_model("openai", ANATOMY_COACH_MODEL)
+                async for event in chat.stream_message(UserMessage(text=payload.message)):
+                    if isinstance(event, TextDelta):
+                        full += event.content
+                        yield f"data: {json.dumps({'delta': event.content})}\n\n"
+                    elif isinstance(event, StreamDone):
+                        break
+                if full.strip():
+                    yield f"data: {json.dumps({'done': True})}\n\n"
+                    return
+                last_err = "empty response"
+            except Exception as e:
+                last_err = str(e)
+                logger.warning(f"coach ask attempt {attempt + 1} failed: {e}")
+                full = ""
+                await asyncio.sleep(0.4 * (attempt + 1))
+        logger.error(f"coach ask failed: {last_err}")
+        yield f"data: {json.dumps({'failed': True})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 # ------------------ Anatomy Model ------------------
 STATIC_DIR = ROOT_DIR / "static"
 

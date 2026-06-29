@@ -19,36 +19,28 @@ export default function TabsLayout() {
           paddingTop: 6,
           paddingBottom: Platform.OS === "ios" ? 28 : 8,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
       }}
     >
       <Tabs.Screen
         name="explore"
-        options={{
-          title: "Explore",
-          tabBarIcon: ({ color, size }) => <Ionicons name="cube-outline" size={size} color={color} />,
-        }}
+        options={{ title: "Explore", tabBarIcon: ({ color, size }) => <Ionicons name="cube-outline" size={size} color={color} /> }}
       />
       <Tabs.Screen
         name="workout"
-        options={{
-          title: "Workout",
-          tabBarIcon: ({ color, size }) => <Ionicons name="barbell-outline" size={size} color={color} />,
-        }}
+        options={{ title: "Workout", tabBarIcon: ({ color, size }) => <Ionicons name="barbell-outline" size={size} color={color} /> }}
       />
       <Tabs.Screen
-        name="info"
-        options={{
-          title: "Muscle Info",
-          tabBarIcon: ({ color, size }) => <Ionicons name="book-outline" size={size} color={color} />,
-        }}
+        name="learn"
+        options={{ title: "Learn", tabBarIcon: ({ color, size }) => <Ionicons name="school-outline" size={size} color={color} /> }}
       />
       <Tabs.Screen
-        name="settings"
-        options={{
-          title: "Settings",
-          tabBarIcon: ({ color, size }) => <Ionicons name="settings-outline" size={size} color={color} />,
-        }}
+        name="coach"
+        options={{ title: "Coach", tabBarIcon: ({ color, size }) => <Ionicons name="sparkles-outline" size={size} color={color} /> }}
+      />
+      <Tabs.Screen
+        name="library"
+        options={{ title: "Library", tabBarIcon: ({ color, size }) => <Ionicons name="library-outline" size={size} color={color} /> }}
       />
     </Tabs>
   );
