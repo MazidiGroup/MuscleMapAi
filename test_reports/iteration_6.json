@@ -1,0 +1,35 @@
+{
+  "summary": "Frontend-only iteration: redesigned draggable MuscleSheet + new Explore UX + library modal — all 8 requested flows verified end-to-end on mobile viewport 390x844. Explore (/explore): 3D anatomy-viewer loads (~10s), draggable bottom sheet shows Layers/Shrink View controls when collapsed. Tap centre of viewer selected the Latissimus Dorsi and the sheet AUTO-EXPANDED revealing muscle-detail, muscle-detail-title ('Latissimus Dorsi'), summary line ('The big back muscle that drives every pulling movement…'), Anatomy card with all four fields (Function/Origin/Insertion/Antagonist) — anatomy-toggle collapses (Function disappears) and re-expands correctly. Scrolling revealed Gym Guide (Frequency: 2–3 sessions / week, Recovery: 48–72 hours, Volume: 14–22 sets) with rep-range rows (Strength/Hypertrophy/Endurance), Common Mistakes list, Coach Tips list, Best Exercises (5 cards: Pull-Up/Lat Pulldown/Barbell Row/Seated Cable Row/Conventional Deadlift), AI Coach Insight card, and the muscle-ask-coach button. Tapping ex-expand-pull-up revealed 2 Primary bars (Latissimus Dorsi, Teres Major) and 3 Secondary bars (Biceps Brachii, Brachialis, Rhomboid Major). Tapping ex-card-pull-up navigated to /workout?ex=pull-up with the Pull-Up preselected and the back muscles highlighted in red — regression intact. AI Coach Insight: tapping ai-insight-btn (LLM budget exceeded) correctly fell back to the static coach tip ('Coach tip: train the latissimus dorsi about 2–3 sessions / week, aiming for 14–22 sets and allowing 48–72 hours of recovery. Prioritise 8–12 reps for growth and full range of motion.') — no crash. muscle-detail-close cleared selection and the sheet returned to the Layers/Shrink controls. Library (/library): library-search 'biceps' → lib-Biceps_Brachii opens the same redesigned MuscleSheet in a modal showing Arms tag, summary, Anatomy card (Flexes the elbow and supinates the forearm / Triceps Brachii antagonist), Gym Guide with arms-specific stats (2–3 sessions / week, 24–48 hours, 10–16 sets), and all exercise cards — scroll works smoothly without crashing. Modal close works. Workout (/workout) and Learn (/learn) regression tabs both render correctly (anatomy-viewer + lesson-pushing both present). No page errors thrown anywhere; only previously-known react-native-web cosmetic warnings (props.pointerEvents, shadow*, useNativeDriver) persist from iteration_5. Deprecated packages detected: none. SafeAreaView issues detected: none.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Header View (explore + workout)", "issue": "props.pointerEvents JSX prop is deprecated on react-native-web — use style={{ pointerEvents: '...' }} instead. Reference: /app/frontend/app/(tabs)/explore.tsx:62 and /app/frontend/app/(tabs)/workout.tsx (carried over from iteration_4/5, still unresolved — cosmetic warning only)."},
+      {"component": "DraggableSheet shadow", "issue": "Using shadowColor/shadowOffset/shadowOpacity/shadowRadius style props which are deprecated on react-native-web — use boxShadow instead. Reference: /app/frontend/src/anatomy/DraggableSheet.tsx:81-84 (cosmetic warning only, shadow still renders on native)."},
+      {"component": "DraggableSheet Animated.spring", "issue": "useNativeDriver=true on react-native-web falls back to JS-based animation (RCTAnimation missing). Animation still works smoothly on web preview; no fix needed for native builds. Reference: /app/frontend/src/anatomy/DraggableSheet.tsx:32."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_6.json"
+  ],
+  "action_items": [
+    "(Optional cosmetic) Migrate JSX prop pointerEvents → style.pointerEvents in explore.tsx and workout.tsx to silence the long-standing RN-web warning.",
+    "(Optional cosmetic) Migrate shadow* props → boxShadow in DraggableSheet.tsx for RN-web parity.",
+    "(Expected, not a bug) Top up the Emergent LLM key budget if you want real AI insights instead of the static fallback in the AI Coach Insight card — fallback path is verified and graceful."
+  ],
+  "critical_code_review_comments": [
+    "DraggableSheet uses PanResponder bound to the small handle zone only — good UX choice (prevents accidental drag while scrolling inner ScrollView). Note: the handle is ~5px tall in a 18px-padded zone which makes the actual touch target ~23px high; consider increasing handleZone paddingTop/paddingBottom to ensure the recommended 44px minimum touch target on the drag handle.",
+    "MuscleSheet.tsx is ~452 lines and contains 6 sub-components (Card/Field/Stat/RepRow/Stars/ExerciseCard/Bar/AiInsight). It is still readable but is approaching the 'split-into-modules' threshold — consider extracting AiInsight + ExerciseCard into separate files for maintainability.",
+    "AiInsight fallback text is derived only from getGuide(groupKey) — if groupKey is undefined for an obscure structure the fallback is a generic sentence. Acceptable, but could also derive from MUSCLE_SUMMARY for richer copy.",
+    "gymGuide.ts EXERCISE_META has good coverage of all current exercise IDs in exercises.ts; getExerciseMeta falls back to { Beginner, 4★, barbell } for any missing ID — safe default."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend-only request)", "frontend": "100% — every requested testID found and interactive; 8/8 listed flows pass including AI fallback and ex-card navigation"},
+  "seed_data_creation": "None required.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "DraggableSheet auto-expands on muscle select via useEffect → sheet.current.snapTo('expanded'). Tap roughly centre of viewer (fraction 0.5, 0.45) for reliable raycast; the first tap landed on Latissimus Dorsi (back of model) which is fine. AI Coach Insight is still in budget-exceeded mode so the static fallback path is the EXPECTED behaviour — do NOT mark it as a bug. EXPO_PUBLIC_BACKEND_URL = https://ai-coach-trainer-2.preview.emergentagent.com.",
+  "rca_of_issue": "N/A — no failing flows."
+}
