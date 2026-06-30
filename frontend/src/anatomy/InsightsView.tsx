@@ -32,7 +32,7 @@ export function InsightsView() {
 
   return (
     <View style={styles.full}>
-      <View style={{ height: "36%" }}>
+      <View style={{ height: "36%", paddingTop: insets.top + 52 }}>
         <AnatomyViewer mode="recovery" recovery={recovery.colorMap} />
       </View>
 
