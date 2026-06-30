@@ -54,3 +54,12 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 - Coaching data in `src/anatomy/gymGuide.ts` (per-group guide, mistakes, tips, muscle summaries, exercise meta).
 - AI Insight calls GPT-5.5 (`/api/coach/ask`) with a graceful static fallback (currently used because the Emergent key budget is capped).
 - Tested: iteration_6.json — 8/8 flows pass.
+
+## V1.2 — Workout Tracker + button fix (iteration 7)
+- BUG FIX: 3D viewer zoom +/-/reset buttons were under the status bar (top "+" untappable). Now offset by safe-area inset (top: insets.top+64) in AnatomyViewer — tappable on Explore & Workout.
+- Workout tab rebuilt into a tracker: 3 segments — **Exercises** (3D + draggable sheet + category chips All/Push/Pull/Legs/Core/Upper/Lower + exercise list), **Session** (set logging: weight/reps, add/duplicate/delete, mark done, rest timer 30/60/90/120 with pause/skip, live duration + stats bar, finish), **History** (list, reopen).
+- `app/exercise/[id].tsx` exercise detail (3D highlight + instructions + Start Workout).
+- `app/summary.tsx` post-workout summary (stats, PR badges, 3D muscle-activation % bars).
+- `src/anatomy/workoutStore.tsx` (Context + AsyncStorage persistence for history, PRs, rest pref), `RestTimer.tsx`. WorkoutProvider wraps the app in `_layout.tsx`.
+- Tested iteration_7.json: 7/7 flows pass, bug fix confirmed.
+- DEFERRED (not yet built): calendar view, search/advanced filters in history, analytics charts (volume/1RM progression), muscle recovery heatmap (green/orange/red), weekly muscle-activation dashboard. RPE/duration/distance fields for cardio.
