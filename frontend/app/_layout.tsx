@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
+import { WorkoutProvider } from "@/src/anatomy/workoutStore";
 
 LogBox.ignoreAllLogs(true);
 SplashScreen.preventAutoHideAsync();
@@ -23,13 +24,15 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#070A0F" }}>
       <SafeAreaProvider>
         <StatusBar barStyle="light-content" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: "#070A0F" },
-            animation: "fade",
-          }}
-        />
+        <WorkoutProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: "#070A0F" },
+              animation: "fade",
+            }}
+          />
+        </WorkoutProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

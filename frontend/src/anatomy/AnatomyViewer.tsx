@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { GLView } from "expo-gl";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AnatomyEngine } from "./engine";
 
@@ -54,6 +55,7 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
 ) {
   const engineRef = useRef<AnatomyEngine | null>(null);
   const [ready, setReady] = useState(false);
+  const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
   const layout = useRef({ w: 1, h: 1 });
   const gesture = useRef({ lastX: 0, lastY: 0, lastDist: 0, two: false, sx: 0, sy: 0, moved: 0 });
@@ -191,7 +193,7 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
       </View>
 
       {/* control buttons */}
-      <View style={[styles.controls, { pointerEvents: "box-none" }]}>
+      <View style={[styles.controls, { top: insets.top + 64, pointerEvents: "box-none" }]}>
         <TouchableOpacity style={styles.ctrlBtn} onPress={() => engineRef.current?.zoom(0.82)} testID="zoom-in-btn">
           <Ionicons name="add" size={22} color="#E6F0FF" />
         </TouchableOpacity>
@@ -229,7 +231,7 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  controls: { position: "absolute", right: 12, top: 12, gap: 8 },
+  controls: { position: "absolute", right: 12, gap: 10 },
   ctrlBtn: {
     width: 44,
     height: 44,
