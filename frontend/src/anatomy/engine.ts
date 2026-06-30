@@ -1,6 +1,20 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
+// React Native (Hermes) defines a global `navigator` object but leaves
+// `navigator.userAgent` undefined. three.js GLTFLoader does
+// `navigator.userAgent.match(...)` for browser detection, which throws
+// "cannot read property 'match' of undefined" on device. Provide a safe
+// string default so the loader's browser checks no-op. (No effect on web,
+// where userAgent is already a real string.)
+if (typeof navigator !== "undefined" && navigator.userAgent == null) {
+  try {
+    (navigator as any).userAgent = "react-native";
+  } catch {
+    // navigator.userAgent may be a read-only getter on some platforms; ignore.
+  }
+}
+
 // ---- colour palette (programmatic, no textures) ----
 const COL_BONE = new THREE.Color("#E8E1CE");
 const COL_MUSCLE = new THREE.Color("#B0473F");
