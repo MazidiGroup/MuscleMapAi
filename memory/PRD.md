@@ -47,3 +47,10 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 - Phase 5: AI Coach (exercise recommendations, muscle explanations) — would use Emergent LLM key.
 - Native mobile optimisation pass + TextDecoder polyfill for GLB parse on native.
 - Trim unused Apex AI code from server.py.
+
+## V1.1 — Premium Muscle Page + Draggable Sheet (iteration 6)
+- Explore muscle detail is now a DRAGGABLE bottom sheet (`src/anatomy/DraggableSheet.tsx`): swipe up to expand, down to collapse; auto-expands on muscle tap.
+- Redesigned `MuscleSheet.tsx` keeps ALL anatomy (Function/Origin/Insertion/Antagonist in a collapsible card) and adds: beginner Summary line, **Gym Guide** (purpose + Frequency/Recovery/Weekly-Volume stats + Strength/Hypertrophy/Endurance rep ranges), **Common Mistakes**, **Coach Tips**, redesigned **Exercise cards** (rating/difficulty/equipment) that expand to show **Muscle Contribution** bars, and an **AI Coach Insight** card.
+- Coaching data in `src/anatomy/gymGuide.ts` (per-group guide, mistakes, tips, muscle summaries, exercise meta).
+- AI Insight calls GPT-5.5 (`/api/coach/ask`) with a graceful static fallback (currently used because the Emergent key budget is capped).
+- Tested: iteration_6.json — 8/8 flows pass.

@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 16,
   },
-  handleZone: { paddingTop: 10, paddingBottom: 8, alignItems: "center" },
-  handle: { width: 44, height: 5, borderRadius: 3, backgroundColor: "rgba(120,160,220,0.35)" },
+  handleZone: { paddingTop: 14, paddingBottom: 16, alignItems: "center" },
+  handle: { width: 44, height: 5, borderRadius: 3, backgroundColor: "rgba(120,160,220,0.4)" },
   content: { flex: 1 },
 });
