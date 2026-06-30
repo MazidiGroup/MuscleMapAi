@@ -288,7 +288,11 @@ export default function WorkoutScreen() {
         </View>
       )}
 
-      <RestTimer visible={restVisible} initial={w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />    </View>
+      {/* INSIGHTS */}
+      {seg === "insights" && <InsightsView />}
+
+      <RestTimer visible={restVisible} initial={w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />
+    </View>
   );
 }
 

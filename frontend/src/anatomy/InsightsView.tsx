@@ -11,14 +11,6 @@ const STATE_COLOR = { red: "#FF4438", orange: "#FFB020", green: "#2FBF71" } as c
 const STATE_LABEL = { red: "Recently trained", orange: "Recovering", green: "Recovered" } as const;
 
 export function InsightsView() {
-  return (
-    <View style={{ flex: 1, backgroundColor: "#222", paddingTop: 100 }}>
-      <Text style={{ color: "#fff", fontSize: 20 }} testID="ins-debug">
-        STATIC INSIGHTS OK
-      </Text>
-    </View>
-  );
-  // eslint-disable-next-line no-unreachable
   const insets = useSafeAreaInsets();
   const { history } = useWorkout();
 
@@ -28,15 +20,6 @@ export function InsightsView() {
   const maxVol = Math.max(1, ...series.map((s) => s.volume));
   const maxSets = Math.max(1, ...weekly.list.map((g) => g.sets));
 
-  return (
-    <View style={[styles.full, { paddingTop: insets.top + 70 }]}>
-      <Text style={{ color: "#fff", fontSize: 18 }} testID="ins-debug">
-        DEBUG groups {recovery.groups.length} · sets {weekly.totalSets} · weeks {series.length} · hist {history.length}
-      </Text>
-    </View>
-  );
-
-  // eslint-disable-next-line no-unreachable
   if (history.length === 0) {
     return (
       <View style={[styles.full, styles.empty, { paddingTop: insets.top + 56 }]}>
@@ -50,9 +33,7 @@ export function InsightsView() {
   return (
     <View style={styles.full}>
       <View style={{ height: "36%" }}>
-        <View style={{ flex: 1, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: T.textDim }}>Recovery model placeholder</Text>
-        </View>
+        <AnatomyViewer mode="recovery" recovery={recovery.colorMap} />
       </View>
 
       <View style={styles.panel}>

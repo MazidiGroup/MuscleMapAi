@@ -1,0 +1,27 @@
+{
+  "summary": "Verified the Insights segment full flow on the Workout tab (mobile viewport 390x844). With NO history, Insights shows the 'No insights yet' empty state. Completed a full session: navigated Workout > Train, opened first exercise (bench-press), tapped Start Workout, filled weight (50) + reps (10), tapped done-bench-press-0, and tapped finish-workout — finish navigated correctly to /summary with PRs in URL. Returning to /workout?seg=insights renders the populated dashboard with no crash: AnatomyViewer (recovery mode) at top with a <canvas> element (Chest highlighted red as recently trained, other groups green), the red/orange/green legend, the 'MUSCLE RECOVERY' list with all 11 groups (rec-chest…rec-calves) each showing state + hours-left or Fresh, 'THIS WEEK' stats (1 Workout / 1 Set / 1 Group hit), per-group set bar (Chest = 1), 'Neglected this week' callout listing the other groups, and a 'WEEKLY VOLUME' 6-week chart showing 0.5k for 'This wk'. Dashboard scrolls and no red-screen/error elements appeared. The previously reported 'Unexpected text node' crash is no longer present.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Workout > Insights", "issues": ["The 3D recovery model area (top 36%) sits behind the segmented header — the model's head/top is partially overlapped by the floating seg pill (segWrap has position:absolute). Consider adding paddingTop = insets.top + 56 to the model container in InsightsView (similar to session/history segments) or lowering AnatomyViewer's camera target so the model isn't clipped under the header."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "OPTIONAL/MINOR: Adjust InsightsView layout so the 3D recovery model is not visually overlapped by the segmented header (e.g., wrap the AnatomyViewer container with paddingTop: insets.top + 56, or shrink/offset the model)."
+  ],
+  "critical_code_review_comments": [
+    "workout.tsx is 369 lines — fine for now but approaching the recommended split threshold; consider extracting the SESSION segment block into its own component if more functionality is added.",
+    "InsightsView relies on testIDs rec-<group> which were verified (11 found). Good coverage for testing."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "seed_data_creation": "Created 1 workout in local storage during the run (Barbell Bench Press, 1 set @ 50kg x 10 reps) to populate the Insights dashboard.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Insights flow is fully working end-to-end. The Train → Exercise detail → Start Workout → Session → Finish → Insights pipeline works and the dashboard renders the 3D recovery heatmap (canvas confirmed), recovery list, weekly stats, bars, and 6-week volume chart. Only minor visual nit: model overlaps with segment header — non-blocking.",
+  "rca_of_issue": "Previously the InsightsView wasn't being rendered and there was a stray whitespace text node between <RestTimer/> and </View> in workout.tsx — both fixes confirmed: workout.tsx now contains `{seg === 'insights' && <InsightsView />}` (line 292) and no stray text nodes between children. No new crashes observed."
+}
