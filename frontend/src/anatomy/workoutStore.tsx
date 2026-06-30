@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { storage } from "@/src/utils/storage";
 import { getExercise } from "./exercises";
 import { getMuscleInfo } from "./muscleData";
-import { prettyName } from "./groups";
+import { prettyName, GYM_GROUPS, GYM_GROUP_ORDER } from "./groups";
 
 export type LoggedSet = { id: string; weight: number; reps: number; done: boolean };
 export type SessionExercise = { exerciseId: string; sets: LoggedSet[]; notes: string };
@@ -251,4 +251,113 @@ export function useWorkout() {
 
 export function getWorkoutById(history: Workout[], id: string) {
   return history.find((w) => w.id === id);
+}
+
+// ---------------- Analytics ----------------
+export const RECOVERY_HOURS: Record<string, number> = {
+  chest: 60,
+  back: 60,
+  shoulders: 36,
+  arms: 36,
+  forearms: 24,
+  core: 24,
+  glutes: 60,
+  quads: 72,
+  hamstrings: 72,
+  adductors: 48,
+  calves: 36,
+};
+
+const REC_COLORS = { red: "#FF4438", orange: "#FFB020", green: "#2FBF71" };
+
+export type GroupRecovery = { group: string; label: string; state: "red" | "orange" | "green"; pct: number; hoursLeft: number; lastTs: number | null };
+
+export function computeRecovery(history: Workout[]): { colorMap: Record<string, string>; groups: GroupRecovery[] } {
+  const now = Date.now();
+  const lastByMuscle: Record<string, number> = {};
+  for (const wk of history) {
+    for (const e of wk.exercises) {
+      if (!e.sets.some((s) => s.done)) continue;
+      const ex = getExercise(e.exerciseId);
+      if (!ex) continue;
+      for (const m of [...ex.primary, ...ex.secondary]) {
+        lastByMuscle[m] = Math.max(lastByMuscle[m] || 0, wk.date);
+      }
+    }
+  }
+
+  const colorMap: Record<string, string> = {};
+  // per-group aggregation (most recently trained muscle drives the group)
+  const groupLast: Record<string, number> = {};
+  for (const [m, ts] of Object.entries(lastByMuscle)) {
+    const g = getMuscleInfo(m)?.group;
+    const recH = (g && RECOVERY_HOURS[g]) || 48;
+    const hoursSince = (now - ts) / 3.6e6;
+    const pct = Math.max(0, Math.min(1, hoursSince / recH));
+    const state = pct < 0.5 ? "red" : pct < 1 ? "orange" : "green";
+    colorMap[m] = REC_COLORS[state];
+    if (g) groupLast[g] = Math.max(groupLast[g] || 0, ts);
+  }
+
+  const groups: GroupRecovery[] = GYM_GROUP_ORDER.map((group) => {
+    const recH = RECOVERY_HOURS[group] || 48;
+    const lastTs = groupLast[group] || null;
+    if (!lastTs) return { group, label: GYM_GROUPS[group].label, state: "green", pct: 1, hoursLeft: 0, lastTs: null };
+    const hoursSince = (now - lastTs) / 3.6e6;
+    const pct = Math.max(0, Math.min(1, hoursSince / recH));
+    const state = pct < 0.5 ? "red" : pct < 1 ? "orange" : "green";
+    return { group, label: GYM_GROUPS[group].label, state, pct, hoursLeft: Math.max(0, Math.round(recH - hoursSince)), lastTs };
+  });
+
+  return { colorMap, groups };
+}
+
+export type GroupVolume = { group: string; label: string; sets: number };
+
+export function weeklySetsByGroup(history: Workout[]): { list: GroupVolume[]; neglected: string[]; totalSets: number; workouts: number } {
+  const cutoff = Date.now() - 7 * 24 * 3.6e6;
+  const counts: Record<string, number> = {};
+  let totalSets = 0;
+  let workouts = 0;
+  for (const wk of history) {
+    if (wk.date < cutoff) continue;
+    workouts++;
+    for (const e of wk.exercises) {
+      const done = e.sets.filter((s) => s.done).length;
+      if (done === 0) continue;
+      totalSets += done;
+      const ex = getExercise(e.exerciseId);
+      if (!ex) continue;
+      const groups = new Set<string>();
+      for (const m of ex.primary) {
+        const g = getMuscleInfo(m)?.group;
+        if (g) groups.add(g);
+      }
+      groups.forEach((g) => (counts[g] = (counts[g] || 0) + done));
+    }
+  }
+  const list = GYM_GROUP_ORDER.map((g) => ({ group: g, label: GYM_GROUPS[g].label, sets: counts[g] || 0 }));
+  const neglected = list.filter((g) => g.sets === 0).map((g) => g.label);
+  return { list, neglected, totalSets, workouts };
+}
+
+export type WeekPoint = { label: string; volume: number; workouts: number };
+
+export function weeklyVolumeSeries(history: Workout[], weeks = 6): WeekPoint[] {
+  const out: WeekPoint[] = [];
+  const now = Date.now();
+  for (let i = weeks - 1; i >= 0; i--) {
+    const end = now - i * 7 * 24 * 3.6e6;
+    const start = end - 7 * 24 * 3.6e6;
+    let volume = 0;
+    let workouts = 0;
+    for (const wk of history) {
+      if (wk.date > start && wk.date <= end) {
+        workouts++;
+        volume += workoutStats(wk.exercises).volume;
+      }
+    }
+    out.push({ label: i === 0 ? "This wk" : `${i}w`, volume, workouts });
+  }
+  return out;
 }

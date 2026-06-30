@@ -7,12 +7,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { AnatomyViewer } from "@/src/anatomy/AnatomyViewer";
 import { DraggableSheet } from "@/src/anatomy/DraggableSheet";
 import { RestTimer } from "@/src/anatomy/RestTimer";
+import { InsightsView } from "@/src/anatomy/InsightsView";
 import { EXERCISES, getExercise } from "@/src/anatomy/exercises";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { useWorkout, workoutStats } from "@/src/anatomy/workoutStore";
 import { T } from "@/src/anatomy/ui";
 
-type Seg = "exercises" | "session" | "history";
+type Seg = "exercises" | "session" | "history" | "insights";
 const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower"];
 
 function fmtClock(sec: number) {
@@ -37,7 +38,7 @@ export default function WorkoutScreen() {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    if (params.seg === "session" || params.seg === "history" || params.seg === "exercises") setSeg(params.seg);
+    if (["exercises", "session", "history", "insights"].includes(String(params.seg))) setSeg(params.seg as Seg);
   }, [params.seg]);
   useEffect(() => {
     if (params.ex) w.addExercise(String(params.ex));
@@ -92,10 +93,10 @@ export default function WorkoutScreen() {
       {/* segmented header */}
       <View style={[styles.segWrap, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
         <View style={styles.seg}>
-          {(["exercises", "session", "history"] as Seg[]).map((s) => (
+          {(["exercises", "session", "history", "insights"] as Seg[]).map((s) => (
             <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => setSeg(s)} testID={`seg-${s}`}>
               <Text style={[styles.segText, seg === s && styles.segTextActive]}>
-                {s === "exercises" ? "Exercises" : s === "session" ? "Session" : "History"}
+                {s === "exercises" ? "Train" : s === "session" ? "Session" : s === "history" ? "History" : "Insights"}
               </Text>
               {s === "session" && w.session && w.session.length > 0 && <View style={styles.dot} />}
             </TouchableOpacity>
@@ -287,8 +288,7 @@ export default function WorkoutScreen() {
         </View>
       )}
 
-      <RestTimer visible={restVisible} initial={w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />
-    </View>
+      <RestTimer visible={restVisible} initial={w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />    </View>
   );
 }
 

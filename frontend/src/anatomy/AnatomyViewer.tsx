@@ -33,9 +33,10 @@ export type ViewerHandle = {
 };
 
 type Props = {
-  mode?: "explore" | "workout";
+  mode?: "explore" | "workout" | "recovery";
   primary?: string[];
   secondary?: string[];
+  recovery?: Record<string, string>;
   shrink?: number;
   hidden?: string[];
   isolate?: string | null;
@@ -50,7 +51,7 @@ function dist(a: any, b: any) {
 }
 
 export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyViewer(
-  { mode = "explore", primary = [], secondary = [], shrink = 0, hidden = [], isolate = null, onSelect, onReady },
+  { mode = "explore", primary = [], secondary = [], recovery = {}, shrink = 0, hidden = [], isolate = null, onSelect, onReady },
   ref,
 ) {
   const engineRef = useRef<AnatomyEngine | null>(null);
@@ -75,6 +76,9 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
     if (ready) engineRef.current?.setHighlight(primary, secondary);
   }, [JSON.stringify(primary), JSON.stringify(secondary), ready]);
   useEffect(() => {
+    if (ready) engineRef.current?.setRecovery(recovery);
+  }, [JSON.stringify(recovery), ready]);
+  useEffect(() => {
     if (ready) engineRef.current?.setShrink(shrink);
   }, [shrink, ready]);
   useEffect(() => {
@@ -91,6 +95,7 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
         // apply initial state
         engine.setMode(mode);
         engine.setHighlight(primary, secondary);
+        engine.setRecovery(recovery);
         engine.setShrink(shrink);
         engine.setHidden(hidden);
         if (isolate) engine.focusContainer(isolate);

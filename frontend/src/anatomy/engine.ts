@@ -44,10 +44,11 @@ export class AnatomyEngine {
   private homeRadius = 4;
 
   // view state
-  private mode: "explore" | "workout" = "explore";
+  private mode: "explore" | "workout" | "recovery" = "explore";
   private selected: string | null = null;
   private primary = new Set<string>();
   private secondary = new Set<string>();
+  private recoveryMap: Record<string, string> = {};
   private hidden = new Set<string>(); // hidden container names
   private isolate: string | null = null; // container to isolate
 
@@ -247,8 +248,13 @@ export class AnatomyEngine {
   }
 
   // ---------- view state setters ----------
-  setMode(mode: "explore" | "workout") {
+  setMode(mode: "explore" | "workout" | "recovery") {
     this.mode = mode;
+    this.refresh();
+  }
+
+  setRecovery(map: Record<string, string>) {
+    this.recoveryMap = map || {};
     this.refresh();
   }
 
@@ -358,7 +364,16 @@ export class AnatomyEngine {
       mat.emissive.setRGB(0, 0, 0);
       mat.emissiveIntensity = 1;
 
-      if (this.mode === "workout") {
+      if (this.mode === "recovery") {
+        if (ud.isBone) {
+          mat.color.copy(COL_BONE).multiplyScalar(0.6);
+        } else {
+          const hex = this.recoveryMap[ud.unitName] || "#2FBF71"; // default = recovered (green)
+          mat.color.set(hex);
+          mat.emissive.set(hex);
+          mat.emissiveIntensity = 0.18;
+        }
+      } else if (this.mode === "workout") {
         if (this.primary.has(ud.unitName)) {
           mat.color.copy(COL_PRIMARY);
           mat.emissive.copy(COL_PRIMARY);
