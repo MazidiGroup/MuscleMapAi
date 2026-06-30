@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Pressable, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
 import { GYM_GROUPS, GYM_GROUP_ORDER, prettyName } from "@/src/anatomy/groups";
@@ -12,6 +12,7 @@ import { T, GROUP_COLORS } from "@/src/anatomy/ui";
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
@@ -111,6 +112,23 @@ export default function LibraryScreen() {
               structures, morph-target muscle atrophy, an AI coach and guided lessons.
             </Text>
             <Text style={styles.version}>v1.0 · Explore · Workout · Learn · Coach</Text>
+
+            <View style={styles.linkList}>
+              <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/privacy")} testID="link-privacy">
+                <Ionicons name="shield-checkmark-outline" size={18} color={T.accent} />
+                <Text style={styles.linkRowText}>Privacy Policy</Text>
+                <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.linkRow}
+                onPress={() => Linking.openURL("mailto:info@mazidigroup.com?subject=Anatomy%20Trainer%20Support")}
+                testID="link-support"
+              >
+                <Ionicons name="mail-outline" size={18} color={T.accent} />
+                <Text style={styles.linkRowText}>Contact Support</Text>
+                <Ionicons name="open-outline" size={16} color={T.textFaint} />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -162,6 +180,9 @@ const styles = StyleSheet.create({
   aboutTitle: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
   aboutText: { color: T.textDim, fontSize: 14, lineHeight: 21 },
   version: { color: T.textFaint, fontSize: 12, marginTop: 12 },
+  linkList: { marginTop: 16, gap: 8 },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13 },
+  linkRowText: { flex: 1, color: T.text, fontSize: 15, fontWeight: "600" },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
   modalBottom: { position: "absolute", left: 0, right: 0, bottom: 0 },
 });
