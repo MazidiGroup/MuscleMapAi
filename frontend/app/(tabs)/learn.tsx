@@ -6,8 +6,16 @@ import { useRouter } from "expo-router";
 
 import { LESSONS } from "@/src/anatomy/lessons";
 import { T } from "@/src/anatomy/ui";
+import { usePremium } from "@/src/premium/PremiumContext";
+import { Paywall } from "@/src/premium/Paywall";
 
 export default function LearnScreen() {
+  const { isPremium } = usePremium();
+  if (!isPremium) return <Paywall title="Unlock Learn" />;
+  return <LearnContent />;
+}
+
+function LearnContent() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 

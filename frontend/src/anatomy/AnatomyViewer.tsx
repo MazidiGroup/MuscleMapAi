@@ -14,17 +14,79 @@ import {
   Text,
   TouchableOpacity,
   LayoutChangeEvent,
+  Platform,
 } from "react-native";
 import { GLView } from "expo-gl";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Asset } from "expo-asset";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { AnatomyEngine } from "./engine";
 
+// Model bundled into the app so production (TestFlight) builds never depend on a
+// remote asset at runtime. Requires glb in metro assetExts.
+const MODEL_MODULE = require("../../assets/models/ecorche.glb");
+// Remote HTTPS fallback (served by backend) if the bundled asset can't be read.
 const MODEL_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL || ""}/api/anatomy/model`;
 
-// Cache the downloaded model buffer across mounts (so tab switches are instant).
+// Cache the model buffer across mounts (so tab switches are instant).
 let cachedBuffer: ArrayBuffer | null = null;
+
+function base64ToArrayBuffer(b64: string): ArrayBuffer {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const lookup = new Uint8Array(256);
+  for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
+  let len = b64.length;
+  if (b64[len - 1] === "=") len--;
+  if (b64[len - 1] === "=") len--;
+  const bytes = new Uint8Array((len * 3) >> 2);
+  let p = 0;
+  for (let i = 0; i < b64.length; i += 4) {
+    const e0 = lookup[b64.charCodeAt(i)];
+    const e1 = lookup[b64.charCodeAt(i + 1)];
+    const e2 = lookup[b64.charCodeAt(i + 2)];
+    const e3 = lookup[b64.charCodeAt(i + 3)];
+    bytes[p++] = (e0 << 2) | (e1 >> 4);
+    if (p < bytes.length) bytes[p++] = ((e1 & 15) << 4) | (e2 >> 2);
+    if (p < bytes.length) bytes[p++] = ((e2 & 3) << 6) | e3;
+  }
+  return bytes.buffer;
+}
+
+// Resolve the model bytes: bundled asset first, HTTPS remote as a fallback.
+async function getModelBuffer(): Promise<ArrayBuffer> {
+  if (cachedBuffer) return cachedBuffer.slice(0);
+
+  // 1) Bundled asset (offline-safe, no ATS/HTTP issues)
+  try {
+    const asset = Asset.fromModule(MODEL_MODULE);
+    await asset.downloadAsync();
+    const uri = asset.localUri || asset.uri;
+    if (uri) {
+      let buf: ArrayBuffer | undefined;
+      if (Platform.OS === "web" || uri.startsWith("http")) {
+        const res = await fetch(uri);
+        if (res.ok) buf = await res.arrayBuffer();
+      } else {
+        const b64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+        buf = base64ToArrayBuffer(b64);
+      }
+      if (buf && buf.byteLength > 0) {
+        cachedBuffer = buf;
+        return cachedBuffer.slice(0);
+      }
+    }
+  } catch {
+    // fall through to remote
+  }
+
+  // 2) Remote HTTPS fallback
+  const res = await fetch(MODEL_URL);
+  if (!res.ok) throw new Error(`Model fetch failed (${res.status})`);
+  cachedBuffer = await res.arrayBuffer();
+  return cachedBuffer.slice(0);
+}
 
 export type ViewerHandle = {
   resetView: () => void;
@@ -88,6 +150,20 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
     if (ready) engineRef.current?.focusContainer(isolate ?? null);
   }, [isolate, ready]);
 
+  const loadModelIntoEngine = useCallback(async () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    setError(null);
+    try {
+      const buffer = await getModelBuffer();
+      if (!buffer || buffer.byteLength === 0) throw new Error("Model data unavailable");
+      // clone the buffer because GLTFLoader may take ownership of it
+      await engine.loadModel(buffer.slice(0));
+    } catch (e: any) {
+      setError(String(e?.message || e) || "Could not load model");
+    }
+  }, []);
+
   const onContextCreate = useCallback(async (gl: any) => {
     const engine = new AnatomyEngine(gl, {
       onReady: () => {
@@ -104,18 +180,7 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
       onError: (msg) => setError(msg),
     });
     engineRef.current = engine;
-
-    try {
-      if (!cachedBuffer) {
-        const res = await fetch(MODEL_URL);
-        if (!res.ok) throw new Error(`Model fetch failed (${res.status})`);
-        cachedBuffer = await res.arrayBuffer();
-      }
-      // clone the buffer because GLTFLoader may take ownership of it
-      await engine.loadModel(cachedBuffer.slice(0));
-    } catch (e: any) {
-      setError(String(e?.message || e));
-    }
+    await loadModelIntoEngine();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -228,6 +293,10 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
           <Ionicons name="warning-outline" size={28} color="#FFB020" />
           <Text style={styles.overlayText}>Could not load model</Text>
           <Text style={styles.errText}>{error}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={loadModelIntoEngine} testID="model-retry">
+            <Ionicons name="refresh" size={16} color="#070A0F" />
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -256,4 +325,15 @@ const styles = StyleSheet.create({
   },
   overlayText: { color: "#C7D4E6", fontSize: 14, fontWeight: "600" },
   errText: { color: "#8A93A3", fontSize: 11, paddingHorizontal: 32, textAlign: "center" },
+  retryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: "#34C7FF",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  retryText: { color: "#070A0F", fontSize: 14, fontWeight: "800" },
 });

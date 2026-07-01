@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { WorkoutProvider } from "@/src/anatomy/workoutStore";
+import { PremiumProvider } from "@/src/premium/PremiumContext";
 
 LogBox.ignoreAllLogs(true);
 SplashScreen.preventAutoHideAsync();
@@ -25,13 +26,15 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar barStyle="light-content" />
         <WorkoutProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: "#070A0F" },
-              animation: "fade",
-            }}
-          />
+          <PremiumProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: "#070A0F" },
+                animation: "fade",
+              }}
+            />
+          </PremiumProvider>
         </WorkoutProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -16,6 +16,8 @@ import { useLocalSearchParams } from "expo-router";
 
 import { askCoach, CoachTurn } from "@/src/anatomy/coachApi";
 import { T } from "@/src/anatomy/ui";
+import { usePremium } from "@/src/premium/PremiumContext";
+import { Paywall } from "@/src/premium/Paywall";
 
 const SUGGESTIONS = [
   "What muscles should I train for a bigger bench press?",
@@ -25,6 +27,12 @@ const SUGGESTIONS = [
 ];
 
 export default function CoachScreen() {
+  const { isPremium } = usePremium();
+  if (!isPremium) return <Paywall title="Unlock AI Coach" />;
+  return <CoachContent />;
+}
+
+function CoachContent() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ q?: string }>();
   const [messages, setMessages] = useState<CoachTurn[]>([]);

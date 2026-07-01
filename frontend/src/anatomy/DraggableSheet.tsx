@@ -6,7 +6,13 @@ export type SheetState = "collapsed" | "expanded";
 export type DraggableSheetHandle = { snapTo: (s: SheetState) => void };
 
 type Props = {
+  /** Minimum visible height when collapsed — the sheet is always grabbable. */
   peekHeight: number;
+  /**
+   * Fully-expanded height of the sheet. This defines the TOP boundary:
+   * when expanded, the top of the sheet sits `maxHeight` above the bottom.
+   * Callers must size this so the sheet never rises above the header row.
+   */
   maxHeight: number;
   initial?: SheetState;
   onSnap?: (s: SheetState) => void;
@@ -17,7 +23,9 @@ export const DraggableSheet = forwardRef<DraggableSheetHandle, Props>(function D
   { peekHeight, maxHeight, initial = "collapsed", onSnap, children },
   ref,
 ) {
-  const range = Math.max(1, maxHeight - peekHeight); // travel distance
+  // translateY travels between 0 (fully expanded, top at maxHeight) and `range`
+  // (collapsed, only `peekHeight` visible). Free dragging rests anywhere in between.
+  const range = Math.max(1, maxHeight - peekHeight);
   const translateY = useRef(new Animated.Value(initial === "expanded" ? 0 : range)).current;
   const currentY = useRef(initial === "expanded" ? 0 : range);
   const startY = useRef(currentY.current);
@@ -26,6 +34,18 @@ export const DraggableSheet = forwardRef<DraggableSheetHandle, Props>(function D
     const id = translateY.addListener(({ value }) => (currentY.current = value));
     return () => translateY.removeListener(id);
   }, [translateY]);
+
+  const clamp = (v: number) => Math.min(range, Math.max(0, v));
+
+  // Settle smoothly to a freely-chosen resting position (with a little momentum).
+  const settleTo = (to: number) => {
+    Animated.spring(translateY, {
+      toValue: clamp(to),
+      useNativeDriver: true,
+      bounciness: 0,
+      speed: 18,
+    }).start();
+  };
 
   const animateTo = (state: SheetState) => {
     const to = state === "expanded" ? 0 : range;
@@ -38,21 +58,21 @@ export const DraggableSheet = forwardRef<DraggableSheetHandle, Props>(function D
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 3,
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 2,
       onPanResponderGrant: () => {
+        translateY.stopAnimation((v) => (startY.current = v));
         startY.current = currentY.current;
       },
       onPanResponderMove: (_e, g) => {
-        const v = Math.min(range, Math.max(0, startY.current + g.dy));
-        translateY.setValue(v);
+        translateY.setValue(clamp(startY.current + g.dy));
       },
       onPanResponderRelease: (_e, g) => {
-        const v = currentY.current;
-        let state: SheetState;
-        if (g.vy < -0.5) state = "expanded";
-        else if (g.vy > 0.5) state = "collapsed";
-        else state = v < range / 2 ? "expanded" : "collapsed";
-        animateTo(state);
+        // Free rest: keep wherever released, adding a small momentum from the fling.
+        const momentum = g.vy * 90; // px of carry based on release velocity
+        settleTo(currentY.current + momentum);
+      },
+      onPanResponderTerminate: () => {
+        settleTo(currentY.current);
       },
     }),
   ).current;

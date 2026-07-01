@@ -12,6 +12,8 @@ import { EXERCISES, getExercise } from "@/src/anatomy/exercises";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { useWorkout, workoutStats } from "@/src/anatomy/workoutStore";
 import { T } from "@/src/anatomy/ui";
+import { usePremium } from "@/src/premium/PremiumContext";
+import { Paywall } from "@/src/premium/Paywall";
 
 type Seg = "exercises" | "session" | "history" | "insights";
 const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower"];
@@ -31,6 +33,7 @@ export default function WorkoutScreen() {
   const { height } = useWindowDimensions();
   const params = useLocalSearchParams<{ seg?: string; ex?: string }>();
   const w = useWorkout();
+  const { isPremium } = usePremium();
 
   const [seg, setSeg] = useState<Seg>("exercises");
   const [cat, setCat] = useState("All");
@@ -98,6 +101,7 @@ export default function WorkoutScreen() {
               <Text style={[styles.segText, seg === s && styles.segTextActive]}>
                 {s === "exercises" ? "Train" : s === "session" ? "Session" : s === "history" ? "History" : "Insights"}
               </Text>
+              {s === "insights" && !isPremium && <Ionicons name="lock-closed" size={11} color={T.textFaint} style={{ marginLeft: 4 }} />}
               {s === "session" && w.session && w.session.length > 0 && <View style={styles.dot} />}
             </TouchableOpacity>
           ))}
@@ -289,7 +293,7 @@ export default function WorkoutScreen() {
       )}
 
       {/* INSIGHTS */}
-      {seg === "insights" && <InsightsView />}
+      {seg === "insights" && (isPremium ? <InsightsView /> : <Paywall title="Unlock Insights" headerOffset={40} />)}
 
       <RestTimer visible={restVisible} initial={w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />
     </View>

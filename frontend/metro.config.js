@@ -22,4 +22,7 @@ config.cacheStores = [
 // Reduce the number of workers to decrease resource usage
 config.maxWorkers = 2;
 
+// Bundle 3D model assets into production builds so they resolve via require()
+config.resolver.assetExts.push("glb", "gltf", "obj", "bin", "mtl");
+
 module.exports = config;

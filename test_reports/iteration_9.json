@@ -1,0 +1,35 @@
+{
+  "summary": "Verified the new Premium gating + Paywall + 3D model retry + Draggable sheet iteration on mobile viewport 390x844. With default isPremium=false: Learn tab renders <Paywall title='Unlock Learn'>, Coach tab renders <Paywall title='Unlock AI Coach'>, Workout>Insights segment renders <Paywall title='Unlock Insights'> (and NOT InsightsView — 'MUSCLE RECOVERY' text absent, confirming gating). Paywall UI shows title, three perks (Learn / AI Coach / Insights), price '£9.99 / month', and both paywall-upgrade and paywall-restore testIDs are present and clickable. Workout > Train / Session / History remain FREE — Session flow works: added Barbell Bench Press (via /exercise/[id] Start Workout), session view shows the exercise card with SET/KG/REPS row and testIDs w-bench-press-0, r-bench-press-0, done-bench-press-0 rendered. Explore tab loads the 3D anatomy model (canvas element present, NO 'Could not load model' overlay). Draggable sheet renders with the handle strip at the top of the sheet on both Explore and Workout>Train. Lock badges are rendered on Learn and Coach tab icons per code. Tab icons for Insights seg-button include lock-closed Ionicon as expected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Paywall (Alert.alert)", "issue": "Tapping 'Upgrade' or 'Restore Purchases' on web preview does NOT show a visible alert dialog. No 'Coming soon' / 'Restore Purchases' Alert text or window dialog was captured after clicks. This is a react-native-web limitation of Alert.alert and is expected to work on native (iOS/Android). No JS error thrown.", "testID": "paywall-upgrade / paywall-restore", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Tabs bar", "issues": ["Lock badge on Learn/Coach tab icons renders a Ionicons 'lock-closed' at size=9 inside a 15x15 accent-color circle. At mobile pixel density it visually reads as a small filled dot rather than a distinct lock silhouette. Consider size 8 white lock inside a slightly larger 16x16 badge with borderRadius: 8 for better legibility. Non-blocking."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "OPTIONAL: Consider slightly enlarging the tab-bar lock badge for legibility (size ~10 icon in a 16x16 badge) — currently reads as a dot on mobile web.",
+    "OPTIONAL/INFO: react-native-web's Alert.alert may not raise a visible dialog on web preview. Consider a cross-platform confirm (custom modal) if E1 wants Upgrade/Restore feedback visible on web too. Not required for TestFlight/native."
+  ],
+  "critical_code_review_comments": [
+    "PremiumContext.tsx (28 LOC): clean, single source of truth, hardcoded isPremium=false with TODO(payments) comment — good.",
+    "Paywall.tsx: uses correct testIDs (paywall-upgrade, paywall-restore), Ionicons, StyleSheet.create, no HTML tags. Alert import from RN — fine on native, best-effort on web.",
+    "(tabs)/learn.tsx and (tabs)/coach.tsx: gating is a simple `if (!isPremium) return <Paywall .../>;` at the top of default export — correct pattern; no leakage of real components.",
+    "workout.tsx line 296: `{seg === 'insights' && (isPremium ? <InsightsView /> : <Paywall title='Unlock Insights' headerOffset={40} />)}` — inline gate is correct and headerOffset accounts for the segmented header (good, addresses last iteration's overlap concern).",
+    "DraggableSheet.tsx: free-drag with momentum + clamped [0, range] translateY looks correct. Uses useNativeDriver:true (warns on web, native no-op on JS). Sheet cannot rise above `maxHeight` from the bottom, respects the peekHeight lower bound. Callers correctly pass a `maxHeight` computed from window height and insets so it does not cover the segmented header.",
+    "AnatomyViewer.tsx: bundled asset (Asset.fromModule) + HTTPS fallback + retry button (testID model-retry) is well structured. Buffer is cloned before feeding to GLTFLoader to avoid detachment. Consider guarding `process.env.EXPO_PUBLIC_BACKEND_URL` is set (currently silently falls back to '/api/anatomy/model' which resolves relative — fine here because .env sets EXPO_PUBLIC_BACKEND_URL).",
+    "workout.tsx is 372 lines — approaching threshold; extracting the SESSION segment into its own component would improve maintainability but not required now."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only test)", "frontend": "100% (all requested scenarios verified)"},
+  "seed_data_creation": "Added Barbell Bench Press to an active workout session in local storage during test. No backend seed data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Premium gating layer verified end-to-end on web preview at 390x844: Learn/Coach/Insights all show Paywall with default isPremium=false; Explore/Workout(Train/Session/History)/Library remain free. 3D model loads via bundled asset on web. Draggable sheet renders correctly with handle. Alert.alert on paywall buttons is a no-op on web (react-native-web limitation) — should be tested again on native TestFlight when payments are wired. Next testing agents can flip isPremium=true in PremiumContext to smoke-test Learn/Coach/Insights unlocked content.",
+  "rca_of_issue": "N/A — no new bugs. Only observation: Alert.alert visual on web preview is limited by react-native-web (not a code bug in this repo)."
+}
