@@ -11,7 +11,7 @@ function TabIcon({ name, color, size, locked }: { name: any; color: string; size
       <Ionicons name={name} size={size} color={color} />
       {locked && (
         <View style={styles.lockBadge}>
-          <Ionicons name="lock-closed" size={9} color="#070A0F" />
+          <Ionicons name="lock-closed" size={11} color="#070A0F" />
         </View>
       )}
     </View>
@@ -66,11 +66,11 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   lockBadge: {
     position: "absolute",
-    top: -4,
-    right: -8,
-    width: 15,
-    height: 15,
-    borderRadius: 8,
+    top: -5,
+    right: -9,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
     backgroundColor: T.accent,
     alignItems: "center",
     justifyContent: "center",
