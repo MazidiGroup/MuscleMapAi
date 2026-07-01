@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse, Fil
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+import certifi
 import os
 import json
 import uuid
@@ -37,7 +38,14 @@ stripe.api_key = STRIPE_API_KEY
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
 
 # ------------------ DB ------------------
-client = AsyncIOMotorClient(MONGO_URL)
+# For MongoDB Atlas (mongodb+srv / TLS) the deploy container needs an explicit,
+# up-to-date CA bundle or the TLS handshake fails with TLSV1_ALERT_INTERNAL_ERROR.
+# certifi provides one. These options are ignored for the local non-TLS sandbox Mongo.
+_mongo_kwargs: dict = {"serverSelectionTimeoutMS": 20000}
+if MONGO_URL.startswith("mongodb+srv://") or "mongodb.net" in MONGO_URL or "tls=true" in MONGO_URL.lower() or "ssl=true" in MONGO_URL.lower():
+    _mongo_kwargs["tls"] = True
+    _mongo_kwargs["tlsCAFile"] = certifi.where()
+client = AsyncIOMotorClient(MONGO_URL, **_mongo_kwargs)
 db = client[DB_NAME]
 
 # ------------------ App ------------------
