@@ -1,8 +1,8 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { usePremium } from "./PremiumContext";
+import { usePremium, PremiumPackage } from "./PremiumContext";
 import { T } from "@/src/anatomy/ui";
 
 const PERKS: { icon: any; label: string; desc: string }[] = [
@@ -11,15 +11,52 @@ const PERKS: { icon: any; label: string; desc: string }[] = [
   { icon: "pulse", label: "Insights", desc: "Recovery heatmap & weekly analytics" },
 ];
 
+// Preferred package order for display.
+const ORDER = ["WEEKLY", "MONTHLY", "ANNUAL", "LIFETIME"];
+
 export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?: string; headerOffset?: number }) {
   const insets = useSafeAreaInsets();
-  const { setPremium } = usePremium();
+  const { packages, purchase, restorePurchases } = usePremium();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"purchase" | "restore" | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  // Payments are not wired yet — keep these as clearly-marked stubs.
-  const onUpgrade = () =>
-    Alert.alert("Coming soon", "Subscriptions will be available shortly.");
-  const onRestore = () =>
-    Alert.alert("Restore Purchases", "No previous purchases found for this account.");
+  const sorted = useMemo(() => {
+    return [...packages].sort((a, b) => {
+      const ia = ORDER.indexOf(a.packageType);
+      const ib = ORDER.indexOf(b.packageType);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  }, [packages]);
+
+  // Default-select the monthly package (or the first available).
+  useEffect(() => {
+    if (selected || sorted.length === 0) return;
+    const monthly = sorted.find((p) => p.packageType === "MONTHLY");
+    setSelected((monthly ?? sorted[0]).identifier);
+  }, [sorted, selected]);
+
+  const onUpgrade = async () => {
+    const pkg = sorted.find((p) => p.identifier === selected);
+    if (!pkg) {
+      setNotice("Subscription plans load inside the app build.");
+      return;
+    }
+    setBusy("purchase");
+    setNotice(null);
+    const ok = await purchase(pkg);
+    setBusy(null);
+    if (!ok) setNotice("Purchase was not completed.");
+    // On success the premium gate re-renders and this screen unmounts.
+  };
+
+  const onRestore = async () => {
+    setBusy("restore");
+    setNotice(null);
+    const ok = await restorePurchases();
+    setBusy(null);
+    setNotice(ok ? "Purchases restored." : "No previous purchases found.");
+  };
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 24 + headerOffset }]}>
@@ -45,21 +82,51 @@ export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?
           ))}
         </View>
 
-        <View style={styles.priceRow}>
-          <Text style={styles.price}>£9.99</Text>
-          <Text style={styles.per}> / month</Text>
-        </View>
+        {/* Live subscription options from the App Store (via RevenueCat) */}
+        {sorted.length > 0 ? (
+          <View style={styles.plans}>
+            {sorted.map((p) => {
+              const active = p.identifier === selected;
+              return (
+                <TouchableOpacity
+                  key={p.identifier}
+                  style={[styles.plan, active && styles.planActive]}
+                  onPress={() => setSelected(p.identifier)}
+                  testID={`plan-${p.packageType.toLowerCase()}`}
+                >
+                  <View style={[styles.radio, active && styles.radioActive]}>
+                    {active && <View style={styles.radioDot} />}
+                  </View>
+                  <Text style={[styles.planLabel, active && { color: T.text }]}>{p.label}</Text>
+                  <Text style={[styles.planPrice, active && { color: T.text }]}>{p.priceString}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <Text style={styles.plansNote}>Subscription plans appear on the installed app.</Text>
+        )}
 
-        <TouchableOpacity style={styles.upgradeBtn} onPress={onUpgrade} testID="paywall-upgrade">
-          <Ionicons name="star" size={16} color={T.bg} />
-          <Text style={styles.upgradeText}>Upgrade</Text>
+        <TouchableOpacity style={[styles.upgradeBtn, busy && { opacity: 0.6 }]} onPress={onUpgrade} disabled={!!busy} testID="paywall-upgrade">
+          {busy === "purchase" ? (
+            <ActivityIndicator color={T.bg} />
+          ) : (
+            <>
+              <Ionicons name="star" size={16} color={T.bg} />
+              <Text style={styles.upgradeText}>Upgrade</Text>
+            </>
+          )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.restoreBtn} onPress={onRestore} testID="paywall-restore">
-          <Text style={styles.restoreText}>Restore Purchases</Text>
+        <TouchableOpacity style={styles.restoreBtn} onPress={onRestore} disabled={!!busy} testID="paywall-restore">
+          {busy === "restore" ? (
+            <ActivityIndicator color={T.accent} />
+          ) : (
+            <Text style={styles.restoreText}>Restore Purchases</Text>
+          )}
         </TouchableOpacity>
 
-        <Text style={styles.legal}>Cancel anytime. Billed monthly.</Text>
+        {notice ? <Text style={styles.notice}>{notice}</Text> : <Text style={styles.legal}>Cancel anytime.</Text>}
       </ScrollView>
     </View>
   );
@@ -74,7 +141,7 @@ const styles = StyleSheet.create({
   },
   title: { color: T.text, fontSize: 26, fontWeight: "800", textAlign: "center" },
   subtitle: { color: T.textDim, fontSize: 14, textAlign: "center", marginTop: 8, lineHeight: 20, maxWidth: 300 },
-  perks: { width: "100%", marginTop: 26, gap: 10 },
+  perks: { width: "100%", marginTop: 24, gap: 10 },
   perkRow: {
     flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: T.surface,
     borderWidth: 1, borderColor: T.border, borderRadius: 14, padding: 14,
@@ -82,15 +149,25 @@ const styles = StyleSheet.create({
   perkIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(52,199,255,0.1)" },
   perkLabel: { color: T.text, fontSize: 15, fontWeight: "700" },
   perkDesc: { color: T.textFaint, fontSize: 12, marginTop: 2 },
-  priceRow: { flexDirection: "row", alignItems: "baseline", marginTop: 28 },
-  price: { color: T.text, fontSize: 34, fontWeight: "900" },
-  per: { color: T.textDim, fontSize: 15, fontWeight: "600" },
+  plans: { width: "100%", marginTop: 22, gap: 10 },
+  plan: {
+    flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface,
+    borderWidth: 1, borderColor: T.border, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 15,
+  },
+  planActive: { borderColor: T.accent, backgroundColor: "rgba(52,199,255,0.08)" },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: T.border, alignItems: "center", justifyContent: "center" },
+  radioActive: { borderColor: T.accent },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: T.accent },
+  planLabel: { flex: 1, color: T.textDim, fontSize: 15, fontWeight: "700" },
+  planPrice: { color: T.textDim, fontSize: 15, fontWeight: "800" },
+  plansNote: { color: T.textFaint, fontSize: 13, marginTop: 22, textAlign: "center" },
   upgradeBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: T.accent, borderRadius: 14, paddingVertical: 16, width: "100%", marginTop: 20,
+    backgroundColor: T.accent, borderRadius: 14, paddingVertical: 16, width: "100%", marginTop: 20, minHeight: 52,
   },
   upgradeText: { color: T.bg, fontSize: 16, fontWeight: "800" },
-  restoreBtn: { paddingVertical: 14, marginTop: 4 },
+  restoreBtn: { paddingVertical: 14, marginTop: 4, minHeight: 44, justifyContent: "center" },
   restoreText: { color: T.accent, fontSize: 14, fontWeight: "700" },
   legal: { color: T.textFaint, fontSize: 11, marginTop: 6 },
+  notice: { color: T.textDim, fontSize: 12, marginTop: 8, textAlign: "center" },
 });
