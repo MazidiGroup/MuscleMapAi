@@ -10,7 +10,7 @@ import { RestTimer } from "@/src/anatomy/RestTimer";
 import { InsightsView } from "@/src/anatomy/InsightsView";
 import { EXERCISES, getExercise } from "@/src/anatomy/exercises";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
-import { useWorkout, workoutStats } from "@/src/anatomy/workoutStore";
+import { useWorkout, workoutStats, Workout } from "@/src/anatomy/workoutStore";
 import { T } from "@/src/anatomy/ui";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { Paywall } from "@/src/premium/Paywall";
@@ -25,6 +25,14 @@ function fmtClock(sec: number) {
 }
 function fmtDate(ts: number) {
   return new Date(ts).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+function startOfWeekMonday(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  const day = (x.getDay() + 6) % 7; // 0 = Monday
+  x.setDate(x.getDate() - day);
+  return x.getTime();
 }
 
 export default function WorkoutScreen() {
@@ -89,6 +97,65 @@ export default function WorkoutScreen() {
     }
   };
 
+  // ---- History: This Week + monthly calendar (derived from existing w.history) ----
+  const nowD = new Date();
+  const calYear = nowD.getFullYear();
+  const calMonth = nowD.getMonth();
+  const calLabel = nowD.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const calMonthShort = nowD.toLocaleDateString(undefined, { month: "short" });
+  const weekStart = startOfWeekMonday(nowD);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+
+  const thisWeek = useMemo(() => w.history.filter((wk) => wk.date >= weekStart), [w.history, weekStart]);
+
+  const workoutDays = useMemo(() => {
+    const set = new Set<number>();
+    w.history.forEach((wk) => {
+      const d = new Date(wk.date);
+      if (d.getFullYear() === calYear && d.getMonth() === calMonth) set.add(d.getDate());
+    });
+    return set;
+  }, [w.history, calYear, calMonth]);
+
+  const calCells = useMemo(() => {
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const firstWeekday = (new Date(calYear, calMonth, 1).getDay() + 6) % 7; // Mon-based
+    return [...Array(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  }, [calYear, calMonth]);
+
+  const selectedDayWorkouts = useMemo(() => {
+    if (selectedDay == null) return [];
+    return w.history.filter((wk) => {
+      const d = new Date(wk.date);
+      return d.getFullYear() === calYear && d.getMonth() === calMonth && d.getDate() === selectedDay;
+    });
+  }, [selectedDay, w.history, calYear, calMonth]);
+
+  const renderHistCard = (wk: Workout) => {
+    const st = workoutStats(wk.exercises);
+    return (
+      <TouchableOpacity
+        key={wk.id}
+        style={styles.histCard}
+        onPress={() => router.push({ pathname: "/summary", params: { id: wk.id } })}
+        testID={`hist-${wk.id}`}
+      >
+        <View style={styles.histTop}>
+          <Text style={styles.histDate}>{fmtDate(wk.date)}</Text>
+          <Text style={styles.histDur}>{fmtClock(wk.durationSec)}</Text>
+        </View>
+        <Text style={styles.histEx} numberOfLines={1}>
+          {wk.exercises.map((e) => getExercise(e.exerciseId)?.name).filter(Boolean).join(" · ")}
+        </Text>
+        <View style={styles.histStats}>
+          <Text style={styles.histStat}>{wk.exercises.length} exercises</Text>
+          <Text style={styles.histStat}>{st.completed} sets</Text>
+          <Text style={styles.histStat}>{st.volume} kg</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={styles.root}>
       {seg === "exercises" && <AnatomyViewer mode="workout" primary={catHighlight.primary} secondary={catHighlight.secondary} />}
@@ -135,7 +202,21 @@ export default function WorkoutScreen() {
                         {meta.difficulty} · {e.equipment} · {e.category}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
+                    {w.session ? (
+                      w.hasExercise(e.id) ? (
+                        <View style={styles.addedPill}>
+                          <Ionicons name="checkmark" size={15} color="#3DDC97" />
+                          <Text style={styles.addedText}>Added</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity style={styles.addPill} onPress={() => w.addExercise(e.id)} testID={`add-ex-${e.id}`}>
+                          <Ionicons name="add" size={16} color={T.bg} />
+                          <Text style={styles.addPillText}>Add</Text>
+                        </TouchableOpacity>
+                      )
+                    ) : (
+                      <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -263,30 +344,59 @@ export default function WorkoutScreen() {
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-              {w.history.map((wk) => {
-                const st = workoutStats(wk.exercises);
-                return (
-                  <TouchableOpacity
-                    key={wk.id}
-                    style={styles.histCard}
-                    onPress={() => router.push({ pathname: "/summary", params: { id: wk.id } })}
-                    testID={`hist-${wk.id}`}
-                  >
-                    <View style={styles.histTop}>
-                      <Text style={styles.histDate}>{fmtDate(wk.date)}</Text>
-                      <Text style={styles.histDur}>{fmtClock(wk.durationSec)}</Text>
-                    </View>
-                    <Text style={styles.histEx} numberOfLines={1}>
-                      {wk.exercises.map((e) => getExercise(e.exerciseId)?.name).filter(Boolean).join(" · ")}
+              {/* This Week */}
+              <Text style={styles.histSectionTitle}>This Week</Text>
+              {thisWeek.length === 0 ? (
+                <Text style={styles.histSectionEmpty}>No workouts logged this week yet.</Text>
+              ) : (
+                thisWeek.map(renderHistCard)
+              )}
+
+              {/* Monthly calendar */}
+              <Text style={[styles.histSectionTitle, { marginTop: 20 }]}>{calLabel}</Text>
+              <View style={styles.calCard}>
+                <View style={styles.calWeekRow}>
+                  {WEEKDAYS.map((d) => (
+                    <Text key={d} style={styles.calWeekday}>
+                      {d}
                     </Text>
-                    <View style={styles.histStats}>
-                      <Text style={styles.histStat}>{wk.exercises.length} exercises</Text>
-                      <Text style={styles.histStat}>{st.completed} sets</Text>
-                      <Text style={styles.histStat}>{st.volume} kg</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                  ))}
+                </View>
+                <View style={styles.calGrid}>
+                  {calCells.map((d, i) => {
+                    if (d == null) return <View key={`b${i}`} style={styles.calCell} />;
+                    const marked = workoutDays.has(d);
+                    const isSel = d === selectedDay;
+                    const isToday = d === nowD.getDate();
+                    return (
+                      <TouchableOpacity
+                        key={d}
+                        style={styles.calCell}
+                        disabled={!marked}
+                        activeOpacity={0.7}
+                        onPress={() => setSelectedDay(isSel ? null : d)}
+                        testID={`cal-day-${d}`}
+                      >
+                        <View style={[styles.calDay, marked && styles.calDayMarked, isToday && !isSel && styles.calDayToday, isSel && styles.calDaySel]}>
+                          <Text style={[styles.calDayText, (marked || isSel) && { color: T.bg, fontWeight: "800" }]}>{d}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Selected day reveal */}
+              {selectedDay != null && selectedDayWorkouts.length > 0 && (
+                <>
+                  <Text style={[styles.histSectionTitle, { marginTop: 20 }]}>{`${calMonthShort} ${selectedDay}`}</Text>
+                  {selectedDayWorkouts.map(renderHistCard)}
+                </>
+              )}
+
+              {/* Full history */}
+              <Text style={[styles.histSectionTitle, { marginTop: 20 }]}>All Workouts</Text>
+              {w.history.map(renderHistCard)}
             </ScrollView>
           )}
         </View>
@@ -369,4 +479,22 @@ const styles = StyleSheet.create({
   histEx: { color: T.textDim, fontSize: 13, marginBottom: 8 },
   histStats: { flexDirection: "row", gap: 14 },
   histStat: { color: T.textFaint, fontSize: 12, fontWeight: "600" },
+
+  addPill: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: T.accent, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  addPillText: { color: T.bg, fontSize: 13, fontWeight: "800" },
+  addedPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: T.border },
+  addedText: { color: "#3DDC97", fontSize: 12, fontWeight: "700" },
+
+  histSectionTitle: { color: T.text, fontSize: 15, fontWeight: "800", marginBottom: 10 },
+  histSectionEmpty: { color: T.textFaint, fontSize: 13, marginBottom: 4 },
+  calCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 12 },
+  calWeekRow: { flexDirection: "row", marginBottom: 6 },
+  calWeekday: { width: `${100 / 7}%`, textAlign: "center", color: T.textFaint, fontSize: 11, fontWeight: "700" },
+  calGrid: { flexDirection: "row", flexWrap: "wrap" },
+  calCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: "center", justifyContent: "center", paddingVertical: 3 },
+  calDay: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  calDayMarked: { backgroundColor: T.accent },
+  calDayToday: { borderWidth: 1, borderColor: T.borderHi },
+  calDaySel: { backgroundColor: "#3DDC97" },
+  calDayText: { color: T.textDim, fontSize: 13, fontWeight: "600" },
 });

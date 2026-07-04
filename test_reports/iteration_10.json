@@ -1,0 +1,32 @@
+{
+  "summary": "Verified the two changes in app/(tabs)/workout.tsx on mobile viewport 390x844 end-to-end. CHANGE 1 (Train Add/Chevron): (a) With NO active session, [data-testid=ex-<id>] rows show a chevron and no [data-testid=add-ex-*] elements are rendered (count=0). Tapping a row navigates to /exercise/<id> (regression path unchanged). (b) After tapping seg-session -> start-empty, returning to seg-exercises now shows an Add pill (add-ex-<id>) on every row. Successfully tapped add-ex-bench-press, add-ex-overhead-press, add-ex-squat (Barbell Back Squat) in sequence -- each row transitioned to an 'Added' state (add-ex-<id> disappears; the checkmark 'Added' pill renders instead, confirmed visually and by count going from 1 to 0). Duplicates are prevented (workoutStore.addExercise no-ops if id already in session). All three appeared in Session with w-<id>-0 / r-<id>-0 / done-<id>-0 inputs. CHANGE 2 (History): After finishing a workout (Barbell Bench Press 60kg x 8 reps + Overhead Press), History segment renders in the required order: 'This Week' section title with one hist card, 'July 2026' calendar card with Mon..Sun headers and day cells 1..31, day 4 (today) highlighted, tapping cal-day-4 reveals a 'Jul 4' section with the workout card directly below the calendar, then 'All Workouts' section with the full list. Each hist card (testID hist-<id>) preserves the original layout: 'Sat, Jul 4' + '00:06' + 'Barbell Bench Press · Overhead Press' + '2 exercises  1 sets  480 kg'. REGRESSION: finish-workout persists to history and pushes to /summary?id=...&prs=... route with PR list; Done on summary returns to /workout; Session set logging (weight/reps/done + rest timer + rest-skip) all functional; Insights segment still shows Paywall 'Unlock Insights' (isPremium=false).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Workout > History > calendar", "issues": ["Minor: when today is both marked AND currently selected, calDaySel (green #3DDC97) overrides calDayMarked (T.accent blue). This is intentional per style order but produces two very-similar highlight colors; consider a distinct border/outline for the selected state so users can tell 'marked' vs 'selected' apart when the same day is both."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_10.json"],
+  "action_items": [
+    "None required. Both changes work as specified and no regressions detected. OPTIONAL polish: differentiate the calendar 'selected' vs 'marked' visuals (currently both use solid green-ish fills)."
+  ],
+  "critical_code_review_comments": [
+    "workout.tsx line 205-219: The conditional (w.session ? (hasExercise ? Added : Add pill) : chevron) is the correct minimal change and reuses w.addExercise / w.hasExercise -- no state duplication. Good.",
+    "workout.tsx line 100-132: Deriving thisWeek / workoutDays / calCells / selectedDayWorkouts from existing w.history via useMemo is efficient and involves no new store calls. startOfWeekMonday correctly computes Monday-anchored week start via (getDay()+6)%7.",
+    "workout.tsx line 122: firstWeekday = (new Date(calYear, calMonth, 1).getDay() + 6) % 7 correctly aligns the first day cell under the Mon..Sun header row.",
+    "workout.tsx line 375: TouchableOpacity with disabled={!marked} prevents tapping empty cells -- good UX and prevents null selection.",
+    "workout.tsx is now 500 lines -- still under the 700-line threshold but approaching. Consider extracting the History segment (This Week + calendar + selected-day + All Workouts) into a HistoryTab component in a follow-up.",
+    "workoutStore.tsx addExercise: `if (base.some(e => e.exerciseId === id)) return base;` correctly no-ops duplicates as expected by the spec.",
+    "workoutStore.tsx: no _id / MongoDB leakage; storage layer only. All state via context, no unrelated store changes."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only test)", "frontend": "100% (all requested Change 1, Change 2, and regression scenarios verified)"},
+  "seed_data_creation": "Created one workout in in-memory session storage during the test run: {exercises: [bench-press (60kg x 8, done), overhead-press (no completed set)], duration ~6s}. Saved via finish() to anat.workouts local storage.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Change 1 & Change 2 in app/(tabs)/workout.tsx are verified. testIDs used: seg-exercises, seg-session, seg-history, seg-insights, ex-<id>, add-ex-<id>, start-empty, w-<id>-<idx>, r-<id>-<idx>, done-<id>-<idx>, rest-skip, finish-workout, hist-<id>, cal-day-<n>. When testing rest timer make sure to click rest-skip (Escape does not dismiss the modal on web). When navigating away from /summary after finish, prefer clicking 'Done' text or the bottom Workout tab (not go_back) because expo-router keeps /workout under /summary and go_back overshoots to home.",
+  "rca_of_issue": "N/A -- no bugs found."
+}
