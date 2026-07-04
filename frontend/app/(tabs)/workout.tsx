@@ -495,6 +495,6 @@ const styles = StyleSheet.create({
   calDay: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   calDayMarked: { backgroundColor: T.accent },
   calDayToday: { borderWidth: 1, borderColor: T.borderHi },
-  calDaySel: { backgroundColor: "#3DDC97" },
+  calDaySel: { backgroundColor: "#3DDC97", borderWidth: 2, borderColor: T.text },
   calDayText: { color: T.textDim, fontSize: 13, fontWeight: "600" },
 });
