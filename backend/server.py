@@ -283,6 +283,22 @@ async def _upsert_user(email: str, name: Optional[str] = None, picture: Optional
         if apple_sub:
             doc["apple_sub"] = apple_sub
         await db.users.insert_one(dict(doc))
+
+    # App Store review bypass: grant premium on EVERY login for the exact reviewer
+    # email, regardless of provider (email code, Apple, Google).
+    if _is_review_email(email):
+        await db.subscriptions.update_one(
+            {"user_id": user_id, "source": "review_bypass"},
+            {"$set": {
+                "user_id": user_id,
+                "source": "review_bypass",
+                "status": "active",
+                "tier": "premium",
+                "updated_at": now,
+            }},
+            upsert=True,
+        )
+
     return await db.users.find_one({"user_id": user_id}, {"_id": 0})
 
 
@@ -454,21 +470,10 @@ async def verify_magic_code(payload: MagicVerifyPayload):
     email = payload.email.strip().lower()
     code = payload.code.strip()
 
-    # App Store reviewer bypass (exact email only): accept the fixed static code and
-    # grant premium directly, without Resend or RevenueCat. Never applies to any other email.
+    # App Store reviewer bypass (exact email only): accept the fixed static code.
+    # Premium is granted inside _upsert_user (applies to every reviewer login).
     if _is_review_email(email) and code == REVIEW_BYPASS_CODE:
         user = await _upsert_user(email, name="App Review", provider="review")
-        await db.subscriptions.update_one(
-            {"user_id": user["user_id"], "source": "review_bypass"},
-            {"$set": {
-                "user_id": user["user_id"],
-                "source": "review_bypass",
-                "status": "active",
-                "tier": "premium",
-                "updated_at": datetime.now(timezone.utc),
-            }},
-            upsert=True,
-        )
         token = await _new_session(user["user_id"])
         return {"session_token": token, "user": _user_out(user)}
 

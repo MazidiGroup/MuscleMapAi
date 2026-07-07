@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 
+import { useAuth } from "@/src/auth/AuthContext";
+
 /**
  * Central premium entitlement, now backed by RevenueCat (react-native-purchases).
  *
@@ -75,9 +77,14 @@ function mapPackage(p: any): PremiumPackage {
 }
 
 export function PremiumProvider({ children }: { children: React.ReactNode }) {
-  const [isPremium, setIsPremium] = useState(false);
+  const { user } = useAuth();
+  const [rcPremium, setRcPremium] = useState(false);
   const [loading, setLoading] = useState(!!Purchases);
   const [packages, setPackages] = useState<PremiumPackage[]>([]);
+
+  // Premium if EITHER the on-device RevenueCat entitlement is active OR the backend
+  // says so via /auth/me (server-validated RevenueCat sync or App Store review bypass).
+  const isPremium = rcPremium || !!user?.is_premium;
 
   const refreshOfferings = useCallback(async () => {
     if (!Purchases) return;
@@ -95,7 +102,7 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     if (!Purchases) return;
     let mounted = true;
     const apply = (customerInfo: any) => {
-      if (mounted) setIsPremium(hasPremium(customerInfo));
+      if (mounted) setRcPremium(hasPremium(customerInfo));
     };
 
     (async () => {
@@ -122,7 +129,7 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     try {
       const { customerInfo } = await Purchases.purchasePackage(pkg.raw);
       const ok = hasPremium(customerInfo);
-      setIsPremium(ok);
+      setRcPremium(ok);
       return ok;
     } catch (e: any) {
       if (!e?.userCancelled) console.warn("[premium] purchase failed", e);
@@ -135,7 +142,7 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     try {
       const customerInfo = await Purchases.restorePurchases();
       const ok = hasPremium(customerInfo);
-      setIsPremium(ok);
+      setRcPremium(ok);
       return ok;
     } catch (e) {
       console.warn("[premium] restore failed", e);
@@ -143,7 +150,7 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const setPremium = useCallback((v: boolean) => setIsPremium(v), []);
+  const setPremium = useCallback((v: boolean) => setRcPremium(v), []);
 
   return (
     <Ctx.Provider value={{ isPremium, loading, packages, purchase, restorePurchases, refreshOfferings, setPremium }}>

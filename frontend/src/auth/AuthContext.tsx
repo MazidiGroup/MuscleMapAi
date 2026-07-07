@@ -75,12 +75,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const establishSession = useCallback(async (sessionToken: string, u?: AuthUser) => {
+  const establishSession = useCallback(async (sessionToken: string) => {
     await setToken(sessionToken);
-    let me = u;
-    if (!me) me = await apiGet<AuthUser>("/auth/me");
+    // Always fetch /auth/me — it's the canonical user object incl. is_premium
+    const me = await apiGet<AuthUser>("/auth/me");
     setUser(me);
-    syncPurchases(me.user_id); // fire-and-forget
+    // Refresh once the purchases sync completes so premium changes reflect immediately
+    syncPurchases(me.user_id).then(async () => {
+      try {
+        setUser(await apiGet<AuthUser>("/auth/me"));
+      } catch {
+        // keep current user on refresh failure
+      }
+    });
   }, []);
 
   // Exchange an Emergent session_id (Google OAuth) for our app session
@@ -88,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await apiPost<{ session_token: string; user: AuthUser }>("/auth/google/session", {
       session_token: sessionId,
     });
-    await establishSession(res.session_token, res.user);
+    await establishSession(res.session_token);
   }, [establishSession]);
 
   // Handle deep links carrying either an Emergent session_id or our own session_token
@@ -147,7 +154,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const me = await apiGet<AuthUser>("/auth/me");
             if (mounted) setUser(me);
-            syncPurchases(me.user_id);
+            syncPurchases(me.user_id).then(async () => {
+              try {
+                const fresh = await apiGet<AuthUser>("/auth/me");
+                if (mounted) setUser(fresh);
+              } catch {
+                // keep current user
+              }
+            });
           } catch {
             await clearToken();
           }
@@ -225,7 +239,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         identity_token: credential.identityToken,
         full_name: fullName || null,
       });
-      await establishSession(res.session_token, res.user);
+      await establishSession(res.session_token);
       return { ok: true };
     } catch (e: any) {
       if (e?.code === "ERR_REQUEST_CANCELED" || e?.code === "ERR_CANCELED") {
@@ -260,7 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyMagicCode = useCallback(async (email: string, code: string): Promise<AuthResult> => {
     try {
       const res = await apiPost<{ session_token: string; user: AuthUser }>("/auth/email/verify", { email, code });
-      await establishSession(res.session_token, res.user);
+      await establishSession(res.session_token);
       return { ok: true };
     } catch (e: any) {
       const msg = String(e?.message || "");

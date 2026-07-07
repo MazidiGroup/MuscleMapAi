@@ -89,3 +89,9 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 ## App Store review bypass (June 2026)
 - Reserved reviewer email applereview@mazidigroup.com skips Resend, accepts fixed code 123456, and is granted premium directly (subscriptions source="review_bypass" → /auth/me is_premium true), independent of RevenueCat.
 - Env-gated: APPLE_REVIEW_BYPASS_EMAIL / APPLE_REVIEW_BYPASS_CODE in backend/.env. Empty email disables it. Exact case-insensitive match only, no wildcards. No effect on any other email.
+
+## Review-bypass premium fix (June 2026)
+- Root cause of "premium locked for reviewer": frontend premium gates read PremiumContext.isPremium derived ONLY from on-device RevenueCat; backend user.is_premium was ignored. Also bypass grant only ran on email-code login, not Apple/Google.
+- Fixes: (1) premium grant moved into _upsert_user → runs on EVERY login for the exact reviewer email regardless of provider; (2) PremiumContext now merges: isPremium = rcPremium || user.is_premium (backend value is server-validated); (3) AuthContext.establishSession always fetches /auth/me (login responses lack is_premium) and re-fetches after RevenueCat sync completes.
+- Verified: DB shows subscriptions{source:review_bypass,status:active}; /auth/me is_premium:true; web UI e2e login as reviewer → Learn tab unlocked.
+- REQUIRES: backend redeploy AND a new iOS build (frontend changed) to reach TestFlight.
