@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Literal, Dict, Any
 from datetime import datetime, timezone, timedelta
 import httpx
-import stripe
 import random
 import jwt as _jwt
 from jwt import PyJWKClient
@@ -27,19 +26,16 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, Strea
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
-
-# ------------------ Config ------------------
 MONGO_URL = os.environ['MONGO_URL']
 DB_NAME = os.environ['DB_NAME']
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
-STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
 PUBLIC_WEB_APP_URL = os.environ.get('PUBLIC_WEB_APP_URL', '')
 APP_SCHEME = os.environ.get('APP_SCHEME', 'apexai')
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 RESEND_SENDER = os.environ.get('RESEND_SENDER', 'Muscle Map Ai <onboarding@resend.dev>')
 APPLE_BUNDLE_ID = os.environ.get('APPLE_BUNDLE_ID', 'com.mazidigroup.apexai')
-
-stripe.api_key = STRIPE_API_KEY
+APPLE_ALLOW_EXPO_GO = os.environ.get('APPLE_ALLOW_EXPO_GO', '1') == '1'
+REVENUECAT_SECRET_KEY = os.environ.get('REVENUECAT_SECRET_KEY', '')
 
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
 
@@ -59,10 +55,13 @@ app = FastAPI(title="Muscle Map Ai Backend")
 api_router = APIRouter(prefix="/api")
 
 # CORS
+# CORS — mobile apps send no Origin header and we authenticate with Bearer tokens
+# (not cookies), so credentials are not needed. Disabling allow_credentials makes the
+# wildcard origin safe.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -79,6 +78,7 @@ async def _ensure_indexes():
         await db.user_sessions.create_index("session_token", unique=True)
         await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
         await db.magic_links.create_index("expires_at", expireAfterSeconds=0)
+        await db.coach_ask_usage.create_index("created_at", expireAfterSeconds=172800)
     except Exception as e:
         logger.warning(f"index creation skipped: {e}")
 
@@ -119,12 +119,6 @@ class CompleteWorkoutRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-
-
-class CreateCheckoutRequest(BaseModel):
-    success_url: Optional[str] = None
-    cancel_url: Optional[str] = None
-    interval: Literal['month', 'year'] = 'month'
 
 
 # ------------------ Auth ------------------
@@ -231,54 +225,9 @@ async def logout(authorization: Optional[str] = Header(None)):
     return {"ok": True}
 
 
-class EmailLoginRequest(BaseModel):
-    email: str
-    name: Optional[str] = None
-
-
-@api_router.post("/auth/email/login")
-async def email_login(payload: EmailLoginRequest):
-    """Passwordless email login (V1 sandbox flow). Creates or logs in user by email."""
-    email = payload.email.strip().lower()
-    if not email or "@" not in email:
-        raise HTTPException(status_code=400, detail="Valid email required")
-
-    user = await db.users.find_one({"email": email}, {"_id": 0})
-    if user:
-        user_id = user["user_id"]
-        await db.users.update_one(
-            {"user_id": user_id},
-            {"$set": {"last_login": datetime.now(timezone.utc)}},
-        )
-    else:
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        await db.users.insert_one({
-            "user_id": user_id,
-            "email": email,
-            "name": payload.name or email.split("@")[0].title(),
-            "picture": "",
-            "onboarded": False,
-            "created_at": datetime.now(timezone.utc),
-            "last_login": datetime.now(timezone.utc),
-        })
-
-    session_token = f"sess_{uuid.uuid4().hex}"
-    await db.user_sessions.insert_one({
-        "session_token": session_token,
-        "user_id": user_id,
-        "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
-        "created_at": datetime.now(timezone.utc),
-    })
-    fresh = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    fresh["created_at"] = fresh["created_at"].isoformat() if isinstance(fresh.get("created_at"), datetime) else fresh.get("created_at")
-    fresh["last_login"] = fresh["last_login"].isoformat() if isinstance(fresh.get("last_login"), datetime) else fresh.get("last_login")
-    return {"session_token": session_token, "user": fresh}
-
-
-@api_router.post("/auth/demo/login")
-async def demo_login():
-    """Quick demo account for sandbox testing."""
-    return await email_login(EmailLoginRequest(email=f"demo_{uuid.uuid4().hex[:6]}@apexai.app", name="Demo Athlete"))
+# NOTE: The unverified /auth/email/login and /auth/demo/login endpoints were removed
+# (security: they issued a session for any email with no verification → account takeover).
+# Email sign-in now requires the emailed code via /auth/email/verify.
 
 
 # ------------------ Shared auth helpers ------------------
@@ -352,8 +301,12 @@ class AppleSessionRequest(BaseModel):
 def _verify_apple_token(identity_token: str) -> Dict[str, Any]:
     signing_key = _apple_jwks.get_signing_key_from_jwt(identity_token)
     last_err: Exception = ValueError("audience check failed")
-    # Accept both the production bundle id and Expo Go's client id (dev)
-    for aud in (APPLE_BUNDLE_ID, "host.exp.Exponent"):
+    # Accept the production bundle id; optionally allow Expo Go's client id in dev only
+    # (APPLE_ALLOW_EXPO_GO=0 in production to reject non-release audiences).
+    audiences = [APPLE_BUNDLE_ID]
+    if APPLE_ALLOW_EXPO_GO:
+        audiences.append("host.exp.Exponent")
+    for aud in audiences:
         try:
             return _jwt.decode(
                 identity_token, signing_key.key, algorithms=["RS256"],
@@ -438,6 +391,12 @@ async def request_magic_link(payload: MagicRequestPayload):
     if not email or "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Please enter a valid email address")
 
+    # Throttle: max 5 requests per email per 15 minutes (anti email-bomb / abuse)
+    window_start = datetime.now(timezone.utc) - timedelta(minutes=15)
+    recent = await db.magic_links.count_documents({"email": email, "created_at": {"$gte": window_start}})
+    if recent >= 5:
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait a few minutes and try again.")
+
     code = f"{random.randint(0, 999999):06d}"
     token = uuid.uuid4().hex
     now = datetime.now(timezone.utc)
@@ -447,6 +406,7 @@ async def request_magic_link(payload: MagicRequestPayload):
         "code": code,
         "token": token,
         "used": False,
+        "attempts": 0,
         "expires_at": now + timedelta(minutes=15),
         "created_at": now,
     })
@@ -454,9 +414,9 @@ async def request_magic_link(payload: MagicRequestPayload):
     link = f"{PUBLIC_WEB_APP_URL}/api/auth/magic/{token}"
     sent = await _send_magic_email(email, code, link)
     resp: Dict[str, Any] = {"sent": sent}
-    if not sent:
-        # Email provider not configured (or send failed) — surface the code so the
-        # flow remains testable in dev. Remove once RESEND_API_KEY is set.
+    # SECURITY: only expose the code when Resend is NOT configured (local dev). Never
+    # leak it in production, even on send failure — that would allow account takeover.
+    if not sent and not RESEND_API_KEY:
         resp["dev_code"] = code
     return resp
 
@@ -477,7 +437,28 @@ async def _consume_magic_link(query: Dict[str, Any]) -> Dict[str, Any]:
 @api_router.post("/auth/email/verify")
 async def verify_magic_code(payload: MagicVerifyPayload):
     email = payload.email.strip().lower()
-    ml = await _consume_magic_link({"email": email, "code": payload.code.strip()})
+    code = payload.code.strip()
+    # Look up the active (unused, unexpired) link for this email, then check the code
+    # with a bounded attempt counter to prevent brute-forcing the 6-digit code.
+    ml = await db.magic_links.find_one({"email": email, "used": False}, {"_id": 0}, sort=[("created_at", -1)])
+    if not ml:
+        raise HTTPException(status_code=401, detail="Invalid or expired code. Please request a new one.")
+
+    expires_at = ml["expires_at"]
+    if isinstance(expires_at, datetime) and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="That code has expired. Please request a new one.")
+
+    if ml.get("attempts", 0) >= 5:
+        await db.magic_links.update_one({"token": ml["token"]}, {"$set": {"used": True}})
+        raise HTTPException(status_code=429, detail="Too many attempts. Please request a new code.")
+
+    if code != ml["code"]:
+        await db.magic_links.update_one({"token": ml["token"]}, {"$inc": {"attempts": 1}})
+        raise HTTPException(status_code=401, detail="Invalid code. Please try again.")
+
+    await db.magic_links.update_one({"token": ml["token"]}, {"$set": {"used": True}})
     user = await _upsert_user(ml["email"], provider="email")
     token = await _new_session(user["user_id"])
     return {"session_token": token, "user": _user_out(user)}
@@ -510,18 +491,55 @@ async def magic_link_open(token: str):
     return HTMLResponse(html)
 
 
-# ------------------ RevenueCat entitlement sync ------------------
+# ------------------ RevenueCat entitlement sync (server-validated) ------------------
 class RevenueCatSyncPayload(BaseModel):
-    is_premium: bool
+    # Client hints are accepted but NOT trusted — entitlement is verified server-side
+    # against the RevenueCat REST API using our secret key.
+    is_premium: Optional[bool] = None
     product_id: Optional[str] = None
     expires_at: Optional[str] = None
 
 
+async def _validate_revenuecat_entitlement(app_user_id: str) -> Dict[str, Any]:
+    """Fetch the subscriber from RevenueCat and return the real 'premium' entitlement
+    state. The app calls Purchases.logIn(user_id), so the RevenueCat app_user_id == our user_id.
+    Returns {active: bool, product_id, expires_at}. Fails closed (active=False) on any error."""
+    if not REVENUECAT_SECRET_KEY:
+        return {"active": False, "product_id": None, "expires_at": None, "unconfigured": True}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as http:
+            r = await http.get(
+                f"https://api.revenuecat.com/v1/subscribers/{app_user_id}",
+                headers={"Authorization": f"Bearer {REVENUECAT_SECRET_KEY}"},
+            )
+        if r.status_code != 200:
+            logger.warning(f"revenuecat lookup {app_user_id} -> {r.status_code}")
+            return {"active": False, "product_id": None, "expires_at": None}
+        data = r.json()
+        ent = (data.get("subscriber", {}).get("entitlements", {}) or {}).get("premium")
+        if not ent:
+            return {"active": False, "product_id": None, "expires_at": None}
+        expires = ent.get("expires_date")  # ISO8601 or null (null = lifetime)
+        active = True
+        if expires:
+            try:
+                exp_dt = datetime.fromisoformat(expires.replace("Z", "+00:00"))
+                active = exp_dt > datetime.now(timezone.utc)
+            except Exception:
+                active = True
+        return {"active": active, "product_id": ent.get("product_identifier"), "expires_at": expires}
+    except Exception as e:
+        logger.warning(f"revenuecat validation error: {e}")
+        return {"active": False, "product_id": None, "expires_at": None}
+
+
 @api_router.post("/billing/revenuecat/sync")
 async def revenuecat_sync(payload: RevenueCatSyncPayload, user=Depends(get_current_user)):
-    """Connect the RevenueCat entitlement to this account so subscription status carries over."""
+    """Validate the RevenueCat entitlement SERVER-SIDE and persist it. The client-sent
+    is_premium is ignored — we ask RevenueCat directly for the truth."""
+    result = await _validate_revenuecat_entitlement(user["user_id"])
     now = datetime.now(timezone.utc)
-    if payload.is_premium:
+    if result["active"]:
         await db.subscriptions.update_one(
             {"user_id": user["user_id"], "source": "revenuecat"},
             {"$set": {
@@ -529,8 +547,8 @@ async def revenuecat_sync(payload: RevenueCatSyncPayload, user=Depends(get_curre
                 "source": "revenuecat",
                 "status": "active",
                 "tier": "premium",
-                "product_id": payload.product_id,
-                "expires_at": payload.expires_at,
+                "product_id": result["product_id"],
+                "expires_at": result["expires_at"],
                 "updated_at": now,
             }},
             upsert=True,
@@ -1621,40 +1639,10 @@ Return JSON only (no markdown), with this exact shape:
     return {"report": report, "workouts_this_week": len(relevant)}
 
 
-# ------------------ Stripe Subscription ------------------
-@api_router.post("/billing/create-checkout")
-async def create_checkout(payload: CreateCheckoutRequest, user=Depends(get_current_user)):
-    success_url = payload.success_url or f"{PUBLIC_WEB_APP_URL}/api/billing/redirect/success?session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = payload.cancel_url or f"{PUBLIC_WEB_APP_URL}/api/billing/redirect/cancel"
-
-    unit_amount = 999 if payload.interval == 'month' else 7999  # £9.99 monthly or £79.99 annually
-    product_name = "Muscle Map Ai Premium (Monthly)" if payload.interval == 'month' else "Muscle Map Ai Premium (Annual)"
-
-    try:
-        session = stripe.checkout.Session.create(
-            mode="subscription",
-            payment_method_types=["card"],
-            customer_email=user.get("email"),
-            line_items=[{
-                "price_data": {
-                    "currency": "gbp",
-                    "unit_amount": unit_amount,
-                    "recurring": {"interval": payload.interval},
-                    "product_data": {
-                        "name": product_name,
-                        "description": "Unlimited AI coaching, adaptive workouts, recovery insights.",
-                    },
-                },
-                "quantity": 1,
-            }],
-            metadata={"app_user_id": user["user_id"], "tier": "premium", "interval": payload.interval},
-            success_url=success_url,
-            cancel_url=cancel_url,
-        )
-    except stripe.error.StripeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    return {"id": session.id, "url": session.url}
+# ------------------ Subscription (RevenueCat only) ------------------
+# NOTE: Stripe checkout/webhook/redirect and the dev mark-premium endpoint were removed.
+# Payments go exclusively through RevenueCat (App Store / Play). Entitlements are
+# validated server-side against the RevenueCat REST API — never trusted from the client.
 
 
 @api_router.get("/billing/subscription")
@@ -1667,97 +1655,11 @@ async def get_subscription(user=Depends(get_current_user)):
     return sub
 
 
-@api_router.post("/billing/webhook")
-async def stripe_webhook(request: Request):
-    payload = await request.body()
-    # In sandbox without webhook secret, just parse the JSON
-    try:
-        event = json.loads(payload)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Bad payload")
-
-    event_type = event.get("type", "")
-    obj = event.get("data", {}).get("object", {})
-    metadata = obj.get("metadata", {}) or {}
-    user_id = metadata.get("app_user_id")
-
-    if event_type == "checkout.session.completed" and user_id:
-        await db.subscriptions.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "user_id": user_id,
-                "status": "active",
-                "tier": "premium",
-                "interval": metadata.get("interval", "month"),
-                "stripe_subscription_id": obj.get("subscription"),
-                "stripe_customer_id": obj.get("customer"),
-                "updated_at": datetime.now(timezone.utc),
-            }},
-            upsert=True,
-        )
-    elif event_type in ("customer.subscription.deleted", "customer.subscription.updated") and user_id:
-        await db.subscriptions.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "status": obj.get("status", "canceled"),
-                "updated_at": datetime.now(timezone.utc),
-            }},
-        )
-    return {"received": True}
-
-
-@api_router.get("/billing/redirect/success")
-async def billing_success(session_id: str = ""):
-    deep = f"{APP_SCHEME}://checkout/success?session_id={session_id}"
-    html = f"""<!doctype html><html><head><meta charset="utf-8"><title>Muscle Map Ai</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <style>body{{background:#0A0A0A;color:#fff;font-family:-apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}}
-    .c{{text-align:center;max-width:340px;padding:24px}}
-    h1{{font-size:24px;margin:0 0 8px}}
-    p{{color:#A1A1AA;line-height:1.5}}
-    a{{display:inline-block;background:#0A84FF;color:#fff;padding:14px 24px;border-radius:999px;text-decoration:none;margin-top:16px;font-weight:600}}</style></head>
-    <body><div class="c"><h1>You're Premium ✓</h1><p>Returning to Muscle Map Ai…</p>
-    <a href="{deep}">Open Muscle Map Ai</a></div>
-    <script>setTimeout(()=>window.location="{deep}",400);</script></body></html>"""
-    return HTMLResponse(html)
-
-
-@api_router.get("/billing/redirect/cancel")
-async def billing_cancel():
-    deep = f"{APP_SCHEME}://checkout/cancel"
-    html = f"""<!doctype html><html><head><meta charset="utf-8"><title>Muscle Map Ai</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <style>body{{background:#0A0A0A;color:#fff;font-family:-apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}}
-    .c{{text-align:center;max-width:340px;padding:24px}}
-    h1{{font-size:24px;margin:0 0 8px}}
-    p{{color:#A1A1AA}}
-    a{{display:inline-block;background:#0A84FF;color:#fff;padding:14px 24px;border-radius:999px;text-decoration:none;margin-top:16px;font-weight:600}}</style></head>
-    <body><div class="c"><h1>Checkout Cancelled</h1><p>No charge made. You can subscribe anytime.</p>
-    <a href="{deep}">Back to Muscle Map Ai</a></div>
-    <script>setTimeout(()=>window.location="{deep}",400);</script></body></html>"""
-    return HTMLResponse(html)
-
-
-# Dev helper: mark current user premium (since we can't run real Stripe checkout in preview)
-@api_router.post("/billing/dev/mark-premium")
-async def mark_premium(payload: CreateCheckoutRequest, user=Depends(get_current_user)):
-    await db.subscriptions.update_one(
-        {"user_id": user["user_id"]},
-        {"$set": {
-            "user_id": user["user_id"],
-            "status": "active",
-            "tier": "premium",
-            "interval": payload.interval,
-            "updated_at": datetime.now(timezone.utc),
-        }},
-        upsert=True,
-    )
-    return {"ok": True, "status": "active", "interval": payload.interval}
-
-
 @api_router.post("/billing/cancel")
 async def cancel_subscription(user=Depends(get_current_user)):
-    """Cancels (marks as canceled) the user's subscription. In production this would call Stripe to cancel at period end."""
+    """Marks the RevenueCat subscription record inactive locally. The actual
+    subscription is managed by the App Store; a later /billing/revenuecat/sync
+    revalidates the real entitlement state from RevenueCat."""
     await db.subscriptions.update_one(
         {"user_id": user["user_id"]},
         {"$set": {
@@ -1811,8 +1713,31 @@ class CoachAskRequest(BaseModel):
 
 
 @api_router.post("/coach/ask")
-async def coach_ask(payload: CoachAskRequest):
-    """Streaming anatomy/fitness coach powered by GPT-5.5 via the Emergent key."""
+async def coach_ask(payload: CoachAskRequest, user=Depends(get_current_user)):
+    """Streaming anatomy/fitness coach. Requires auth + enforces a per-user daily
+    quota to prevent LLM cost abuse (denial-of-wallet)."""
+    # Per-user daily quota (prevents unbounded paid LLM calls). Premium = higher cap.
+    today = datetime.now(timezone.utc).date().isoformat()
+    sub = await db.subscriptions.find_one({"user_id": user["user_id"], "status": "active"}, {"_id": 0})
+    daily_cap = 200 if sub else 40
+    usage = await db.coach_ask_usage.find_one({"user_id": user["user_id"], "date": today}, {"_id": 0})
+    used = usage.get("count", 0) if usage else 0
+    if used >= daily_cap:
+        limit_msg = "You have reached today's coaching limit. Please try again tomorrow."
+        async def limited():
+            yield f"data: {json.dumps({'delta': limit_msg})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'gated': True})}\n\n"
+        return StreamingResponse(limited(), media_type="text/event-stream")
+    await db.coach_ask_usage.update_one(
+        {"user_id": user["user_id"], "date": today},
+        {"$inc": {"count": 1}, "$setOnInsert": {"created_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+    # Cap prompt size to bound token cost / abuse
+    if payload.message and len(payload.message) > 2000:
+        payload.message = payload.message[:2000]
+
     system_msg = COACH_SYSTEM
     if payload.context:
         system_msg += f"\n\nCURRENT CONTEXT: The user is currently looking at: {payload.context}. Tailor your answer to this if relevant."

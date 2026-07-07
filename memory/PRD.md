@@ -75,3 +75,13 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 - Files: src/auth/AuthContext.tsx, app/login.tsx, app/auth.tsx (deep-link landing).
 - Tested: iteration_11.json — 15/15 backend, all frontend flows pass.
 - PENDING FROM USER: Apple "Sign in with Apple" capability on App ID; validate Apple + RevenueCat login on TestFlight build.
+
+## Security Audit remediation (June 2026)
+- SEC-001 (CRITICAL, account takeover): removed unverified /auth/email/login & /auth/demo/login. Email sign-in now REQUIRES the emailed code (/auth/email/verify).
+- SEC-002 (HIGH, free premium): removed all Stripe endpoints (create-checkout, webhook, redirect/success|cancel, dev/mark-premium) + stripe dep. /billing/revenuecat/sync now VALIDATES SERVER-SIDE against RevenueCat REST API (GET /v1/subscribers/{user_id} with REVENUECAT_SECRET_KEY); client is_premium is ignored, fails closed.
+- SEC-003 (HIGH, reflected XSS): resolved by removing the billing redirect HTML pages entirely.
+- SEC-004 (MED, code leak): /auth/email/request only returns dev_code when RESEND_API_KEY is unset (local dev); never on prod send-failure.
+- SEC-005 (MED, unauth paid LLM): /coach/ask now requires auth + per-user daily quota (40 free / 200 premium) + 2000-char prompt cap. coachApi.ts sends Bearer token.
+- Hardening: verify-code lockout after 5 wrong attempts (429); email-request throttle 5/15min (429); Apple audience host.exp.Exponent gated behind APPLE_ALLOW_EXPO_GO (set 0 in prod); CORS allow_credentials=False (Bearer auth, no cookies).
+- New env: REVENUECAT_SECRET_KEY (set), APPLE_ALLOW_EXPO_GO=1. Removed: STRIPE_API_KEY usage.
+- Verified via curl: removed endpoints 404; coach 401 w/o auth & 200 with; RC sync fails closed (is_premium:false for non-subscriber); lockout & no dev_code leak confirmed.

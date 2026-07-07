@@ -1,4 +1,6 @@
 // Streaming client for the anatomy AI coach SSE endpoint.
+import { getToken } from "@/src/api";
+
 const URL = `${process.env.EXPO_PUBLIC_BACKEND_URL || ""}/api/coach/ask`;
 
 export type CoachTurn = { role: "user" | "assistant"; content: string };
@@ -38,9 +40,13 @@ function parseSSE(chunk: string, h: Handlers): boolean {
 
 export async function askCoach(message: string, history: CoachTurn[], context: string | null, h: Handlers) {
   try {
+    const token = await getToken();
     const res = await fetch(URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ message, history, context }),
     });
 
