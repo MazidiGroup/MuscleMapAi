@@ -27,7 +27,7 @@ export default function PrivacyScreen() {
         <Text style={styles.updated}>Last updated: {UPDATED}</Text>
 
         <Text style={styles.p}>
-          Anatomy Trainer ("the app") respects your privacy. This policy explains what data the app handles and how it is
+          Muscle Map Ai ("the app") respects your privacy. This policy explains what data the app handles and how it is
           used. We designed the app to keep your personal data on your device wherever possible.
         </Text>
 

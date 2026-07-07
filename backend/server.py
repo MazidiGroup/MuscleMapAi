@@ -1,5 +1,5 @@
 """
-Apex AI - AI Gym Companion - Backend
+Muscle Map Ai - AI Gym Companion - Backend
 FastAPI + MongoDB + Claude Sonnet 4.5 + Stripe + Emergent Google Auth
 """
 from fastapi import FastAPI, APIRouter, HTTPException, Header, Request, Depends
@@ -36,7 +36,7 @@ STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
 PUBLIC_WEB_APP_URL = os.environ.get('PUBLIC_WEB_APP_URL', '')
 APP_SCHEME = os.environ.get('APP_SCHEME', 'apexai')
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
-RESEND_SENDER = os.environ.get('RESEND_SENDER', 'Anatomy Trainer <onboarding@resend.dev>')
+RESEND_SENDER = os.environ.get('RESEND_SENDER', 'Muscle Map Ai <onboarding@resend.dev>')
 APPLE_BUNDLE_ID = os.environ.get('APPLE_BUNDLE_ID', 'com.mazidigroup.apexai')
 
 stripe.api_key = STRIPE_API_KEY
@@ -55,7 +55,7 @@ client = AsyncIOMotorClient(MONGO_URL, **_mongo_kwargs)
 db = client[DB_NAME]
 
 # ------------------ App ------------------
-app = FastAPI(title="Apex AI Backend")
+app = FastAPI(title="Muscle Map Ai Backend")
 api_router = APIRouter(prefix="/api")
 
 # CORS
@@ -402,7 +402,7 @@ async def _send_magic_email(email: str, code: str, link: str) -> bool:
         return False
     html = f"""<!doctype html><html><body style="margin:0;background:#0A0A0A;padding:32px 16px;font-family:-apple-system,system-ui,sans-serif">
     <div style="max-width:440px;margin:0 auto;background:#141414;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:32px;text-align:center">
-      <h1 style="color:#fff;font-size:20px;margin:0 0 6px">Anatomy Trainer</h1>
+      <h1 style="color:#fff;font-size:20px;margin:0 0 6px">Muscle Map Ai</h1>
       <p style="color:#A1A1AA;font-size:14px;margin:0 0 24px">Use this code to sign in. It expires in 15 minutes.</p>
       <div style="background:#1C1C1C;border-radius:12px;padding:18px;margin-bottom:24px">
         <span style="color:#fff;font-size:32px;font-weight:700;letter-spacing:10px">{code}</span>
@@ -418,7 +418,7 @@ async def _send_magic_email(email: str, code: str, link: str) -> bool:
                 json={
                     "from": RESEND_SENDER,
                     "to": [email],
-                    "subject": f"Your Anatomy Trainer login code: {code}",
+                    "subject": f"Your Muscle Map Ai login code: {code}",
                     "html": html,
                 },
             )
@@ -489,7 +489,7 @@ async def magic_link_open(token: str):
     try:
         ml = await _consume_magic_link({"token": token})
     except HTTPException:
-        html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Anatomy Trainer</title>
+        html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Muscle Map Ai</title>
         <style>body{background:#0A0A0A;color:#fff;font-family:-apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
         .c{text-align:center;max-width:340px;padding:24px}h1{font-size:22px}p{color:#A1A1AA;line-height:1.5}</style></head>
         <body><div class="c"><h1>Link expired</h1><p>This sign-in link is invalid or has expired. Please open the app and request a new one.</p></div></body></html>"""
@@ -499,12 +499,12 @@ async def magic_link_open(token: str):
     session_token = await _new_session(user["user_id"])
     deep = f"{APP_SCHEME}://auth#session_token={session_token}"
     web = f"{PUBLIC_WEB_APP_URL}/?app_session={session_token}"
-    html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Anatomy Trainer</title>
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Muscle Map Ai</title>
     <style>body{{background:#0A0A0A;color:#fff;font-family:-apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}}
     .c{{text-align:center;max-width:340px;padding:24px}}h1{{font-size:22px;margin:0 0 8px}}p{{color:#A1A1AA;line-height:1.5}}
     a{{display:inline-block;background:#0A84FF;color:#fff;padding:14px 24px;border-radius:999px;text-decoration:none;margin-top:14px;font-weight:600}}
     a.alt{{background:transparent;border:1px solid rgba(255,255,255,0.2)}}</style></head>
-    <body><div class="c"><h1>You're signed in ✓</h1><p>Opening Anatomy Trainer…</p>
+    <body><div class="c"><h1>You're signed in ✓</h1><p>Opening Muscle Map Ai…</p>
     <a href="{deep}">Open the app</a><br><a class="alt" href="{web}">Continue on web</a></div>
     <script>setTimeout(()=>window.location="{deep}",400);</script></body></html>"""
     return HTMLResponse(html)
@@ -1628,7 +1628,7 @@ async def create_checkout(payload: CreateCheckoutRequest, user=Depends(get_curre
     cancel_url = payload.cancel_url or f"{PUBLIC_WEB_APP_URL}/api/billing/redirect/cancel"
 
     unit_amount = 999 if payload.interval == 'month' else 7999  # £9.99 monthly or £79.99 annually
-    product_name = "Apex AI Premium (Monthly)" if payload.interval == 'month' else "Apex AI Premium (Annual)"
+    product_name = "Muscle Map Ai Premium (Monthly)" if payload.interval == 'month' else "Muscle Map Ai Premium (Annual)"
 
     try:
         session = stripe.checkout.Session.create(
@@ -1709,15 +1709,15 @@ async def stripe_webhook(request: Request):
 @api_router.get("/billing/redirect/success")
 async def billing_success(session_id: str = ""):
     deep = f"{APP_SCHEME}://checkout/success?session_id={session_id}"
-    html = f"""<!doctype html><html><head><meta charset="utf-8"><title>Apex AI</title>
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><title>Muscle Map Ai</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <style>body{{background:#0A0A0A;color:#fff;font-family:-apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}}
     .c{{text-align:center;max-width:340px;padding:24px}}
     h1{{font-size:24px;margin:0 0 8px}}
     p{{color:#A1A1AA;line-height:1.5}}
     a{{display:inline-block;background:#0A84FF;color:#fff;padding:14px 24px;border-radius:999px;text-decoration:none;margin-top:16px;font-weight:600}}</style></head>
-    <body><div class="c"><h1>You're Premium ✓</h1><p>Returning to Apex AI…</p>
-    <a href="{deep}">Open Apex AI</a></div>
+    <body><div class="c"><h1>You're Premium ✓</h1><p>Returning to Muscle Map Ai…</p>
+    <a href="{deep}">Open Muscle Map Ai</a></div>
     <script>setTimeout(()=>window.location="{deep}",400);</script></body></html>"""
     return HTMLResponse(html)
 
@@ -1725,7 +1725,7 @@ async def billing_success(session_id: str = ""):
 @api_router.get("/billing/redirect/cancel")
 async def billing_cancel():
     deep = f"{APP_SCHEME}://checkout/cancel"
-    html = f"""<!doctype html><html><head><meta charset="utf-8"><title>Apex AI</title>
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><title>Muscle Map Ai</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <style>body{{background:#0A0A0A;color:#fff;font-family:-apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}}
     .c{{text-align:center;max-width:340px;padding:24px}}
@@ -1733,7 +1733,7 @@ async def billing_cancel():
     p{{color:#A1A1AA}}
     a{{display:inline-block;background:#0A84FF;color:#fff;padding:14px 24px;border-radius:999px;text-decoration:none;margin-top:16px;font-weight:600}}</style></head>
     <body><div class="c"><h1>Checkout Cancelled</h1><p>No charge made. You can subscribe anytime.</p>
-    <a href="{deep}">Back to Apex AI</a></div>
+    <a href="{deep}">Back to Muscle Map Ai</a></div>
     <script>setTimeout(()=>window.location="{deep}",400);</script></body></html>"""
     return HTMLResponse(html)
 
@@ -1780,7 +1780,7 @@ async def restore_purchases(user=Depends(get_current_user)):
 # ------------------ Health ------------------
 @api_router.get("/")
 async def root():
-    return {"app": "Apex AI", "ok": True}
+    return {"app": "Muscle Map Ai", "ok": True}
 
 
 # ------------------ Anatomy AI Coach (GPT-5.5) ------------------

@@ -65,7 +65,7 @@ export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?
           <Ionicons name="star" size={30} color={T.accent} />
         </View>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>Go Premium to unlock the full Anatomy Trainer experience.</Text>
+        <Text style={styles.subtitle}>Go Premium to unlock the full Muscle Map Ai experience.</Text>
 
         <View style={styles.perks}>
           {PERKS.map((p) => (

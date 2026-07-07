@@ -79,7 +79,7 @@ export default function LoginScreen() {
           <View style={styles.logoWrap}>
             <Image source={require("../assets/images/icon.png")} style={styles.logo} />
           </View>
-          <Text style={styles.appName}>Anatomy Trainer</Text>
+          <Text style={styles.appName}>Muscle Map Ai</Text>
           <Text style={styles.tagline}>Learn the body. Train it smarter.</Text>
         </View>
 

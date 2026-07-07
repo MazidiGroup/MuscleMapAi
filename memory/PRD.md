@@ -1,4 +1,4 @@
-# Fitness Anatomy Trainer — V1 (3D Écorché)
+# Fitness Muscle Map Ai — V1 (3D Écorché)
 
 A mobile + web 3D skeletal & muscular anatomy learning app. Replaced the previous "Apex AI"
 fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend serving the model.

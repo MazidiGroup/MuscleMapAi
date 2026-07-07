@@ -1,4 +1,4 @@
-// Apex AI Design Tokens
+// Muscle Map Ai Design Tokens
 export const COLORS = {
   bg: '#0A0A0A',
   surface: '#141414',

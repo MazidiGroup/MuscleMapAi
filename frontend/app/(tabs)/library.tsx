@@ -23,10 +23,10 @@ export default function LibraryScreen() {
   const confirmLogout = useCallback(() => {
     if (Platform.OS === "web") {
       // eslint-disable-next-line no-alert
-      if (window.confirm("Log out of Anatomy Trainer?")) logout();
+      if (window.confirm("Log out of Muscle Map Ai?")) logout();
       return;
     }
-    Alert.alert("Log out", "Log out of Anatomy Trainer?", [
+    Alert.alert("Log out", "Log out of Muscle Map Ai?", [
       { text: "Cancel", style: "cancel" },
       { text: "Log Out", style: "destructive", onPress: () => logout() },
     ]);
@@ -143,7 +143,7 @@ export default function LibraryScreen() {
           <View style={styles.about}>
             <Text style={styles.aboutTitle}>About</Text>
             <Text style={styles.aboutText}>
-              Fitness Anatomy Trainer — an interactive 3D écorché (real-scale 180 cm) with 270 named
+              Muscle Map Ai — an interactive 3D écorché (real-scale 180 cm) with 270 named
               structures, morph-target muscle atrophy, an AI coach and guided lessons.
             </Text>
             <Text style={styles.version}>v1.0 · Explore · Workout · Learn · Coach</Text>
@@ -156,7 +156,7 @@ export default function LibraryScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.linkRow}
-                onPress={() => Linking.openURL("mailto:info@mazidigroup.com?subject=Anatomy%20Trainer%20Support")}
+                onPress={() => Linking.openURL("mailto:info@mazidigroup.com?subject=Muscle%20Map%20Ai%20Support")}
                 testID="link-support"
               >
                 <Ionicons name="mail-outline" size={18} color={T.accent} />
