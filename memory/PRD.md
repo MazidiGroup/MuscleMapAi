@@ -85,3 +85,7 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 - Hardening: verify-code lockout after 5 wrong attempts (429); email-request throttle 5/15min (429); Apple audience host.exp.Exponent gated behind APPLE_ALLOW_EXPO_GO (set 0 in prod); CORS allow_credentials=False (Bearer auth, no cookies).
 - New env: REVENUECAT_SECRET_KEY (set), APPLE_ALLOW_EXPO_GO=1. Removed: STRIPE_API_KEY usage.
 - Verified via curl: removed endpoints 404; coach 401 w/o auth & 200 with; RC sync fails closed (is_premium:false for non-subscriber); lockout & no dev_code leak confirmed.
+
+## App Store review bypass (June 2026)
+- Reserved reviewer email applereview@mazidigroup.com skips Resend, accepts fixed code 123456, and is granted premium directly (subscriptions source="review_bypass" → /auth/me is_premium true), independent of RevenueCat.
+- Env-gated: APPLE_REVIEW_BYPASS_EMAIL / APPLE_REVIEW_BYPASS_CODE in backend/.env. Empty email disables it. Exact case-insensitive match only, no wildcards. No effect on any other email.

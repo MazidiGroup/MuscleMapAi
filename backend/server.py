@@ -36,6 +36,15 @@ RESEND_SENDER = os.environ.get('RESEND_SENDER', 'Muscle Map Ai <onboarding@resen
 APPLE_BUNDLE_ID = os.environ.get('APPLE_BUNDLE_ID', 'com.mazidigroup.apexai')
 APPLE_ALLOW_EXPO_GO = os.environ.get('APPLE_ALLOW_EXPO_GO', '1') == '1'
 REVENUECAT_SECRET_KEY = os.environ.get('REVENUECAT_SECRET_KEY', '')
+# App Store review bypass — ONLY the exact reserved reviewer email (env-gated) skips
+# Resend and accepts a fixed static code, and is granted premium directly. Empty = disabled.
+REVIEW_BYPASS_EMAIL = os.environ.get('APPLE_REVIEW_BYPASS_EMAIL', '').strip().lower()
+REVIEW_BYPASS_CODE = os.environ.get('APPLE_REVIEW_BYPASS_CODE', '123456')
+
+
+def _is_review_email(email: str) -> bool:
+    """True ONLY for the exact reserved reviewer address (case-insensitive). No wildcards."""
+    return bool(REVIEW_BYPASS_EMAIL) and email.strip().lower() == REVIEW_BYPASS_EMAIL
 
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
 
@@ -392,6 +401,11 @@ async def request_magic_link(payload: MagicRequestPayload):
     if not email or "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Please enter a valid email address")
 
+    # App Store reviewer bypass (exact email only): don't send a real email; the
+    # fixed static code is accepted at /auth/email/verify.
+    if _is_review_email(email):
+        return {"sent": True}
+
     # Throttle: max 5 requests per email per 15 minutes (anti email-bomb / abuse)
     window_start = datetime.now(timezone.utc) - timedelta(minutes=15)
     recent = await db.magic_links.count_documents({"email": email, "created_at": {"$gte": window_start}})
@@ -439,6 +453,25 @@ async def _consume_magic_link(query: Dict[str, Any]) -> Dict[str, Any]:
 async def verify_magic_code(payload: MagicVerifyPayload):
     email = payload.email.strip().lower()
     code = payload.code.strip()
+
+    # App Store reviewer bypass (exact email only): accept the fixed static code and
+    # grant premium directly, without Resend or RevenueCat. Never applies to any other email.
+    if _is_review_email(email) and code == REVIEW_BYPASS_CODE:
+        user = await _upsert_user(email, name="App Review", provider="review")
+        await db.subscriptions.update_one(
+            {"user_id": user["user_id"], "source": "review_bypass"},
+            {"$set": {
+                "user_id": user["user_id"],
+                "source": "review_bypass",
+                "status": "active",
+                "tier": "premium",
+                "updated_at": datetime.now(timezone.utc),
+            }},
+            upsert=True,
+        )
+        token = await _new_session(user["user_id"])
+        return {"session_token": token, "user": _user_out(user)}
+
     # Look up the active (unused, unexpired) link for this email, then check the code
     # with a bounded attempt counter to prevent brute-forcing the 6-digit code.
     ml = await db.magic_links.find_one({"email": email, "used": False}, {"_id": 0}, sort=[("created_at", -1)])
