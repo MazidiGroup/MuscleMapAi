@@ -66,7 +66,7 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 
 ## V1.3 — Authentication + Account-linked Subscriptions (iteration 11, June 2026)
 - Login-first flow: app gated behind auth (`AuthGate` in `app/_layout.tsx`); `/login` + `/privacy` are the only public routes.
-- Sign-in methods: Google (Emergent-managed OAuth), Apple (expo-apple-authentication, iOS native builds only, `usesAppleSignIn` in app.json), passwordless email code + one-tap magic link (Resend; DEV MODE while RESEND_API_KEY empty — code returned in API response & shown in login UI).
+- Sign-in methods: Google (Emergent-managed OAuth), Apple (expo-apple-authentication, iOS native builds only, `usesAppleSignIn` in app.json), passwordless email code + one-tap magic link via Resend (LIVE since June 2026 — sender "Apex AI <login@mazidigroup.com>", key in backend/.env; on send failure the API returns dev_code so login is never blocked).
 - Account linking by email: one users doc per email regardless of provider (`_upsert_user` in server.py); `providers` array + `apple_sub` stored.
 - Sessions: 7-day tokens in `user_sessions` (TTL index), stored via expo-secure-store (native) / localStorage (web), key `apex.session_token`.
 - RevenueCat: after sign-in `Purchases.logIn(user_id)` (iOS) then POST /api/billing/revenuecat/sync upserts `subscriptions` (source: revenuecat) → `/api/auth/me` returns `is_premium`.
@@ -74,4 +74,4 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 - Key endpoints: POST /api/auth/email/request|verify, GET /api/auth/magic/{token}, POST /api/auth/apple/session, POST /api/auth/google/session, GET /api/auth/me, POST /api/auth/logout, POST /api/billing/revenuecat/sync.
 - Files: src/auth/AuthContext.tsx, app/login.tsx, app/auth.tsx (deep-link landing).
 - Tested: iteration_11.json — 15/15 backend, all frontend flows pass.
-- PENDING FROM USER: Resend API key + verified sender (to enable real emails); Apple "Sign in with Apple" capability on App ID; validate Apple + RevenueCat login on TestFlight build.
+- PENDING FROM USER: Apple "Sign in with Apple" capability on App ID; validate Apple + RevenueCat login on TestFlight build.
