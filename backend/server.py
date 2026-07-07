@@ -518,7 +518,8 @@ async def magic_link_open(token: str):
     user = await _upsert_user(ml["email"], provider="email")
     session_token = await _new_session(user["user_id"])
     deep = f"{APP_SCHEME}://auth#session_token={session_token}"
-    web = f"{PUBLIC_WEB_APP_URL}/?app_session={session_token}"
+    # Fragment (not query) so the token doesn't land in server logs / browser history referrers
+    web = f"{PUBLIC_WEB_APP_URL}/#app_session={session_token}"
     html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Muscle Map Ai</title>
     <style>body{{background:#0A0A0A;color:#fff;font-family:-apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}}
     .c{{text-align:center;max-width:340px;padding:24px}}h1{{font-size:22px;margin:0 0 8px}}p{{color:#A1A1AA;line-height:1.5}}
