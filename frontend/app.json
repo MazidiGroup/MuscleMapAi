@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mazidigroup.apexai",
+      "usesAppleSignIn": true,
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -40,6 +41,7 @@
         }
       ],
       "expo-asset",
+      "expo-apple-authentication",
       [
         "expo-build-properties",
         {

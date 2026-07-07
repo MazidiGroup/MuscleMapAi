@@ -19,6 +19,9 @@ from typing import List, Optional, Literal, Dict, Any
 from datetime import datetime, timezone, timedelta
 import httpx
 import stripe
+import random
+import jwt as _jwt
+from jwt import PyJWKClient
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 
@@ -32,6 +35,9 @@ EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
 PUBLIC_WEB_APP_URL = os.environ.get('PUBLIC_WEB_APP_URL', '')
 APP_SCHEME = os.environ.get('APP_SCHEME', 'apexai')
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+RESEND_SENDER = os.environ.get('RESEND_SENDER', 'Anatomy Trainer <onboarding@resend.dev>')
+APPLE_BUNDLE_ID = os.environ.get('APPLE_BUNDLE_ID', 'com.mazidigroup.apexai')
 
 stripe.api_key = STRIPE_API_KEY
 
@@ -63,6 +69,18 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("apex")
+
+
+@app.on_event("startup")
+async def _ensure_indexes():
+    try:
+        await db.users.create_index("user_id", unique=True)
+        await db.users.create_index("email", unique=True)
+        await db.user_sessions.create_index("session_token", unique=True)
+        await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
+        await db.magic_links.create_index("expires_at", expireAfterSeconds=0)
+    except Exception as e:
+        logger.warning(f"index creation skipped: {e}")
 
 
 # ------------------ Models ------------------
@@ -152,13 +170,14 @@ async def create_google_session(payload: GoogleSessionRequest):
     picture = data.get("picture", "")
     session_token = data.get("session_token", payload.session_token)
 
-    # Upsert user
+    # Upsert user (account linking by email — one account per email)
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if user:
         user_id = user["user_id"]
         await db.users.update_one(
             {"user_id": user_id},
-            {"$set": {"name": name, "picture": picture, "last_login": datetime.now(timezone.utc)}},
+            {"$set": {"name": name, "picture": picture, "last_login": datetime.now(timezone.utc)},
+             "$addToSet": {"providers": "google"}},
         )
     else:
         user_id = f"user_{uuid.uuid4().hex[:12]}"
@@ -167,6 +186,7 @@ async def create_google_session(payload: GoogleSessionRequest):
             "email": email,
             "name": name,
             "picture": picture,
+            "providers": ["google"],
             "onboarded": False,
             "created_at": datetime.now(timezone.utc),
             "last_login": datetime.now(timezone.utc),
@@ -259,6 +279,269 @@ async def email_login(payload: EmailLoginRequest):
 async def demo_login():
     """Quick demo account for sandbox testing."""
     return await email_login(EmailLoginRequest(email=f"demo_{uuid.uuid4().hex[:6]}@apexai.app", name="Demo Athlete"))
+
+
+# ------------------ Shared auth helpers ------------------
+def _user_out(u: Dict[str, Any]) -> Dict[str, Any]:
+    for k in ("created_at", "last_login"):
+        if isinstance(u.get(k), datetime):
+            u[k] = u[k].isoformat()
+    return u
+
+
+async def _upsert_user(email: str, name: Optional[str] = None, picture: Optional[str] = None,
+                       provider: Optional[str] = None, apple_sub: Optional[str] = None) -> Dict[str, Any]:
+    """Upsert a user by email — the single identity key so Google/Apple/email logins
+    with the same address resolve to ONE account."""
+    email = email.strip().lower()
+    now = datetime.now(timezone.utc)
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        user_id = existing["user_id"]
+        sets: Dict[str, Any] = {"last_login": now}
+        # Never clobber an existing profile with a derived/partial one
+        if name and not existing.get("name"):
+            sets["name"] = name
+        if picture and not existing.get("picture"):
+            sets["picture"] = picture
+        if apple_sub:
+            sets["apple_sub"] = apple_sub
+        update: Dict[str, Any] = {"$set": sets}
+        if provider:
+            update["$addToSet"] = {"providers": provider}
+        await db.users.update_one({"user_id": user_id}, update)
+    else:
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        doc: Dict[str, Any] = {
+            "user_id": user_id,
+            "email": email,
+            "name": name or email.split("@")[0].title(),
+            "picture": picture or "",
+            "providers": [provider] if provider else [],
+            "onboarded": False,
+            "created_at": now,
+            "last_login": now,
+        }
+        if apple_sub:
+            doc["apple_sub"] = apple_sub
+        await db.users.insert_one(dict(doc))
+    return await db.users.find_one({"user_id": user_id}, {"_id": 0})
+
+
+async def _new_session(user_id: str) -> str:
+    token = f"sess_{uuid.uuid4().hex}"
+    now = datetime.now(timezone.utc)
+    await db.user_sessions.insert_one({
+        "session_token": token,
+        "user_id": user_id,
+        "expires_at": now + timedelta(days=7),
+        "created_at": now,
+    })
+    return token
+
+
+# ------------------ Apple Sign-In ------------------
+_apple_jwks = PyJWKClient("https://appleid.apple.com/auth/keys")
+
+
+class AppleSessionRequest(BaseModel):
+    identity_token: str
+    full_name: Optional[str] = None
+
+
+def _verify_apple_token(identity_token: str) -> Dict[str, Any]:
+    signing_key = _apple_jwks.get_signing_key_from_jwt(identity_token)
+    last_err: Exception = ValueError("audience check failed")
+    # Accept both the production bundle id and Expo Go's client id (dev)
+    for aud in (APPLE_BUNDLE_ID, "host.exp.Exponent"):
+        try:
+            return _jwt.decode(
+                identity_token, signing_key.key, algorithms=["RS256"],
+                audience=aud, issuer="https://appleid.apple.com",
+            )
+        except _jwt.InvalidAudienceError as e:
+            last_err = e
+    raise last_err
+
+
+@api_router.post("/auth/apple/session")
+async def apple_session(payload: AppleSessionRequest):
+    """Verify Apple identity token, link/create the account by email, return app session."""
+    try:
+        claims = await asyncio.to_thread(_verify_apple_token, payload.identity_token)
+    except Exception as e:
+        logger.warning(f"apple token verify failed: {e}")
+        raise HTTPException(status_code=401, detail="Invalid Apple identity token")
+
+    apple_sub = claims.get("sub")
+    email = (claims.get("email") or "").strip().lower()
+    if not email:
+        # Apple only shares email on first authorization — fall back to sub lookup
+        existing = await db.users.find_one({"apple_sub": apple_sub}, {"_id": 0})
+        if not existing:
+            raise HTTPException(status_code=400, detail="Apple didn't share your email. Please sign in with Google or email link first.")
+        email = existing["email"]
+
+    user = await _upsert_user(email, name=(payload.full_name or None), provider="apple", apple_sub=apple_sub)
+    token = await _new_session(user["user_id"])
+    return {"session_token": token, "user": _user_out(user)}
+
+
+# ------------------ Email Magic Link (Resend) ------------------
+class MagicRequestPayload(BaseModel):
+    email: str
+
+
+class MagicVerifyPayload(BaseModel):
+    email: str
+    code: str
+
+
+async def _send_magic_email(email: str, code: str, link: str) -> bool:
+    if not RESEND_API_KEY:
+        return False
+    html = f"""<!doctype html><html><body style="margin:0;background:#0A0A0A;padding:32px 16px;font-family:-apple-system,system-ui,sans-serif">
+    <div style="max-width:440px;margin:0 auto;background:#141414;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:32px;text-align:center">
+      <h1 style="color:#fff;font-size:20px;margin:0 0 6px">Anatomy Trainer</h1>
+      <p style="color:#A1A1AA;font-size:14px;margin:0 0 24px">Use this code to sign in. It expires in 15 minutes.</p>
+      <div style="background:#1C1C1C;border-radius:12px;padding:18px;margin-bottom:24px">
+        <span style="color:#fff;font-size:32px;font-weight:700;letter-spacing:10px">{code}</span>
+      </div>
+      <a href="{link}" style="display:inline-block;background:#0A84FF;color:#fff;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:600;font-size:15px">Sign in with one tap</a>
+      <p style="color:#71717A;font-size:12px;margin-top:24px">If you didn't request this, you can safely ignore this email.</p>
+    </div></body></html>"""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as http:
+            r = await http.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+                json={
+                    "from": RESEND_SENDER,
+                    "to": [email],
+                    "subject": f"Your Anatomy Trainer login code: {code}",
+                    "html": html,
+                },
+            )
+        if r.status_code in (200, 201):
+            return True
+        logger.warning(f"resend send failed {r.status_code}: {r.text[:200]}")
+        return False
+    except Exception as e:
+        logger.warning(f"resend send error: {e}")
+        return False
+
+
+@api_router.post("/auth/email/request")
+async def request_magic_link(payload: MagicRequestPayload):
+    """Send a passwordless login code + magic link to the user's email."""
+    email = payload.email.strip().lower()
+    if not email or "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address")
+
+    code = f"{random.randint(0, 999999):06d}"
+    token = uuid.uuid4().hex
+    now = datetime.now(timezone.utc)
+    await db.magic_links.delete_many({"email": email, "used": False})
+    await db.magic_links.insert_one({
+        "email": email,
+        "code": code,
+        "token": token,
+        "used": False,
+        "expires_at": now + timedelta(minutes=15),
+        "created_at": now,
+    })
+
+    link = f"{PUBLIC_WEB_APP_URL}/api/auth/magic/{token}"
+    sent = await _send_magic_email(email, code, link)
+    resp: Dict[str, Any] = {"sent": sent}
+    if not sent:
+        # Email provider not configured (or send failed) — surface the code so the
+        # flow remains testable in dev. Remove once RESEND_API_KEY is set.
+        resp["dev_code"] = code
+    return resp
+
+
+async def _consume_magic_link(query: Dict[str, Any]) -> Dict[str, Any]:
+    ml = await db.magic_links.find_one({**query, "used": False}, {"_id": 0})
+    if not ml:
+        raise HTTPException(status_code=401, detail="Invalid or expired code. Please request a new one.")
+    expires_at = ml["expires_at"]
+    if isinstance(expires_at, datetime) and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="That code has expired. Please request a new one.")
+    await db.magic_links.update_one({"token": ml["token"]}, {"$set": {"used": True}})
+    return ml
+
+
+@api_router.post("/auth/email/verify")
+async def verify_magic_code(payload: MagicVerifyPayload):
+    email = payload.email.strip().lower()
+    ml = await _consume_magic_link({"email": email, "code": payload.code.strip()})
+    user = await _upsert_user(ml["email"], provider="email")
+    token = await _new_session(user["user_id"])
+    return {"session_token": token, "user": _user_out(user)}
+
+
+@api_router.get("/auth/magic/{token}")
+async def magic_link_open(token: str):
+    """One-tap magic link target — creates a session and hands it to the app."""
+    try:
+        ml = await _consume_magic_link({"token": token})
+    except HTTPException:
+        html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Anatomy Trainer</title>
+        <style>body{background:#0A0A0A;color:#fff;font-family:-apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+        .c{text-align:center;max-width:340px;padding:24px}h1{font-size:22px}p{color:#A1A1AA;line-height:1.5}</style></head>
+        <body><div class="c"><h1>Link expired</h1><p>This sign-in link is invalid or has expired. Please open the app and request a new one.</p></div></body></html>"""
+        return HTMLResponse(html, status_code=401)
+
+    user = await _upsert_user(ml["email"], provider="email")
+    session_token = await _new_session(user["user_id"])
+    deep = f"{APP_SCHEME}://auth#session_token={session_token}"
+    web = f"{PUBLIC_WEB_APP_URL}/?app_session={session_token}"
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Anatomy Trainer</title>
+    <style>body{{background:#0A0A0A;color:#fff;font-family:-apple-system,system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}}
+    .c{{text-align:center;max-width:340px;padding:24px}}h1{{font-size:22px;margin:0 0 8px}}p{{color:#A1A1AA;line-height:1.5}}
+    a{{display:inline-block;background:#0A84FF;color:#fff;padding:14px 24px;border-radius:999px;text-decoration:none;margin-top:14px;font-weight:600}}
+    a.alt{{background:transparent;border:1px solid rgba(255,255,255,0.2)}}</style></head>
+    <body><div class="c"><h1>You're signed in ✓</h1><p>Opening Anatomy Trainer…</p>
+    <a href="{deep}">Open the app</a><br><a class="alt" href="{web}">Continue on web</a></div>
+    <script>setTimeout(()=>window.location="{deep}",400);</script></body></html>"""
+    return HTMLResponse(html)
+
+
+# ------------------ RevenueCat entitlement sync ------------------
+class RevenueCatSyncPayload(BaseModel):
+    is_premium: bool
+    product_id: Optional[str] = None
+    expires_at: Optional[str] = None
+
+
+@api_router.post("/billing/revenuecat/sync")
+async def revenuecat_sync(payload: RevenueCatSyncPayload, user=Depends(get_current_user)):
+    """Connect the RevenueCat entitlement to this account so subscription status carries over."""
+    now = datetime.now(timezone.utc)
+    if payload.is_premium:
+        await db.subscriptions.update_one(
+            {"user_id": user["user_id"], "source": "revenuecat"},
+            {"$set": {
+                "user_id": user["user_id"],
+                "source": "revenuecat",
+                "status": "active",
+                "tier": "premium",
+                "product_id": payload.product_id,
+                "expires_at": payload.expires_at,
+                "updated_at": now,
+            }},
+            upsert=True,
+        )
+    else:
+        await db.subscriptions.update_many(
+            {"user_id": user["user_id"], "source": "revenuecat", "status": "active"},
+            {"$set": {"status": "inactive", "updated_at": now}},
+        )
+    sub = await db.subscriptions.find_one({"user_id": user["user_id"], "status": "active"}, {"_id": 0})
+    return {"ok": True, "is_premium": sub is not None}
 
 
 

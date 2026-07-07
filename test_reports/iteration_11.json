@@ -1,0 +1,37 @@
+{
+  "summary": "Full auth flow (backend + frontend) tested end-to-end. Backend: all 15 pytest cases pass in /app/backend/tests/test_auth_flow.py covering email/request (200 with dev_code, 400 invalid), email/verify (200 session+user, 401 wrong code, 401 reused code), auth/me (200 with valid Bearer showing is_premium=false, 401 no/bad token), magic-link HTML endpoint (200 signed-in on first open, 401 expired on reuse), RevenueCat sync (is_premium true/false round-trips and reflects in /auth/me, 401 without auth), account linking (same email via multiple verify calls → same user_id and exactly 1 users doc), and logout (session_token invalidated → subsequent /auth/me returns 401). Frontend (390x844 mobile viewport): fresh visit lands on /login with app logo, 'Anatomy Trainer', tagline, Continue with Google + Continue with email buttons; Apple button correctly hidden on web (count=0). Email flow: click login-email → enter test email → login-send-code → login-dev-code appears with 6-digit code → wrong code (000000) shows login-error 'That code is invalid or expired' → entering correct code lands on /explore with all 5 tabs (Explore/Workout/Learn/Coach/Library) rendered. localStorage.apex.session_token persists (length 39). Reload → stays on /explore (session restored, no redirect to login). Library tab shows account-info (name + email) and logout-btn; window.confirm auto-accepted → logout returns to /login; reload after logout still shows /login. Deep route gating: /privacy is public when logged out (loads); /workout when logged out redirects to /login. No regressions detected on tab navigation.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auth_flow.py",
+    "/app/test_reports/pytest/pytest_auth.xml",
+    "/app/test_reports/iteration_11.json"
+  ],
+  "action_items": [
+    "None required — auth feature works as specified. Optional: switch class-scoped pytest fixtures to @classmethod to remove PytestRemovedIn10Warning (cosmetic)."
+  ],
+  "critical_code_review_comments": [
+    "server.py _upsert_user() correctly keys off email (lowercased) — Google/Apple/email flows all resolve to one account. Uses $addToSet on providers list, doesn't clobber existing name/picture. Good.",
+    "server.py _consume_magic_link() atomically marks code as used before returning — protects against reuse race. Correct 401 on both wrong-code and already-used-code paths.",
+    "server.py /auth/email/request writes dev_code only when RESEND_API_KEY is empty (or send fails). Once RESEND_API_KEY is set, dev_code disappears from the response — remember to also hide the login-dev-code UI block in that case (login.tsx renders it whenever devCode is truthy, which is safe).",
+    "server.py /auth/me correctly returns is_premium by looking up an active subscription doc — RevenueCat sync updates the same collection so state stays consistent.",
+    "server.py get_current_user() properly handles naive-datetime expires_at (attaches UTC) and returns 401 on expiration. TTL index expireAfterSeconds=0 auto-purges expired sessions.",
+    "_layout.tsx AuthGate correctly uses replace() (not push) to avoid history bloat, and gates on segments[0] === 'login' | 'privacy' as public paths.",
+    "AuthContext.tsx boot() first processes ?session_id= / ?app_session= URL params (Google + magic-link web returns), THEN restores stored token — correct ordering to avoid races.",
+    "AuthContext.tsx web logout clears localStorage via clearToken() and setUser(null); AuthGate then redirects to /login. Verified.",
+    "login.tsx: KeyboardAvoidingView, autoCapitalize='none', keyboardType='email-address' and 'number-pad', maxLength=6 on code input — good mobile UX. All required testIDs present: login-google, login-email, login-email-input, login-send-code, login-dev-code, login-code-input, login-verify, login-error, login-back, login-resend.",
+    "server.py is now 1600+ lines — approaching the split threshold. Consider extracting the auth/billing block into a separate module in a follow-up (not blocking)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (15/15 pytest cases)", "frontend": "100% (all 14 scenarios in review request verified)"},
+  "seed_data_creation": "Created several TEST_auth_*@example.com users + one test_e2e_playwright@example.com user via the actual email verify flow. Users linger in db.users with 'providers':['email']. Magic-link docs are TTL-indexed and self-purge in 15 min.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Auth is fully verified. testIDs to use: login-google, login-apple (iOS-only, count=0 on web), login-email, login-email-input, login-send-code, login-dev-code, login-code-input, login-verify, login-error, login-back, login-resend, account-info, logout-btn. Web logout uses window.confirm — accept via page.once('dialog', lambda d: d.accept()). Session persists in localStorage['apex.session_token']. Fresh test emails auto-create accounts. Dev-mode /auth/email/request returns {sent:false, dev_code:'######'} while RESEND_API_KEY is empty; setting the key will remove dev_code and the login-dev-code UI block will hide automatically.",
+  "rca_of_issue": "N/A — no bugs found. Feature works as specified."
+}

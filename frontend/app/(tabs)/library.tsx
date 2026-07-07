@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Pressable, Linking } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Pressable, Linking, Alert, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -9,14 +9,28 @@ import { GYM_GROUPS, GYM_GROUP_ORDER, prettyName } from "@/src/anatomy/groups";
 import { MUSCLE_DATA, getMuscleInfo } from "@/src/anatomy/muscleData";
 import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
 import { T, GROUP_COLORS } from "@/src/anatomy/ui";
+import { useAuth } from "@/src/auth/AuthContext";
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
+
+  const confirmLogout = useCallback(() => {
+    if (Platform.OS === "web") {
+      // eslint-disable-next-line no-alert
+      if (window.confirm("Log out of Anatomy Trainer?")) logout();
+      return;
+    }
+    Alert.alert("Log out", "Log out of Anatomy Trainer?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Log Out", style: "destructive", onPress: () => logout() },
+    ]);
+  }, [logout]);
 
   const refresh = useCallback(() => {
     getRecent().then(setRecent);
@@ -103,6 +117,27 @@ export default function LibraryScreen() {
         })}
         {groups.length === 0 && <Text style={styles.empty}>No muscles match “{query}”.</Text>}
 
+        {/* Account */}
+        {query.length === 0 && user && (
+          <View style={styles.about}>
+            <Text style={styles.aboutTitle}>Account</Text>
+            <View style={styles.linkList}>
+              <View style={styles.linkRow} testID="account-info">
+                <Ionicons name="person-circle-outline" size={20} color={T.accent} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.linkRowText} numberOfLines={1}>{user.name}</Text>
+                  <Text style={styles.accountEmail} numberOfLines={1}>{user.email}</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.linkRow} onPress={confirmLogout} testID="logout-btn">
+                <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+                <Text style={[styles.linkRowText, { color: "#EF4444" }]}>Log Out</Text>
+                <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* About */}
         {query.length === 0 && (
           <View style={styles.about}>
@@ -183,6 +218,7 @@ const styles = StyleSheet.create({
   linkList: { marginTop: 16, gap: 8 },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13 },
   linkRowText: { flex: 1, color: T.text, fontSize: 15, fontWeight: "600" },
+  accountEmail: { color: T.textFaint, fontSize: 12, marginTop: 1 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
   modalBottom: { position: "absolute", left: 0, right: 0, bottom: 0 },
 });
