@@ -32,6 +32,7 @@ type AuthCtx = {
   loginWithApple: () => Promise<AuthResult>;
   requestMagicLink: (email: string) => Promise<{ ok: boolean; devCode?: string; error?: string }>;
   verifyMagicCode: (email: string, code: string) => Promise<AuthResult>;
+  refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -42,6 +43,7 @@ const Ctx = createContext<AuthCtx>({
   loginWithApple: async () => ({ ok: false }),
   requestMagicLink: async () => ({ ok: false }),
   verifyMagicCode: async () => ({ ok: false }),
+  refreshUser: async () => {},
   logout: async () => {},
 });
 
@@ -287,6 +289,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [establishSession]);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      setUser(await apiGet<AuthUser>("/auth/me"));
+    } catch {
+      // keep current user on refresh failure
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await apiPost("/auth/logout");
@@ -305,7 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ user, loading, loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode, logout }}>
+    <Ctx.Provider value={{ user, loading, loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode, refreshUser, logout }}>
       {children}
     </Ctx.Provider>
   );

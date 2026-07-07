@@ -556,18 +556,22 @@ async def _validate_revenuecat_entitlement(app_user_id: str) -> Dict[str, Any]:
             logger.warning(f"revenuecat lookup {app_user_id} -> {r.status_code}")
             return {"active": False, "product_id": None, "expires_at": None}
         data = r.json()
-        ent = (data.get("subscriber", {}).get("entitlements", {}) or {}).get("premium")
-        if not ent:
-            return {"active": False, "product_id": None, "expires_at": None}
-        expires = ent.get("expires_date")  # ISO8601 or null (null = lifetime)
-        active = True
-        if expires:
-            try:
-                exp_dt = datetime.fromisoformat(expires.replace("Z", "+00:00"))
-                active = exp_dt > datetime.now(timezone.utc)
-            except Exception:
-                active = True
-        return {"active": active, "product_id": ent.get("product_identifier"), "expires_at": expires}
+        # Name-agnostic: accept ANY active entitlement (single-tier app). This avoids
+        # silent lockout if the RevenueCat dashboard entitlement isn't named "premium".
+        ents = (data.get("subscriber", {}).get("entitlements", {}) or {})
+        now_utc = datetime.now(timezone.utc)
+        for ent in ents.values():
+            expires = ent.get("expires_date")  # ISO8601 or null (null = lifetime)
+            active = True
+            if expires:
+                try:
+                    exp_dt = datetime.fromisoformat(expires.replace("Z", "+00:00"))
+                    active = exp_dt > now_utc
+                except Exception:
+                    active = True
+            if active:
+                return {"active": True, "product_id": ent.get("product_identifier"), "expires_at": expires}
+        return {"active": False, "product_id": None, "expires_at": None}
     except Exception as e:
         logger.warning(f"revenuecat validation error: {e}")
         return {"active": False, "product_id": None, "expires_at": None}

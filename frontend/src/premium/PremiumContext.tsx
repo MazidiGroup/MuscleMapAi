@@ -2,20 +2,22 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { Platform } from "react-native";
 
 import { useAuth } from "@/src/auth/AuthContext";
+import { apiPost } from "@/src/api";
 
 /**
- * Central premium entitlement, now backed by RevenueCat (react-native-purchases).
+ * Central premium entitlement, backed by RevenueCat (react-native-purchases).
  *
- * `isPremium` is the SINGLE source of truth the whole app reads. It is DERIVED
- * from the `premium` entitlement in the RevenueCat CustomerInfo — checked on
- * mount, via a customer-info update listener, and after purchase/restore.
+ * `isPremium` is the SINGLE source of truth the whole app reads. It unlocks when
+ * EITHER (a) ANY active RevenueCat entitlement exists on-device (name-agnostic, so
+ * dashboard naming can't silently break gating) or (b) the backend reports
+ * `is_premium` via /auth/me (server-validated sync or App Store review bypass).
+ * After purchase/restore we immediately sync the entitlement to the backend and
+ * re-fetch the user so premium reflects without an app restart.
  *
  * NOTE: react-native-purchases requires a native (dev/production) build. It does
  * NOT run in Expo Go or on web, so the SDK is only loaded off-web and every call
  * is guarded. On web/Expo Go the app simply behaves as a free (non-premium) user.
  */
-
-const ENTITLEMENT_ID = "premium";
 
 // Only load the native module off-web to avoid breaking the web bundle.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -61,7 +63,9 @@ const PACKAGE_LABELS: Record<string, string> = {
 };
 
 function hasPremium(customerInfo: any): boolean {
-  return !!customerInfo?.entitlements?.active?.[ENTITLEMENT_ID];
+  // Name-agnostic: ANY active entitlement unlocks premium (single-tier app).
+  const active = customerInfo?.entitlements?.active ?? {};
+  return Object.keys(active).length > 0;
 }
 
 function mapPackage(p: any): PremiumPackage {
@@ -77,7 +81,7 @@ function mapPackage(p: any): PremiumPackage {
 }
 
 export function PremiumProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [rcPremium, setRcPremium] = useState(false);
   const [loading, setLoading] = useState(!!Purchases);
   const [packages, setPackages] = useState<PremiumPackage[]>([]);
@@ -85,6 +89,19 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
   // Premium if EITHER the on-device RevenueCat entitlement is active OR the backend
   // says so via /auth/me (server-validated RevenueCat sync or App Store review bypass).
   const isPremium = rcPremium || !!user?.is_premium;
+
+  // Persist the entitlement server-side (backend re-validates against RevenueCat's
+  // REST API — the payload is just a trigger) then refresh /auth/me so is_premium
+  // updates immediately, not on next launch.
+  const syncToBackend = useCallback(async (premium: boolean) => {
+    try {
+      await apiPost("/billing/revenuecat/sync", { is_premium: premium });
+    } catch (e) {
+      console.warn("[premium] backend sync failed", e);
+    } finally {
+      refreshUser();
+    }
+  }, [refreshUser]);
 
   const refreshOfferings = useCallback(async () => {
     if (!Purchases) return;
@@ -130,12 +147,13 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
       const { customerInfo } = await Purchases.purchasePackage(pkg.raw);
       const ok = hasPremium(customerInfo);
       setRcPremium(ok);
+      if (ok) syncToBackend(true); // record purchase server-side right away
       return ok;
     } catch (e: any) {
       if (!e?.userCancelled) console.warn("[premium] purchase failed", e);
       return false;
     }
-  }, []);
+  }, [syncToBackend]);
 
   const restorePurchases = useCallback(async () => {
     if (!Purchases) return false;
@@ -143,12 +161,13 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
       const customerInfo = await Purchases.restorePurchases();
       const ok = hasPremium(customerInfo);
       setRcPremium(ok);
+      if (ok) syncToBackend(true);
       return ok;
     } catch (e) {
       console.warn("[premium] restore failed", e);
       return false;
     }
-  }, []);
+  }, [syncToBackend]);
 
   const setPremium = useCallback((v: boolean) => setRcPremium(v), []);
 

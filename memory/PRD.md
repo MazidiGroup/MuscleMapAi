@@ -95,3 +95,9 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 - Fixes: (1) premium grant moved into _upsert_user → runs on EVERY login for the exact reviewer email regardless of provider; (2) PremiumContext now merges: isPremium = rcPremium || user.is_premium (backend value is server-validated); (3) AuthContext.establishSession always fetches /auth/me (login responses lack is_premium) and re-fetches after RevenueCat sync completes.
 - Verified: DB shows subscriptions{source:review_bypass,status:active}; /auth/me is_premium:true; web UI e2e login as reviewer → Learn tab unlocked.
 - REQUIRES: backend redeploy AND a new iOS build (frontend changed) to reach TestFlight.
+
+## Purchase→premium sync fix (June 2026)
+- Gap: after a real RevenueCat purchase, backend was never synced (only at login/boot) and /auth/me not re-fetched; also entitlement check hardcoded name "premium" on BOTH frontend (ENTITLEMENT_ID) and backend REST validation — a dashboard naming mismatch silently locks premium forever.
+- Fixes: (1) hasPremium + backend _validate_revenuecat_entitlement are now name-agnostic (ANY active entitlement = premium); (2) PremiumContext purchase()/restore() now POST /billing/revenuecat/sync then refreshUser() (new AuthContext method) so is_premium updates immediately; (3) no webhook exists by design — sync is client-triggered (login/boot + post-purchase/restore).
+- Regression-verified: reviewer bypass premium intact; forged sync still fails closed.
+- REQUIRES: backend redeploy + new iOS build. User should also verify in RevenueCat dashboard that the weekly product is attached to an entitlement.
