@@ -377,7 +377,8 @@ async def _send_magic_email(email: str, code: str, link: str) -> bool:
             )
         if r.status_code in (200, 201):
             return True
-        logger.warning(f"resend send failed {r.status_code}: {r.text[:200]}")
+        # Log status only — avoid capturing recipient/PII from the provider body.
+        logger.warning(f"resend send failed: HTTP {r.status_code}")
         return False
     except Exception as e:
         logger.warning(f"resend send error: {e}")
