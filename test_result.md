@@ -174,3 +174,15 @@
 ## agent_communication:
 ##     -agent: "main"
 ##     -message: "Rebuilt app as Fitness Anatomy Trainer. 3D model renders on web (verified via screenshot). Please test all anatomy flows on web. No auth/login. Tabs: Explore, Workout, Muscle Info, Settings."
+##     -agent: "main"
+##     -message: |
+##       [June 2026 - Guest Mode & Auth QA] Please run backend regression on the auth + guest + coach + billing flows:
+##         1) POST /api/auth/guest — must issue guest session with is_guest:true and a session_token.
+##         2) GET /api/auth/me (Bearer=guest token) — must return is_guest true, is_premium false.
+##         3) POST /api/auth/email/request with a non-bypass address — must succeed (dev_code fallback OK if Resend fails).
+##         4) POST /api/auth/email/verify — must issue a session; /api/auth/me returns is_guest:false.
+##         5) Apple Review Bypass: email=applereview@mazidigroup.com code=123456 via /api/auth/email/verify — must return session AND /api/auth/me is_premium:true.
+##         6) Bypass negative test: applereview@mazidigroup.com with wrong code → 401; other email + 123456 → 401.
+##         7) POST /api/coach/ask (Bearer required) — no token = 401; guest token = 200 (subject to quota); rate limit works.
+##         8) POST /api/billing/revenuecat/sync — auth required; syncs subscription doc.
+##       Skip 3D viewer + frontend UI screenshots (already validated). Backend-only test.
