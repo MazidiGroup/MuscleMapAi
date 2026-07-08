@@ -205,7 +205,6 @@ class TestRevenueCat:
         gr = api.post(f"{BASE_URL}/api/auth/guest/session")
         assert gr.status_code == 200
         token = gr.json()["session_token"]
-        user_id = gr.json()["user"]["user_id"]
         r = api.post(f"{BASE_URL}/api/billing/revenuecat/sync",
                      json={"is_premium": False},
                      headers={"Authorization": f"Bearer {token}"})

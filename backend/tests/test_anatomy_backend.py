@@ -60,7 +60,6 @@ class TestCoachAsk:
         r = requests.post(self.URL, json=self.PAYLOAD, timeout=60, stream=True)
         assert r.status_code == 200
         saw_data = False
-        saw_terminal = False  # done or failed
         try:
             for raw in r.iter_lines(decode_unicode=True):
                 if raw is None:
@@ -72,7 +71,6 @@ class TestCoachAsk:
                         try:
                             obj = json.loads(payload)
                             if obj.get("done") or obj.get("failed"):
-                                saw_terminal = True
                                 break
                         except json.JSONDecodeError:
                             pass
