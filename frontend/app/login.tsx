@@ -23,7 +23,7 @@ type Step = "buttons" | "email" | "code";
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode } = useAuth();
+  const { user, loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode, continueAsGuest } = useAuth();
 
   const [step, setStep] = useState<Step>("buttons");
   const [email, setEmail] = useState("");
@@ -66,6 +66,18 @@ export default function LoginScreen() {
   };
 
   const verify = () => run("verify", () => verifyMagicCode(email.trim(), code.trim()));
+
+  const guest = async () => {
+    setError(null);
+    setBusy("guest");
+    try {
+      const res = await continueAsGuest();
+      if (res.ok) router.replace("/(tabs)/explore");
+      else if (res.error) setError(res.error);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -138,6 +150,24 @@ export default function LoginScreen() {
               <Ionicons name="mail-outline" size={18} color={T.text} />
               <Text style={styles.btnEmailText}>Continue with email</Text>
             </TouchableOpacity>
+
+            {user?.is_guest ? (
+              <TouchableOpacity
+                style={styles.guestLink}
+                onPress={() => router.replace("/(tabs)/explore")}
+                testID="login-guest-back"
+              >
+                <Text style={styles.guestLinkText}>Not now — keep browsing as guest</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.guestLink} onPress={guest} disabled={!!busy} testID="login-guest">
+                {busy === "guest" ? (
+                  <ActivityIndicator color={T.textDim} size="small" />
+                ) : (
+                  <Text style={styles.guestLinkText}>Continue without an account</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -298,6 +328,8 @@ const styles = StyleSheet.create({
   devCodeText: { color: "#7CB8FF", fontSize: 13, textAlign: "center" },
   backLink: { alignItems: "center", paddingVertical: 6 },
   backLinkText: { color: T.textDim, fontSize: 14, fontWeight: "600" },
+  guestLink: { alignItems: "center", paddingVertical: 12, minHeight: 44, justifyContent: "center" },
+  guestLinkText: { color: T.textDim, fontSize: 15, fontWeight: "600", textDecorationLine: "underline" },
   terms: { color: T.textFaint, fontSize: 12, textAlign: "center", lineHeight: 18 },
   termsLink: { color: T.textDim, textDecorationLine: "underline" },
 });

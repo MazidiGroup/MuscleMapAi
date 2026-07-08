@@ -20,6 +20,7 @@ export type AuthUser = {
   name: string;
   picture?: string;
   is_premium?: boolean;
+  is_guest?: boolean;
   [key: string]: any;
 };
 
@@ -32,6 +33,7 @@ type AuthCtx = {
   loginWithApple: () => Promise<AuthResult>;
   requestMagicLink: (email: string) => Promise<{ ok: boolean; devCode?: string; error?: string }>;
   verifyMagicCode: (email: string, code: string) => Promise<AuthResult>;
+  continueAsGuest: () => Promise<AuthResult>;
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -43,6 +45,7 @@ const Ctx = createContext<AuthCtx>({
   loginWithApple: async () => ({ ok: false }),
   requestMagicLink: async () => ({ ok: false }),
   verifyMagicCode: async () => ({ ok: false }),
+  continueAsGuest: async () => ({ ok: false }),
   refreshUser: async () => {},
   logout: async () => {},
 });
@@ -289,6 +292,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [establishSession]);
 
+  const continueAsGuest = useCallback(async (): Promise<AuthResult> => {
+    try {
+      const res = await apiPost<{ session_token: string; user: AuthUser }>("/auth/guest/session", {});
+      await establishSession(res.session_token);
+      return { ok: true };
+    } catch (e) {
+      console.warn("[auth] guest session failed", e);
+      return { ok: false, error: "Couldn't start browsing — check your connection and try again." };
+    }
+  }, [establishSession]);
+
   const refreshUser = useCallback(async () => {
     try {
       setUser(await apiGet<AuthUser>("/auth/me"));
@@ -315,7 +329,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ user, loading, loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode, refreshUser, logout }}>
+    <Ctx.Provider value={{ user, loading, loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode, continueAsGuest, refreshUser, logout }}>
       {children}
     </Ctx.Provider>
   );

@@ -44,7 +44,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const isPublic = seg === "login" || seg === "privacy";
     if (!user && !isPublic) {
       router.replace("/login");
-    } else if (user && seg === "login") {
+    } else if (user && !user.is_guest && seg === "login") {
+      // Guests may visit /login to upgrade to a real account
       router.replace("/(tabs)/explore");
     }
   }, [user, loading, segments, router]);

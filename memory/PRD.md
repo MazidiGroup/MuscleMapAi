@@ -101,3 +101,13 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 - Fixes: (1) hasPremium + backend _validate_revenuecat_entitlement are now name-agnostic (ANY active entitlement = premium); (2) PremiumContext purchase()/restore() now POST /billing/revenuecat/sync then refreshUser() (new AuthContext method) so is_premium updates immediately; (3) no webhook exists by design — sync is client-triggered (login/boot + post-purchase/restore).
 - Regression-verified: reviewer bypass premium intact; forged sync still fails closed.
 - REQUIRES: backend redeploy + new iOS build. User should also verify in RevenueCat dashboard that the weekly product is attached to an entitlement.
+
+## Guest mode — App Store 5.1.1 fix (July 2026)
+- Apple rejected 1.0.5: login required for non-account features (5.1.1v) + business model questions (2.1b).
+- Fix: anonymous guest access. POST /api/auth/guest/session creates server-generated anonymous user (is_guest:true, synthetic email @guest.musclemap.app) + normal session — no personal info entered, coach quota still enforced per guest.
+- Login screen: "Continue without an account" link (testID login-guest); for existing guests visiting /login: "Not now — keep browsing as guest" (login-guest-back).
+- AuthGate: guests allowed on /login (upgrade path); redirect-away only for non-guest users.
+- Library: guests see "Guest / Browsing without an account" + "Sign In or Create Account" row (signin-btn) instead of Log Out.
+- Guest→real login: new session replaces guest; local zustand workout data persists on device; RevenueCat logIn transfers entitlement.
+- Verified e2e: guest link → Explore works; Library guest section; upgrade screen with Not-now; guest can call /coach/ask (200).
+- REQUIRES: backend redeploy + new iOS build (1.0.6) before replying to Apple.

@@ -122,18 +122,37 @@ export default function LibraryScreen() {
           <View style={styles.about}>
             <Text style={styles.aboutTitle}>Account</Text>
             <View style={styles.linkList}>
-              <View style={styles.linkRow} testID="account-info">
-                <Ionicons name="person-circle-outline" size={20} color={T.accent} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.linkRowText} numberOfLines={1}>{user.name}</Text>
-                  <Text style={styles.accountEmail} numberOfLines={1}>{user.email}</Text>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.linkRow} onPress={confirmLogout} testID="logout-btn">
-                <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-                <Text style={[styles.linkRowText, { color: "#EF4444" }]}>Log Out</Text>
-                <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
-              </TouchableOpacity>
+              {user.is_guest ? (
+                <>
+                  <View style={styles.linkRow} testID="account-info">
+                    <Ionicons name="person-circle-outline" size={20} color={T.accent} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.linkRowText} numberOfLines={1}>Guest</Text>
+                      <Text style={styles.accountEmail} numberOfLines={1}>Browsing without an account</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/login")} testID="signin-btn">
+                    <Ionicons name="log-in-outline" size={18} color={T.accent} />
+                    <Text style={[styles.linkRowText, { color: T.accent }]}>Sign In or Create Account</Text>
+                    <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <View style={styles.linkRow} testID="account-info">
+                    <Ionicons name="person-circle-outline" size={20} color={T.accent} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.linkRowText} numberOfLines={1}>{user.name}</Text>
+                      <Text style={styles.accountEmail} numberOfLines={1}>{user.email}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.linkRow} onPress={confirmLogout} testID="logout-btn">
+                    <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+                    <Text style={[styles.linkRowText, { color: "#EF4444" }]}>Log Out</Text>
+                    <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         )}

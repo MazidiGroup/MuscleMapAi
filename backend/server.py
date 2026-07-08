@@ -314,6 +314,30 @@ async def _new_session(user_id: str) -> str:
     return token
 
 
+# ------------------ Guest access (App Store 5.1.1) ------------------
+@api_router.post("/auth/guest/session")
+async def guest_session():
+    """Anonymous guest access: full app use without entering any personal info.
+    Creates a fresh server-generated anonymous user — no takeover surface since
+    the identity cannot be chosen by the caller."""
+    now = datetime.now(timezone.utc)
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    user = {
+        "user_id": user_id,
+        "email": f"{user_id}@guest.musclemap.app",
+        "name": "Guest",
+        "picture": "",
+        "providers": ["guest"],
+        "is_guest": True,
+        "onboarded": False,
+        "created_at": now,
+        "last_login": now,
+    }
+    await db.users.insert_one(dict(user))
+    token = await _new_session(user_id)
+    return {"session_token": token, "user": _user_out(user)}
+
+
 # ------------------ Apple Sign-In ------------------
 _apple_jwks = PyJWKClient("https://appleid.apple.com/auth/keys")
 
