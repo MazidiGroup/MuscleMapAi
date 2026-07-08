@@ -426,11 +426,18 @@ async def _send_magic_email(email: str, code: str, link: str) -> bool:
             )
         if r.status_code in (200, 201):
             return True
-        # Log status only — avoid capturing recipient/PII from the provider body.
-        logger.warning(f"resend send failed: HTTP {r.status_code}")
+        # Log full provider response for debugging domain/key/scope issues.
+        # Truncate to avoid runaway logs but keep enough for diagnosis.
+        body_snippet = (r.text or "")[:800]
+        sender_masked = RESEND_SENDER  # already safe (configured value, not user input)
+        key_prefix = (RESEND_API_KEY[:6] + "…" + RESEND_API_KEY[-4:]) if RESEND_API_KEY else ""
+        logger.warning(
+            f"resend send failed: HTTP {r.status_code} "
+            f"sender={sender_masked!r} key={key_prefix} body={body_snippet}"
+        )
         return False
     except Exception as e:
-        logger.warning(f"resend send error: {e}")
+        logger.warning(f"resend send error: {type(e).__name__}: {e}")
         return False
 
 
