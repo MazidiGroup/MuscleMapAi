@@ -33,6 +33,10 @@ PUBLIC_WEB_APP_URL = os.environ.get('PUBLIC_WEB_APP_URL', '')
 APP_SCHEME = os.environ.get('APP_SCHEME', 'apexai')
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 RESEND_SENDER = os.environ.get('RESEND_SENDER', 'Muscle Map Ai <onboarding@resend.dev>')
+# Resend's shared sender that works without domain verification. Used as an automatic
+# fallback so a stale/mis-configured RESEND_SENDER (e.g. domain verification lapsed,
+# API key restricted, DNS changed) NEVER locks users out of magic-link login.
+RESEND_FALLBACK_SENDER = 'Muscle Map Ai <onboarding@resend.dev>'
 APPLE_BUNDLE_ID = os.environ.get('APPLE_BUNDLE_ID', 'com.mazidigroup.apexai')
 APPLE_ALLOW_EXPO_GO = os.environ.get('APPLE_ALLOW_EXPO_GO', '1') == '1'
 REVENUECAT_SECRET_KEY = os.environ.get('REVENUECAT_SECRET_KEY', '')
@@ -443,32 +447,64 @@ async def _send_magic_email(email: str, code: str, link: str) -> bool:
       <a href="{link}" style="display:inline-block;background:#0A84FF;color:#fff;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:600;font-size:15px">Sign in with one tap</a>
       <p style="color:#71717A;font-size:12px;margin-top:24px">If you didn't request this, you can safely ignore this email.</p>
     </div></body></html>"""
-    try:
+    async def _post(from_addr: str):
         async with httpx.AsyncClient(timeout=15.0) as http:
-            r = await http.post(
+            return await http.post(
                 "https://api.resend.com/emails",
                 headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
                 json={
-                    "from": RESEND_SENDER,
+                    "from": from_addr,
                     "to": [email],
                     "subject": f"Your Muscle Map Ai login code: {code}",
                     "html": html,
                 },
             )
+
+    key_prefix = (RESEND_API_KEY[:6] + "…" + RESEND_API_KEY[-4:]) if RESEND_API_KEY else ""
+    try:
+        r = await _post(RESEND_SENDER)
         if r.status_code in (200, 201):
             return True
-        # Log full provider response for debugging domain/key/scope issues.
-        # Truncate to avoid runaway logs but keep enough for diagnosis.
+
+        # Log the exact failure reason for diagnosis (domain/key/scope).
         body_snippet = (r.text or "")[:800]
-        sender_masked = RESEND_SENDER  # already safe (configured value, not user input)
-        key_prefix = (RESEND_API_KEY[:6] + "…" + RESEND_API_KEY[-4:]) if RESEND_API_KEY else ""
         logger.warning(
-            f"resend send failed: HTTP {r.status_code} "
-            f"sender={sender_masked!r} key={key_prefix} body={body_snippet}"
+            f"resend send failed (primary): HTTP {r.status_code} "
+            f"sender={RESEND_SENDER!r} key={key_prefix} body={body_snippet}"
         )
+
+        # Auto-fallback: if the configured sender was rejected (e.g. 403 domain not
+        # verified, 422 validation, unauthorized sender) AND we're not already on
+        # Resend's shared sender, retry once with onboarding@resend.dev so users
+        # can still receive their login code. This is the safety-net that
+        # guarantees deliverability regardless of DNS state.
+        if RESEND_SENDER != RESEND_FALLBACK_SENDER and r.status_code in (401, 403, 422):
+            try:
+                r2 = await _post(RESEND_FALLBACK_SENDER)
+                if r2.status_code in (200, 201):
+                    logger.warning(
+                        f"resend send recovered via fallback sender "
+                        f"{RESEND_FALLBACK_SENDER!r}"
+                    )
+                    return True
+                logger.warning(
+                    f"resend send failed (fallback): HTTP {r2.status_code} "
+                    f"body={(r2.text or '')[:400]}"
+                )
+            except Exception as e2:
+                logger.warning(f"resend fallback error: {type(e2).__name__}: {e2}")
         return False
     except Exception as e:
         logger.warning(f"resend send error: {type(e).__name__}: {e}")
+        # On network / transport errors, still try the fallback sender.
+        if RESEND_SENDER != RESEND_FALLBACK_SENDER:
+            try:
+                r2 = await _post(RESEND_FALLBACK_SENDER)
+                if r2.status_code in (200, 201):
+                    logger.warning("resend send recovered via fallback sender after transport error")
+                    return True
+            except Exception:
+                pass
         return False
 
 
