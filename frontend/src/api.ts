@@ -44,6 +44,16 @@ export async function apiPost<T = any>(path: string, body: any = {}): Promise<T>
   return r.json();
 }
 
+export async function apiDelete<T = any>(path: string): Promise<T> {
+  const headers = await authHeaders();
+  const r = await fetch(`${API_BASE}${path}`, { method: 'DELETE', headers });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`DELETE ${path} failed: ${r.status} ${txt}`);
+  }
+  return r.json();
+}
+
 // SSE-style streaming via fetch ReadableStream
 export async function streamCoach(
   message: string,

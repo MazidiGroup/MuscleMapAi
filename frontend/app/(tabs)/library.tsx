@@ -14,7 +14,7 @@ import { useAuth } from "@/src/auth/AuthContext";
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, deleteAccount } = useAuth();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
@@ -31,6 +31,60 @@ export default function LibraryScreen() {
       { text: "Log Out", style: "destructive", onPress: () => logout() },
     ]);
   }, [logout]);
+
+  const runDelete = useCallback(async () => {
+    const res = await deleteAccount();
+    if (res.ok) {
+      // On success AuthProvider has already cleared session; the root layout
+      // will redirect to /login. Give the user a small confirmation on web.
+      if (Platform.OS === "web") {
+        // eslint-disable-next-line no-alert
+        window.alert("Your account has been deleted.");
+      }
+    } else {
+      const msg = res.error || "Couldn't delete your account. Please try again.";
+      if (Platform.OS === "web") {
+        // eslint-disable-next-line no-alert
+        window.alert(msg);
+      } else {
+        Alert.alert("Delete failed", msg);
+      }
+    }
+  }, [deleteAccount]);
+
+  const confirmDeleteAccount = useCallback(() => {
+    // Two-step confirmation on native (Apple 5.1.1(v) requires clear intent).
+    const step2 = () => {
+      if (Platform.OS === "web") {
+        // eslint-disable-next-line no-alert
+        if (window.confirm("Final confirmation: permanently delete your account and all data? This cannot be undone.")) {
+          runDelete();
+        }
+        return;
+      }
+      Alert.alert(
+        "Delete account permanently?",
+        "This will permanently delete your account, your workout history, coach chats and subscription record. This cannot be undone.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete Forever", style: "destructive", onPress: runDelete },
+        ],
+      );
+    };
+    if (Platform.OS === "web") {
+      // eslint-disable-next-line no-alert
+      if (window.confirm("Delete your Muscle Map Ai account?")) step2();
+      return;
+    }
+    Alert.alert(
+      "Delete account?",
+      "Deleting your account removes all your data from our servers. You can create a new account anytime.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Continue", style: "destructive", onPress: step2 },
+      ],
+    );
+  }, [runDelete]);
 
   const refresh = useCallback(() => {
     getRecent().then(setRecent);
@@ -151,6 +205,11 @@ export default function LibraryScreen() {
                     <Text style={[styles.linkRowText, { color: "#EF4444" }]}>Log Out</Text>
                     <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
                   </TouchableOpacity>
+                  <TouchableOpacity style={styles.linkRow} onPress={confirmDeleteAccount} testID="delete-account-btn">
+                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    <Text style={[styles.linkRowText, { color: "#EF4444" }]}>Delete Account</Text>
+                    <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+                  </TouchableOpacity>
                 </>
               )}
             </View>
@@ -171,6 +230,11 @@ export default function LibraryScreen() {
               <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/privacy")} testID="link-privacy">
                 <Ionicons name="shield-checkmark-outline" size={18} color={T.accent} />
                 <Text style={styles.linkRowText}>Privacy Policy</Text>
+                <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/terms")} testID="link-terms">
+                <Ionicons name="document-text-outline" size={18} color={T.accent} />
+                <Text style={styles.linkRowText}>Terms of Use</Text>
                 <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
               </TouchableOpacity>
               <TouchableOpacity

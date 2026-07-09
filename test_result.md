@@ -176,7 +176,17 @@
 ##     -message: "Rebuilt app as Fitness Anatomy Trainer. 3D model renders on web (verified via screenshot). Please test all anatomy flows on web. No auth/login. Tabs: Explore, Workout, Muscle Info, Settings."
 ##     -agent: "main"
 ##     -message: |
-##       [June 2026 - Guest Mode & Auth QA] Please run backend regression on the auth + guest + coach + billing flows:
+##       [July 2026 - Apple resubmission fixes] Backend test scope:
+##         1) DELETE /api/auth/me (new) — no token=401; valid token=200 {ok:true,deleted:true};
+##            /auth/me with same token AFTER delete=401 (session revoked).
+##            Also verify user + sessions + subscriptions + coach_messages + coach_ask_usage +
+##            workouts docs for that user_id are gone from Mongo.
+##         2) Full regression on prior 12 backend cases (guest/session, bypass, coach quota,
+##            billing sync) — should all still pass.
+##         3) Coach system prompt updated to include Sources block requirement (1.4.1). No
+##            behavioural test needed beyond confirming /coach/ask still returns 200 SSE with
+##            non-empty content on a health-related question.
+##       Skip frontend UI screenshots — no visual regressions expected on tabs, viewer, workout.
 ##         1) POST /api/auth/guest — must issue guest session with is_guest:true and a session_token.
 ##         2) GET /api/auth/me (Bearer=guest token) — must return is_guest true, is_premium false.
 ##         3) POST /api/auth/email/request with a non-bypass address — must succeed (dev_code fallback OK if Resend fails).

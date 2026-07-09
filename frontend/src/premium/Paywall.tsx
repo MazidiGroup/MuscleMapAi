@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { usePremium, PremiumPackage } from "./PremiumContext";
 import { T } from "@/src/anatomy/ui";
 
@@ -14,8 +15,54 @@ const PERKS: { icon: any; label: string; desc: string }[] = [
 // Preferred package order for display.
 const ORDER = ["WEEKLY", "MONTHLY", "ANNUAL", "LIFETIME"];
 
+// Human-readable subscription length for App Store compliance (3.1.2(c)).
+const PERIOD_LABEL: Record<string, string> = {
+  WEEKLY: "1 week",
+  MONTHLY: "1 month",
+  ANNUAL: "1 year",
+  TWO_MONTH: "2 months",
+  THREE_MONTH: "3 months",
+  SIX_MONTH: "6 months",
+  LIFETIME: "one-time",
+};
+
+// Divisor to derive price-per-month from a package price. Undefined => no derived unit.
+const MONTHS_IN_PACKAGE: Record<string, number | undefined> = {
+  WEEKLY: undefined, // shown per-week directly
+  MONTHLY: 1,
+  ANNUAL: 12,
+  TWO_MONTH: 2,
+  THREE_MONTH: 3,
+  SIX_MONTH: 6,
+  LIFETIME: undefined,
+};
+
+/**
+ * Format a "price per month" string using the numeric product.price + priceString.
+ * Falls back to empty string if we can't safely compute it.
+ */
+function pricePerUnit(pkg: PremiumPackage): string {
+  const product = pkg.raw?.product ?? {};
+  const price: number | undefined = typeof product.price === "number" ? product.price : undefined;
+  const priceStr: string = pkg.priceString || product.priceString || "";
+  const type = pkg.packageType;
+  if (type === "WEEKLY" && priceStr) return `${priceStr} / week`;
+  if (type === "LIFETIME") return "one-time purchase";
+  const months = MONTHS_IN_PACKAGE[type];
+  if (!months || !price || !priceStr) return "";
+  const per = price / months;
+  // Extract the currency prefix/suffix from priceString (e.g. "£9.99", "US$9.99", "9,99 €").
+  // Preserve the same non-numeric characters, replace the number with per-month value.
+  const numMatch = priceStr.match(/[\d.,]+/);
+  if (!numMatch) return "";
+  const perFmt = per.toFixed(2);
+  const priceStrPerMonth = priceStr.replace(numMatch[0], perFmt);
+  return months === 1 ? `${priceStrPerMonth} / month` : `${priceStrPerMonth} / month`;
+}
+
 export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?: string; headerOffset?: number }) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { packages, purchase, restorePurchases } = usePremium();
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState<"purchase" | "restore" | null>(null);
@@ -87,6 +134,8 @@ export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?
           <View style={styles.plans}>
             {sorted.map((p) => {
               const active = p.identifier === selected;
+              const perUnit = pricePerUnit(p);
+              const length = PERIOD_LABEL[p.packageType] || "";
               return (
                 <TouchableOpacity
                   key={p.identifier}
@@ -97,8 +146,14 @@ export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?
                   <View style={[styles.radio, active && styles.radioActive]}>
                     {active && <View style={styles.radioDot} />}
                   </View>
-                  <Text style={[styles.planLabel, active && { color: T.text }]}>{p.label}</Text>
-                  <Text style={[styles.planPrice, active && { color: T.text }]}>{p.priceString}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.planLabel, active && { color: T.text }]}>{p.label}</Text>
+                    {length ? <Text style={styles.planMeta}>{length}</Text> : null}
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={[styles.planPrice, active && { color: T.text }]}>{p.priceString}</Text>
+                    {perUnit ? <Text style={styles.planMeta}>{perUnit}</Text> : null}
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -106,6 +161,18 @@ export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?
         ) : (
           <Text style={styles.plansNote}>Subscription plans appear on the installed app.</Text>
         )}
+
+        {/* Required subscription disclosure — Guideline 3.1.2 */}
+        <View style={styles.discBox}>
+          <Text style={styles.discTitle}>Subscription details</Text>
+          <Text style={styles.discBody}>
+            Muscle Map Ai Premium is an auto-renewing subscription. Payment is charged to your Apple ID
+            at confirmation of purchase. The subscription automatically renews for the same period at
+            the same price unless auto-renew is turned off at least 24 hours before the end of the
+            current period. You can manage or cancel your subscription in your Apple ID Account Settings
+            after purchase.
+          </Text>
+        </View>
 
         <TouchableOpacity style={[styles.upgradeBtn, busy && { opacity: 0.6 }]} onPress={onUpgrade} disabled={!!busy} testID="paywall-upgrade">
           {busy === "purchase" ? (
@@ -126,7 +193,18 @@ export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?
           )}
         </TouchableOpacity>
 
-        {notice ? <Text style={styles.notice}>{notice}</Text> : <Text style={styles.legal}>Cancel anytime.</Text>}
+        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+        {/* Legal footer — Guideline 3.1.2 requires functional Terms & Privacy links */}
+        <View style={styles.legalRow}>
+          <TouchableOpacity onPress={() => router.push("/terms")} testID="paywall-terms">
+            <Text style={styles.legalLink}>Terms of Use</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalSep}>·</Text>
+          <TouchableOpacity onPress={() => router.push("/privacy")} testID="paywall-privacy">
+            <Text style={styles.legalLink}>Privacy Policy</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -158,9 +236,16 @@ const styles = StyleSheet.create({
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: T.border, alignItems: "center", justifyContent: "center" },
   radioActive: { borderColor: T.accent },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: T.accent },
-  planLabel: { flex: 1, color: T.textDim, fontSize: 15, fontWeight: "700" },
+  planLabel: { color: T.textDim, fontSize: 15, fontWeight: "700" },
+  planMeta: { color: T.textFaint, fontSize: 11, fontWeight: "500", marginTop: 2 },
   planPrice: { color: T.textDim, fontSize: 15, fontWeight: "800" },
   plansNote: { color: T.textFaint, fontSize: 13, marginTop: 22, textAlign: "center" },
+  discBox: {
+    width: "100%", marginTop: 18, backgroundColor: T.surface,
+    borderWidth: 1, borderColor: T.border, borderRadius: 12, padding: 14,
+  },
+  discTitle: { color: T.textDim, fontSize: 12, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
+  discBody: { color: T.textFaint, fontSize: 12, lineHeight: 18 },
   upgradeBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     backgroundColor: T.accent, borderRadius: 14, paddingVertical: 16, width: "100%", marginTop: 20, minHeight: 52,
@@ -170,4 +255,10 @@ const styles = StyleSheet.create({
   restoreText: { color: T.accent, fontSize: 14, fontWeight: "700" },
   legal: { color: T.textFaint, fontSize: 11, marginTop: 6 },
   notice: { color: T.textDim, fontSize: 12, marginTop: 8, textAlign: "center" },
+  legalRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, marginTop: 14,
+  },
+  legalLink: { color: T.textDim, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" },
+  legalSep: { color: T.textFaint, fontSize: 12 },
 });

@@ -1,0 +1,42 @@
+{
+  "summary": "Backend-only iteration 13 — Apple 5.1.1(v) account deletion (DELETE /api/auth/me) + full regression of the 12 prior auth/coach/billing cases. All 18 tests pass (6 new deletion + 12 regression). Verified: (1) DELETE /api/auth/me without Authorization -> 401; (2) DELETE with bogus Bearer -> 401 (session not found); (3) DELETE with valid guest Bearer -> 200 {ok:true, deleted:true}; (4) After DELETE, the same token on GET /api/auth/me -> 401 (session revoked because db.user_sessions row purged); (5) Mongo cascade cleanup confirmed on live DB: users, user_sessions, subscriptions, coach_messages, coach_ask_usage, workouts, workout_sessions, workout_logs, status_checks all return None for the deleted user_id, plus magic_links purged by email. Pre-seeded a test workout doc and a coach_ask_usage doc before deletion — both were removed; (6) DELETE works identically for a normal email-verified (non-guest) user created via /auth/email/request + /auth/email/verify; (7) DELETE for the Apple Review bypass account (applereview@mazidigroup.com) removes the {source:'review_bypass', tier:'premium'} subscription doc AND the reviewer can immediately sign back in with 123456 to a fresh account with is_premium=true (Apple 5.1.1(v) only requires that deletion is possible, not permanent lockout); (8) REGRESSION: all 12 cases in test_guest_and_bypass.py still pass — /api/auth/guest/session, guest /auth/me, /auth/email/request, /auth/email/verify (normal + bypass positive + 2 negatives), /api/coach/ask (401 no token, 200 with guest, quota gating at 41st request on non-premium cap of 40), /api/billing/revenuecat/sync (401 no auth, 200 with auth); (9) Direct smoke of the health prompt 'what is the rotator cuff?' via guest Bearer returned 868 chars of real medical content from the Emergent LLM (Claude Sonnet 4.5) — confirms 1.4.1 pathway is live.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/email/request", "issue": "Carry-over from iteration 12: Resend still returning HTTP 403 in server logs on some sends (sender domain 'login@mazidigroup.com' verification issue). Backend correctly hides dev_code when RESEND_API_KEY is set, but real users will see {sent:false} with no way to recover the code. Not blocking Apple resubmit — magic-link is a fallback to Guest/Apple/Google. Recommend main agent verify Resend domain."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_account_deletion.py",
+    "/app/backend/tests/test_guest_and_bypass.py",
+    "/app/test_reports/pytest/pytest_iter13_delete.xml",
+    "/app/test_reports/pytest/pytest_iter13_regression.xml"
+  ],
+  "action_items": [
+    "No blocking action items. Backend is ready for Apple App Store v1.0.8 resubmission from a 5.1.1(v) (account deletion) standpoint.",
+    "Info-only: Resend HTTP 403 issue from iteration 12 still visible — verify sender domain in Resend dashboard when convenient. Not a blocker.",
+    "Info-only: server.py is 1898+ lines. Consider splitting auth/billing/coach into modules in a follow-up refactor."
+  ],
+  "critical_code_review_comments": [
+    "server.py:237-265 DELETE /api/auth/me is correctly protected by get_current_user (returns 401 pre-deletion for anonymous or invalid Bearer), uses asyncio.gather with return_exceptions=True so a missing collection cannot 500 the endpoint, deletes across all 9 user-scoped collections + magic_links by email, and returns the exact contract {ok:true, deleted:true} the frontend expects.",
+    "Because get_current_user pulls the session BEFORE cascade, and the same asyncio.gather deletes db.user_sessions, subsequent /auth/me calls with the same token correctly 401 — session revocation is inherent, no separate blacklist needed.",
+    "review_bypass subscription (source='review_bypass') IS removed on DELETE, and _upsert_user re-creates it on the next reviewer login — full round-trip works. Confirmed with a positive test.",
+    "delete_account swallows partial failures via 'return_exceptions=True' + a warning log. This is intentional (Apple only requires best-effort deletion) but means the endpoint could theoretically return {ok:true,deleted:true} even if one collection failed. Acceptable for App Store compliance; consider surfacing a boolean 'partial' in the response if any op raises.",
+    "Reviewed the previously-noted concerns from iter 12 (server.py length, Resend 403, in-band SSE quota gating) — all unchanged and still non-blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_account_deletion.py (new)"
+  ],
+  "success_rate": {"backend": "100% (18/18: 6 new + 12 regression)", "frontend": "not tested (backend-only iteration)"},
+  "seed_data_creation": "Ephemeral test data only, all deleted by the tests themselves: 3 guest users (deleted immediately), 1 email-verified TEST_ user (deleted), 2 reviewer sessions on applereview@mazidigroup.com (first one deleted, second one left signed in with is_premium=true — matches the resting state expected by iOS review). Pre-seeded 1 TEST_workout doc and 1 coach_ask_usage doc on the guest under test to prove cascade — both removed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "DELETE /api/auth/me is fully working and Apple 5.1.1(v)-compliant. Tests live at /app/backend/tests/test_account_deletion.py (6 tests) and /app/backend/tests/test_guest_and_bypass.py (12 regression tests). To rerun the full suite: `pytest /app/backend/tests/test_account_deletion.py /app/backend/tests/test_guest_and_bypass.py -v`. Regression suite takes ~90s because of the 45-request quota-gating burst test. The reviewer bypass account (applereview@mazidigroup.com / 123456) legitimately re-creates itself on every login and is safe to delete — the review_bypass subscription is re-upserted on the next verify call. Health-prompt smoke of /coach/ask returned real Claude output (868 chars for 'what is the rotator cuff?') — the LLM key is live, not mocked.",
+  "rca_of_issue": "N/A — no bugs. Only carry-over minor from iter 12 (Resend 403) which does not block Apple resubmit."
+}

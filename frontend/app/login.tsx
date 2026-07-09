@@ -249,7 +249,11 @@ export default function LoginScreen() {
 
         {/* Terms */}
         <Text style={styles.terms}>
-          By continuing you agree to our Terms &{" "}
+          By continuing you agree to our{" "}
+          <Text style={styles.termsLink} onPress={() => router.push("/terms")}>
+            Terms
+          </Text>
+          {" & "}
           <Text style={styles.termsLink} onPress={() => router.push("/privacy")}>
             Privacy Policy
           </Text>

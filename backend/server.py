@@ -234,6 +234,37 @@ async def logout(authorization: Optional[str] = Header(None)):
     return {"ok": True}
 
 
+@api_router.delete("/auth/me")
+async def delete_account(user=Depends(get_current_user)):
+    """Permanently deletes the current user's account and all associated data.
+    Required by Apple App Store Guideline 5.1.1(v). This is not reversible."""
+    user_id = user["user_id"]
+    email = user.get("email")
+
+    # Delete every collection tied to this user. Missing collections are ignored.
+    ops = [
+        db.users.delete_one({"user_id": user_id}),
+        db.user_sessions.delete_many({"user_id": user_id}),
+        db.subscriptions.delete_many({"user_id": user_id}),
+        db.coach_messages.delete_many({"user_id": user_id}),
+        db.coach_ask_usage.delete_many({"user_id": user_id}),
+        db.workouts.delete_many({"user_id": user_id}),
+        db.workout_sessions.delete_many({"user_id": user_id}),
+        db.workout_logs.delete_many({"user_id": user_id}),
+        db.status_checks.delete_many({"user_id": user_id}),
+    ]
+    if email:
+        # Also purge any pending magic-link codes tied to this email so a fresh
+        # signup starts clean.
+        ops.append(db.magic_links.delete_many({"email": email}))
+    try:
+        await asyncio.gather(*ops, return_exceptions=True)
+    except Exception as e:
+        logger.warning(f"account deletion partial failure for {user_id}: {e}")
+    logger.info(f"account deleted: user_id={user_id} email={email}")
+    return {"ok": True, "deleted": True}
+
+
 # NOTE: The unverified /auth/email/login and /auth/demo/login endpoints were removed
 # (security: they issued a session for any email with no verification → account takeover).
 # Email sign-in now requires the emailed code via /auth/email/verify.
@@ -1488,7 +1519,16 @@ USER PROFILE:
 RECENT WORKOUTS:
 {chr(10).join(recent) if recent else 'No workouts logged yet.'}
 
-Keep responses tight (under 120 words usually). Never refuse fitness questions. If asked something unrelated, redirect politely."""
+Keep responses tight (under 120 words usually). Never refuse fitness questions. If asked something unrelated, redirect politely.
+
+Citations (REQUIRED for medical/health/anatomical/physiological claims — App Store 1.4.1):
+- Whenever your answer contains a health, medical, anatomical, physiological, nutritional
+  or rehabilitation claim, end with a "Sources:" section listing 1-3 reputable citations.
+- Preferred domains: pubmed.ncbi.nlm.nih.gov, nih.gov, mayoclinic.org, my.clevelandclinic.org,
+  acsm.org, nasm.org, nsca.com, nhs.uk, who.int.
+- Format: "- Title — Publisher (URL)" per line. Use only real URLs from those domains; if
+  unsure of a deep link, cite the publisher home page instead.
+- Greetings and pure motivation don't need citations."""
     return sys
 
 
@@ -1773,7 +1813,21 @@ Guidelines:
 - When relevant, mention which muscles a movement targets (origin/insertion/function) and antagonist pairs.
 - Keep answers tight: usually 3-6 short sentences or a short bullet list. Avoid filler.
 - Never give medical diagnoses; for pain/injury suggest seeing a professional.
-- Stay on anatomy/fitness topics; politely redirect if asked something unrelated."""
+- Stay on anatomy/fitness topics; politely redirect if asked something unrelated.
+
+Citations (REQUIRED for any medical, anatomical, physiological or health-related claim
+— App Store Guideline 1.4.1):
+- Any answer that contains a health, medical, anatomical, physiological, nutritional or
+  rehabilitation claim MUST end with a "Sources:" section listing 1-3 reputable citations.
+- Prefer, in this order: peer-reviewed papers on PubMed (https://pubmed.ncbi.nlm.nih.gov/),
+  NIH (https://www.nih.gov/), Mayo Clinic (https://www.mayoclinic.org/), Cleveland Clinic
+  (https://my.clevelandclinic.org/), ACSM position stands (https://www.acsm.org/), NASM
+  (https://www.nasm.org/), NSCA (https://www.nsca.com/), NHS (https://www.nhs.uk/), or WHO
+  (https://www.who.int/).
+- Format each source as "- Title — Publisher (URL)" on its own line. Only use real URLs
+  from those domains; if you are not certain a specific URL exists, cite the publisher's
+  home page instead of inventing a deep link.
+- Pure conversation ("how are you", greetings, meta questions) does not need citations."""
 
 
 class CoachMsg(BaseModel):

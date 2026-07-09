@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 
-import { apiGet, apiPost, setToken, getToken, clearToken } from "@/src/api";
+import { apiGet, apiPost, apiDelete, setToken, getToken, clearToken } from "@/src/api";
 
 /**
  * App-wide authentication.
@@ -36,6 +36,7 @@ type AuthCtx = {
   continueAsGuest: () => Promise<AuthResult>;
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<AuthResult>;
 };
 
 const Ctx = createContext<AuthCtx>({
@@ -48,6 +49,7 @@ const Ctx = createContext<AuthCtx>({
   continueAsGuest: async () => ({ ok: false }),
   refreshUser: async () => {},
   logout: async () => {},
+  deleteAccount: async () => ({ ok: false }),
 });
 
 // Native-only modules (same guard pattern as PremiumContext)
@@ -328,8 +330,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const deleteAccount = useCallback(async (): Promise<AuthResult> => {
+    try {
+      await apiDelete("/auth/me");
+    } catch (e: any) {
+      console.warn("[auth] delete account failed", e);
+      return { ok: false, error: "Couldn't delete your account. Please check your connection and try again." };
+    }
+    // Fully sign the user out — clear session token + RevenueCat identity — and
+    // reset state so the app returns to the login screen.
+    await clearToken();
+    if (Platform.OS === "ios" && Purchases) {
+      try {
+        await Purchases.logOut();
+      } catch {
+        // already anonymous — fine
+      }
+    }
+    setUser(null);
+    return { ok: true };
+  }, []);
+
   return (
-    <Ctx.Provider value={{ user, loading, loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode, continueAsGuest, refreshUser, logout }}>
+    <Ctx.Provider value={{ user, loading, loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode, continueAsGuest, refreshUser, logout, deleteAccount }}>
       {children}
     </Ctx.Provider>
   );

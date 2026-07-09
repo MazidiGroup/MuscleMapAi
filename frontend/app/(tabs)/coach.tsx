@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +26,35 @@ const SUGGESTIONS = [
   "What's a good push/pull/legs split?",
   "Why are antagonist muscles important?",
 ];
+
+// Auto-linkify http(s) URLs in coach responses so citation links are tappable.
+// Guideline 1.4.1 requires citations to be "easy for the user to find".
+const URL_RE = /(https?:\/\/[^\s)]+)(?=[\s)]|$)/g;
+function renderMessageWithLinks(text: string, baseStyle: any, linkStyle: any) {
+  if (!text) return null;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  URL_RE.lastIndex = 0;
+  while ((match = URL_RE.exec(text)) !== null) {
+    const url = match[1];
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <Text
+        key={`u-${match.index}`}
+        style={linkStyle}
+        onPress={() => Linking.openURL(url).catch(() => {})}
+      >
+        {url}
+      </Text>,
+    );
+    lastIndex = match.index + url.length;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return <Text style={baseStyle}>{parts}</Text>;
+}
 
 export default function CoachScreen() {
   const { isPremium } = usePremium();
@@ -106,6 +136,13 @@ function CoachContent() {
             <Text style={styles.sub}>AI anatomy & training assistant</Text>
           </View>
         </View>
+        <View style={styles.disclaimer}>
+          <Ionicons name="information-circle-outline" size={14} color={T.textFaint} />
+          <Text style={styles.disclaimerText} numberOfLines={2}>
+            Educational information only, not medical advice. Consult a qualified professional before
+            changing your training or health regimen.
+          </Text>
+        </View>
       </View>
 
       <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 20 }}>
@@ -126,8 +163,10 @@ function CoachContent() {
               <View style={[styles.bubble, m.role === "user" ? styles.userBubble : styles.aiBubble]}>
                 {m.content === "" && busy ? (
                   <ActivityIndicator color={T.accent} size="small" />
+                ) : m.role === "assistant" ? (
+                  renderMessageWithLinks(m.content, styles.bubbleText, styles.linkText)
                 ) : (
-                  <Text style={[styles.bubbleText, m.role === "user" && { color: T.bg }]}>{m.content}</Text>
+                  <Text style={[styles.bubbleText, { color: T.bg }]}>{m.content}</Text>
                 )}
               </View>
             </View>
@@ -165,6 +204,19 @@ const styles = StyleSheet.create({
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" },
   h1: { color: T.text, fontSize: 20, fontWeight: "800" },
   sub: { color: T.textDim, fontSize: 12 },
+  disclaimer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: T.surface,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 10,
+  },
+  disclaimerText: { flex: 1, color: T.textFaint, fontSize: 11, lineHeight: 15 },
   empty: { alignItems: "center", paddingTop: 40, gap: 12 },
   emptyText: { color: T.textDim, fontSize: 15, textAlign: "center", marginBottom: 8, paddingHorizontal: 20 },
   suggestion: {
@@ -188,6 +240,7 @@ const styles = StyleSheet.create({
   userBubble: { backgroundColor: T.accent, borderBottomRightRadius: 4 },
   aiBubble: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderBottomLeftRadius: 4 },
   bubbleText: { color: T.text, fontSize: 15, lineHeight: 21 },
+  linkText: { color: T.accent, textDecorationLine: "underline", fontSize: 15, lineHeight: 21 },
   inputBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingTop: 8, borderTopWidth: 1, borderTopColor: T.border, backgroundColor: T.bg2 },
   input: { flex: 1, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, color: T.text, fontSize: 15, maxHeight: 100 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" },
