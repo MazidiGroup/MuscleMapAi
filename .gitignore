@@ -80,3 +80,8 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/
+
+# Test / cache artifacts that must not ship into EAS build source
+.pytest_cache/
+**/.pytest_cache/
+test_reports/

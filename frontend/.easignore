@@ -1,0 +1,23 @@
+# EAS build ignore list — keeps the uploaded source tarball small and prevents
+# stale caches / test artifacts from confusing the EAS builder.
+node_modules
+.pytest_cache
+**/.pytest_cache
+__pycache__
+**/__pycache__
+*.pyc
+.venv
+venv
+env
+.env.local
+.env.*.local
+.DS_Store
+.vscode
+.idea
+coverage
+dist
+build
+web-build
+.expo
+.next
+test_reports
