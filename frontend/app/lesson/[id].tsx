@@ -52,6 +52,19 @@ export default function LessonDetail() {
               </View>
             </View>
           ))}
+
+          {/* Citations — Guideline 1.4.1: sources for anatomy lessons */}
+          <TouchableOpacity
+            style={styles.srcRow}
+            onPress={() => router.push("/references")}
+            testID="lesson-view-sources"
+          >
+            <Ionicons name="library-outline" size={14} color={T.textFaint} />
+            <Text style={styles.srcText}>
+              Lesson content is based on Gray&apos;s Anatomy, TeachMeAnatomy, Kenhub and NIH/NCBI anatomy references.
+            </Text>
+            <Text style={styles.srcCta}>View sources</Text>
+          </TouchableOpacity>
         </ScrollView>
 
         <TouchableOpacity style={[styles.quizBtn, { bottom: insets.bottom + 14 }]} onPress={() => setQuizOpen(true)} testID="start-quiz-btn">
@@ -117,6 +130,21 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   quizBtnText: { color: T.bg, fontSize: 15, fontWeight: "800" },
+  srcRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+    marginBottom: 88,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: T.bg2,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  srcText: { flex: 1, color: T.textFaint, fontSize: 11, lineHeight: 15 },
+  srcCta: { color: T.accent, fontSize: 11, fontWeight: "800" },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
   quizWrap: { position: "absolute", left: 0, right: 0, bottom: 0 },
 });

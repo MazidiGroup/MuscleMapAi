@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import { AnatomyViewer } from "./AnatomyViewer";
 import { useWorkout, computeRecovery, weeklySetsByGroup, weeklyVolumeSeries } from "./workoutStore";
@@ -12,6 +13,7 @@ const STATE_LABEL = { red: "Recently trained", orange: "Recovering", green: "Rec
 
 export function InsightsView() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { history } = useWorkout();
 
   const recovery = useMemo(() => computeRecovery(history), [history]);
@@ -108,6 +110,19 @@ export function InsightsView() {
             ))}
           </View>
           <Text style={styles.hint}>Total volume lifted (kg) per week over the last 6 weeks.</Text>
+
+          {/* Citations — Guideline 1.4.1: sources for recovery timing & training data */}
+          <TouchableOpacity
+            style={styles.srcRow}
+            onPress={() => router.push("/references")}
+            testID="insights-view-sources"
+          >
+            <Ionicons name="library-outline" size={14} color={T.textFaint} />
+            <Text style={styles.srcText}>
+              Recovery timing (24–72 h) and volume guidance based on ACSM position stands and peer-reviewed research on DOMS &amp; muscle protein synthesis.
+            </Text>
+            <Text style={styles.srcCta}>View sources</Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
     </View>
@@ -148,4 +163,18 @@ const styles = StyleSheet.create({
   chartBar: { width: "100%", backgroundColor: T.accent, borderRadius: 6, minHeight: 3 },
   chartLabel: { color: T.textFaint, fontSize: 11, marginTop: 6 },
   hint: { color: T.textFaint, fontSize: 12, marginTop: 8 },
+  srcRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: T.bg2,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  srcText: { flex: 1, color: T.textFaint, fontSize: 11, lineHeight: 15 },
+  srcCta: { color: T.accent, fontSize: 11, fontWeight: "800" },
 });

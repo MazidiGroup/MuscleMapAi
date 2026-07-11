@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { askCoach, CoachTurn } from "@/src/anatomy/coachApi";
 import { T } from "@/src/anatomy/ui";
@@ -64,6 +64,7 @@ export default function CoachScreen() {
 
 function CoachContent() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const params = useLocalSearchParams<{ q?: string }>();
   const [messages, setMessages] = useState<CoachTurn[]>([]);
   const [input, setInput] = useState("");
@@ -138,10 +139,13 @@ function CoachContent() {
         </View>
         <View style={styles.disclaimer}>
           <Ionicons name="information-circle-outline" size={14} color={T.textFaint} />
-          <Text style={styles.disclaimerText} numberOfLines={2}>
+          <Text style={styles.disclaimerText} numberOfLines={3}>
             Educational information only, not medical advice. Consult a qualified professional before
             changing your training or health regimen.
           </Text>
+          <TouchableOpacity onPress={() => router.push("/references")} testID="coach-view-sources">
+            <Text style={styles.disclaimerLink}>Sources</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -217,6 +221,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   disclaimerText: { flex: 1, color: T.textFaint, fontSize: 11, lineHeight: 15 },
+  disclaimerLink: { color: T.accent, fontSize: 11, fontWeight: "800", marginLeft: 6 },
   empty: { alignItems: "center", paddingTop: 40, gap: 12 },
   emptyText: { color: T.textDim, fontSize: 15, textAlign: "center", marginBottom: 8, paddingHorizontal: 20 },
   suggestion: {

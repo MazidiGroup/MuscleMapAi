@@ -227,6 +227,11 @@ export default function LibraryScreen() {
             <Text style={styles.version}>v1.0 · Explore · Workout · Learn · Coach</Text>
 
             <View style={styles.linkList}>
+              <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/references")} testID="link-references">
+                <Ionicons name="library-outline" size={18} color={T.accent} />
+                <Text style={styles.linkRowText}>Sources & References</Text>
+                <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/privacy")} testID="link-privacy">
                 <Ionicons name="shield-checkmark-outline" size={18} color={T.accent} />
                 <Text style={styles.linkRowText}>Privacy Policy</Text>

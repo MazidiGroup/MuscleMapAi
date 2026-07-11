@@ -193,6 +193,19 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
           <Ionicons name="sparkles" size={16} color={T.bg} />
           <Text style={styles.askBtnText}>Open full chat with Atlas</Text>
         </TouchableOpacity>
+
+        {/* Citations — Guideline 1.4.1: sources for anatomical & recovery info */}
+        <TouchableOpacity
+          style={styles.srcRow}
+          onPress={() => router.push("/references")}
+          testID="muscle-view-sources"
+        >
+          <Ionicons name="library-outline" size={14} color={T.textFaint} />
+          <Text style={styles.srcText}>
+            Anatomy and recovery data sourced from Gray&apos;s Anatomy, ACSM, NIH/NCBI and Kenhub.
+          </Text>
+          <Text style={styles.srcCta}>View sources</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -449,4 +462,18 @@ const styles = StyleSheet.create({
 
   askBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.borderHi, borderRadius: 12, paddingVertical: 13, marginTop: 8 },
   askBtnText: { color: T.text, fontSize: 14, fontWeight: "700" },
+  srcRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: T.bg2,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  srcText: { flex: 1, color: T.textFaint, fontSize: 11, lineHeight: 15 },
+  srcCta: { color: T.accent, fontSize: 11, fontWeight: "800" },
 });
