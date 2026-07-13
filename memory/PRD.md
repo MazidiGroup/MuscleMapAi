@@ -111,3 +111,8 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 - Guest→real login: new session replaces guest; local zustand workout data persists on device; RevenueCat logIn transfers entitlement.
 - Verified e2e: guest link → Explore works; Library guest section; upgrade screen with Not-now; guest can call /coach/ask (200).
 - REQUIRES: backend redeploy + new iOS build (1.0.6) before replying to Apple.
+
+## Apple rejection round 5 fixes — v1.0.9 (July 2026)
+- 2.1(a) BUG (Terms link dead on login): root cause was AuthGate whitelisting only /login + /privacy — tapping Terms pushed /terms then instantly bounced back to /login. Fix: /terms and /references added to public routes in app/_layout.tsx. Verified e2e: signed-out tap on Terms now opens Terms of Use screen.
+- 3.1.2(c) metadata: Apple needs functional WEB links. Added /app/backend/legal_pages.py serving public HTML pages: GET /api/legal/privacy and GET /api/legal/terms (registered in server.py). User must paste https://<deployed-domain>/api/legal/privacy into App Store Connect Privacy Policy field and put the terms URL (or Apple standard EULA link) in the App Description, then redeploy backend + new iOS build.
+- app.json version bumped to 1.0.9.

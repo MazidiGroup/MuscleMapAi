@@ -41,7 +41,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (loading) return;
     SplashScreen.hideAsync();
     const seg = segments[0] as string | undefined;
-    const isPublic = seg === "login" || seg === "privacy";
+    const isPublic = seg === "login" || seg === "privacy" || seg === "terms" || seg === "references";
     if (!user && !isPublic) {
       router.replace("/login");
     } else if (user && !user.is_guest && seg === "login") {

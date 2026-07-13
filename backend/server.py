@@ -1991,4 +1991,7 @@ async def shutdown():
     client.close()
 
 
+from legal_pages import legal_router
+
 app.include_router(api_router)
+app.include_router(legal_router)
