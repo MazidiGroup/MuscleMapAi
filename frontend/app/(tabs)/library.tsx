@@ -7,15 +7,30 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
 import { GYM_GROUPS, GYM_GROUP_ORDER, prettyName } from "@/src/anatomy/groups";
 import { MUSCLE_DATA, getMuscleInfo } from "@/src/anatomy/muscleData";
+import { EXERCISES, Exercise } from "@/src/anatomy/exercises";
+import { getExerciseMeta } from "@/src/anatomy/gymGuide";
+import { exerciseMatches, exerciseGroup, muscleAliasMatches } from "@/src/anatomy/search";
 import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
 import { T, GROUP_COLORS } from "@/src/anatomy/ui";
 import { useAuth } from "@/src/auth/AuthContext";
+import { FLAGS } from "@/src/config/featureFlags";
+
+type LibSeg = "muscles" | "exercises";
+type GroupBy = "muscle" | "equipment" | "movement";
+
+const GROUP_BY_OPTIONS: { key: GroupBy; label: string }[] = [
+  { key: "muscle", label: "By Muscle" },
+  { key: "equipment", label: "By Equipment" },
+  { key: "movement", label: "By Movement" },
+];
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout, deleteAccount } = useAuth();
   const [query, setQuery] = useState("");
+  const [seg, setSeg] = useState<LibSeg>("muscles");
+  const [groupBy, setGroupBy] = useState<GroupBy>("muscle");
   const [selected, setSelected] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
@@ -103,11 +118,30 @@ export default function LibraryScreen() {
       const g = GYM_GROUPS[key];
       const items = g.nodes.filter((n) => {
         const label = (MUSCLE_DATA[n]?.label || n).toLowerCase();
-        return !q || label.includes(q) || key.includes(q);
+        return !q || label.includes(q) || key.includes(q) || muscleAliasMatches(n, q);
       });
       return { key, label: g.label, items };
     }).filter((g) => g.items.length > 0);
   }, [query]);
+
+  const exerciseSections = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = EXERCISES.filter((e) => exerciseMatches(e, q));
+    const buckets: Record<string, Exercise[]> = {};
+    const keyOf = (e: Exercise) => (groupBy === "equipment" ? e.equipment : groupBy === "movement" ? e.category : exerciseGroup(e));
+    for (const e of filtered) {
+      const k = keyOf(e);
+      if (!buckets[k]) buckets[k] = [];
+      buckets[k].push(e);
+    }
+    const order = groupBy === "muscle" ? [...GYM_GROUP_ORDER, "other"].filter((k) => buckets[k]) : Object.keys(buckets).sort();
+    return order.map((k) => ({
+      key: k,
+      label: groupBy === "muscle" ? GYM_GROUPS[k]?.label || "Other" : k,
+      color: groupBy === "muscle" ? GROUP_COLORS[k] || T.accent : T.accent,
+      items: buckets[k],
+    }));
+  }, [query, groupBy]);
 
   const open = (n: string) => setSelected(n);
   const closeSheet = () => {
@@ -119,12 +153,12 @@ export default function LibraryScreen() {
     <View style={styles.root}>
       <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 18 }}>
         <Text style={styles.h1}>Library</Text>
-        <Text style={styles.sub}>Muscle reference · bookmarks · history</Text>
+        <Text style={styles.sub}>Exercises · muscle guide · account</Text>
         <View style={styles.search}>
           <Ionicons name="search" size={18} color={T.textFaint} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search muscles…"
+            placeholder={seg === "exercises" ? "Search exercises…" : "Search muscles…"}
             placeholderTextColor={T.textFaint}
             value={query}
             onChangeText={setQuery}
@@ -136,40 +170,101 @@ export default function LibraryScreen() {
             </TouchableOpacity>
           )}
         </View>
+        {FLAGS.libraryExercises && (
+          <View style={styles.libSeg}>
+            {(["muscles", "exercises"] as LibSeg[]).map((s) => (
+              <TouchableOpacity key={s} style={[styles.libSegBtn, seg === s && styles.libSegActive]} onPress={() => setSeg(s)} testID={`lib-seg-${s}`}>
+                <Ionicons name={s === "muscles" ? "body-outline" : "barbell-outline"} size={15} color={seg === s ? T.bg : T.textDim} />
+                <Text style={[styles.libSegText, seg === s && styles.libSegTextActive]}>{s === "muscles" ? "Muscles" : "Exercises"}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-        {query.length === 0 && bookmarks.length > 0 && (
-          <Pills title="Bookmarked" icon="bookmark" data={bookmarks} onPress={open} />
-        )}
-        {query.length === 0 && recent.length > 0 && (
-          <Pills title="Recently Viewed" icon="time-outline" data={recent} onPress={open} />
+        {seg === "muscles" && (
+          <>
+            {query.length === 0 && bookmarks.length > 0 && (
+              <Pills title="Bookmarked" icon="bookmark" data={bookmarks} onPress={open} />
+            )}
+            {query.length === 0 && recent.length > 0 && (
+              <Pills title="Recently Viewed" icon="time-outline" data={recent} onPress={open} />
+            )}
+
+            {groups.map((g) => {
+              const color = GROUP_COLORS[g.key] || T.accent;
+              return (
+                <View key={g.key} style={{ marginBottom: 18 }}>
+                  <View style={styles.groupHead}>
+                    <View style={[styles.gdot, { backgroundColor: color }]} />
+                    <Text style={styles.groupTitle}>{g.label}</Text>
+                  </View>
+                  {g.items.map((n) => {
+                    const info = getMuscleInfo(n);
+                    return (
+                      <TouchableOpacity key={n} style={styles.row} onPress={() => open(n)} testID={`lib-${n}`}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.rowName}>{info?.label || n}</Text>
+                          {info && <Text style={styles.rowFn} numberOfLines={1}>{info.fn}</Text>}
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              );
+            })}
+            {groups.length === 0 && <Text style={styles.empty}>No muscles match “{query}”.</Text>}
+          </>
         )}
 
-        {groups.map((g) => {
-          const color = GROUP_COLORS[g.key] || T.accent;
-          return (
-            <View key={g.key} style={{ marginBottom: 18 }}>
-              <View style={styles.groupHead}>
-                <View style={[styles.gdot, { backgroundColor: color }]} />
-                <Text style={styles.groupTitle}>{g.label}</Text>
-              </View>
-              {g.items.map((n) => {
-                const info = getMuscleInfo(n);
-                return (
-                  <TouchableOpacity key={n} style={styles.row} onPress={() => open(n)} testID={`lib-${n}`}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.rowName}>{info?.label || n}</Text>
-                      {info && <Text style={styles.rowFn} numberOfLines={1}>{info.fn}</Text>}
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
+        {seg === "exercises" && (
+          <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 14 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {GROUP_BY_OPTIONS.map((o) => (
+                  <TouchableOpacity
+                    key={o.key}
+                    style={[styles.gbChip, groupBy === o.key && styles.gbChipActive]}
+                    onPress={() => setGroupBy(o.key)}
+                    testID={`lib-groupby-${o.key}`}
+                  >
+                    <Text style={[styles.gbChipText, groupBy === o.key && { color: T.bg }]}>{o.label}</Text>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
-          );
-        })}
-        {groups.length === 0 && <Text style={styles.empty}>No muscles match “{query}”.</Text>}
+                ))}
+              </View>
+            </ScrollView>
+
+            {exerciseSections.map((s) => (
+              <View key={s.key} style={{ marginBottom: 18 }}>
+                <View style={styles.groupHead}>
+                  <View style={[styles.gdot, { backgroundColor: s.color }]} />
+                  <Text style={styles.groupTitle}>{s.label}</Text>
+                  <Text style={styles.groupCount}>{s.items.length}</Text>
+                </View>
+                {s.items.map((e) => {
+                  const meta = getExerciseMeta(e.id);
+                  return (
+                    <TouchableOpacity key={e.id} style={styles.row} onPress={() => router.push(`/exercise/${e.id}`)} testID={`lib-ex-${e.id}`}>
+                      <View style={[styles.exIcon, { backgroundColor: s.color + "1A" }]}>
+                        <Ionicons name={meta.icon as any} size={18} color={s.color} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rowName}>{e.name}</Text>
+                        <Text style={styles.rowFn} numberOfLines={1}>
+                          {meta.difficulty} · {e.equipment} · {e.category}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+            {exerciseSections.length === 0 && <Text style={styles.empty}>No exercises match “{query}”.</Text>}
+          </>
+        )}
 
         {/* Account */}
         {query.length === 0 && user && (
@@ -221,10 +316,10 @@ export default function LibraryScreen() {
           <View style={styles.about}>
             <Text style={styles.aboutTitle}>About</Text>
             <Text style={styles.aboutText}>
-              Muscle Map Ai — an interactive 3D écorché (real-scale 180 cm) with 270 named
-              structures, morph-target muscle atrophy, an AI coach and guided lessons.
+              Muscle Map Ai — explore a life-size 3D muscle model with 270 named structures,
+              see how muscles shrink, track your workouts and learn with lessons and an AI coach.
             </Text>
-            <Text style={styles.version}>v1.0 · Explore · Workout · Learn · Coach</Text>
+            <Text style={styles.version}>v1.1.0 · Explore · Workout · Learn · Coach</Text>
 
             <View style={styles.linkList}>
               <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/references")} testID="link-references">
@@ -290,6 +385,16 @@ const styles = StyleSheet.create({
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
   search: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 12, height: 44, marginTop: 14 },
   searchInput: { flex: 1, color: T.text, fontSize: 15 },
+  libSeg: { flexDirection: "row", backgroundColor: T.surface, borderRadius: 12, padding: 4, gap: 4, marginTop: 10, borderWidth: 1, borderColor: T.border },
+  libSegBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 9, borderRadius: 9 },
+  libSegActive: { backgroundColor: T.accent },
+  libSegText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
+  libSegTextActive: { color: T.bg },
+  gbChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border },
+  gbChipActive: { backgroundColor: T.accent, borderColor: T.accent },
+  gbChipText: { color: T.text, fontSize: 13, fontWeight: "700" },
+  exIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", marginRight: 12 },
+  groupCount: { color: T.textFaint, fontSize: 12, fontWeight: "700", marginLeft: "auto" },
   groupHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   gdot: { width: 10, height: 10, borderRadius: 5 },
   groupTitle: { color: T.text, fontSize: 17, fontWeight: "800" },

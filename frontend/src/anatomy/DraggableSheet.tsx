@@ -14,7 +14,8 @@ type Props = {
    * Callers must size this so the sheet never rises above the header row.
    */
   maxHeight: number;
-  initial?: SheetState;
+  /** "half" starts the sheet resting midway between collapsed and expanded. */
+  initial?: SheetState | "half";
   onSnap?: (s: SheetState) => void;
   children: React.ReactNode;
 };
@@ -26,8 +27,9 @@ export const DraggableSheet = forwardRef<DraggableSheetHandle, Props>(function D
   // translateY travels between 0 (fully expanded, top at maxHeight) and `range`
   // (collapsed, only `peekHeight` visible). Free dragging rests anywhere in between.
   const range = Math.max(1, maxHeight - peekHeight);
-  const translateY = useRef(new Animated.Value(initial === "expanded" ? 0 : range)).current;
-  const currentY = useRef(initial === "expanded" ? 0 : range);
+  const initialY = initial === "expanded" ? 0 : initial === "half" ? range / 2 : range;
+  const translateY = useRef(new Animated.Value(initialY)).current;
+  const currentY = useRef(initialY);
   const startY = useRef(currentY.current);
 
   useEffect(() => {
@@ -79,7 +81,22 @@ export const DraggableSheet = forwardRef<DraggableSheetHandle, Props>(function D
 
   return (
     <Animated.View style={[styles.sheet, { height: maxHeight, transform: [{ translateY }] }]}>
-      <View style={styles.handleZone} {...pan.panHandlers}>
+      <View
+        style={styles.handleZone}
+        {...pan.panHandlers}
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel="Panel size"
+        accessibilityHint="Drag up or down to resize the panel"
+        accessibilityActions={[
+          { name: "increment", label: "Expand panel" },
+          { name: "decrement", label: "Collapse panel" },
+        ]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === "increment") animateTo("expanded");
+          else if (e.nativeEvent.actionName === "decrement") animateTo("collapsed");
+        }}
+      >
         <View style={styles.handle} />
       </View>
       <View style={styles.content}>{children}</View>

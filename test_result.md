@@ -176,6 +176,27 @@
 ##     -message: "Rebuilt app as Fitness Anatomy Trainer. 3D model renders on web (verified via screenshot). Please test all anatomy flows on web. No auth/login. Tabs: Explore, Workout, Muscle Info, Settings."
 ##     -agent: "main"
 ##     -message: |
+##       [June 2026 - v1.1.0 feature release] FRONTEND-ONLY test scope (backend untouched this session):
+##       1) Insights gesture fix (workout tab -> Insights segment; PREMIUM ONLY - login with
+##          applereview@mazidigroup.com code 123456 via email flow to get premium):
+##          - First finish a workout (Train seg -> add exercise -> Session -> fill weight/reps -> done -> Finish Workout)
+##          - Insights now renders 3D recovery model full screen with a DRAGGABLE sheet (drag handle up/down)
+##          - New v1.1.0 sections: period toggle (Last 7 days / Last 30 days, testID insights-period-week|month),
+##            4 stat cards, streak card (testID insights-streak), Personal Records rows (testID pr-<exerciseId>),
+##            Volume Trend chart (6 bars week / 12 bars month)
+##       2) Library tab reorganization (public, guest OK):
+##          - Segmented control (testID lib-seg-muscles / lib-seg-exercises)
+##          - Exercises segment: group-by chips (lib-groupby-muscle|equipment|movement), rows testID lib-ex-<id>,
+##            tap row -> /exercise/<id> detail; alias search: "ohp" -> Overhead Press, "lats" (muscles seg) -> Latissimus Dorsi
+##          - Muscles segment: unchanged muscle reference + alias search support
+##       3) Coach tab (PREMIUM ONLY): context-aware suggestions (with workout history they change),
+##          send message -> streaming; KNOWN LIMITATION: Emergent LLM budget exhausted so reply may show
+##          "couldn't reach the AI service" - that error bubble IS the expected mocked path, NOT a bug.
+##          While streaming/busy a STOP button (testID coach-stop) replaces send; leaving screen cancels request.
+##       4) Regression: Explore tab 3D + draggable sheet + muscle tap, Workout session logging flow, guest login.
+##       Backend NOT modified - skip backend testing.
+##     -agent: "main"
+##     -message: |
 ##       [July 2026 - Apple resubmission fixes] Backend test scope:
 ##         1) DELETE /api/auth/me (new) — no token=401; valid token=200 {ok:true,deleted:true};
 ##            /auth/me with same token AFTER delete=401 (session revoked).

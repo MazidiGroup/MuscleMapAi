@@ -38,45 +38,66 @@ function parseSSE(chunk: string, h: Handlers): boolean {
   return terminal;
 }
 
-export async function askCoach(message: string, history: CoachTurn[], context: string | null, h: Handlers) {
-  try {
-    const token = await getToken();
-    const res = await fetch(URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ message, history, context }),
-    });
+export type CoachRequestHandle = { cancel: () => void };
 
-    // Streaming path (web / platforms with ReadableStream support)
-    const body: any = res.body;
-    if (body && typeof body.getReader === "function") {
-      const reader = body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() || "";
-        for (const part of parts) {
-          if (parseSSE(part, h)) return;
+/**
+ * Ask the coach and stream the reply. Returns a handle whose `cancel()` aborts
+ * the network request mid-stream (used when the user taps Stop or leaves the
+ * screen). On cancel, `onDone` fires with whatever text already arrived.
+ */
+export function askCoach(message: string, history: CoachTurn[], context: string | null, h: Handlers): CoachRequestHandle {
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  let cancelled = false;
+
+  (async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch(URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ message, history, context }),
+        signal: controller?.signal,
+      });
+
+      // Streaming path (web / platforms with ReadableStream support)
+      const body: any = res.body;
+      if (body && typeof body.getReader === "function") {
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() || "";
+          for (const part of parts) {
+            if (parseSSE(part, h)) return;
+          }
         }
+        if (buffer) parseSSE(buffer, h);
+        h.onDone();
+        return;
       }
-      if (buffer) parseSSE(buffer, h);
-      h.onDone();
-      return;
-    }
 
-    // Fallback: read whole text and parse all events at once.
-    const text = await res.text();
-    const terminal = parseSSE(text, h);
-    if (!terminal) h.onDone();
-  } catch {
-    h.onFail();
-  }
+      // Fallback: read whole text and parse all events at once.
+      const text = await res.text();
+      const terminal = parseSSE(text, h);
+      if (!terminal) h.onDone();
+    } catch {
+      if (cancelled) h.onDone();
+      else h.onFail();
+    }
+  })();
+
+  return {
+    cancel: () => {
+      cancelled = true;
+      controller?.abort();
+    },
+  };
 }

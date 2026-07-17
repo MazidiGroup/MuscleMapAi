@@ -1,46 +1,69 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { AnatomyViewer } from "./AnatomyViewer";
-import { useWorkout, computeRecovery, weeklySetsByGroup, weeklyVolumeSeries } from "./workoutStore";
+import { DraggableSheet } from "./DraggableSheet";
+import {
+  useWorkout,
+  computeRecovery,
+  weeklySetsByGroup,
+  weeklyVolumeSeries,
+  computeStreaks,
+  periodStats,
+  topPRs,
+} from "./workoutStore";
 import { T } from "./ui";
+import { FLAGS } from "@/src/config/featureFlags";
 
 const STATE_COLOR = { red: "#FF4438", orange: "#FFB020", green: "#2FBF71" } as const;
 const STATE_LABEL = { red: "Recently trained", orange: "Recovering", green: "Recovered" } as const;
 
+type Period = "week" | "month";
+
+const fmtVol = (v: number) => (v >= 10000 ? `${Math.round(v / 100) / 10}k` : `${v}`);
+
 export function InsightsView() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { history } = useWorkout();
+  const { height } = useWindowDimensions();
+  const { history, prs } = useWorkout();
+  const [period, setPeriod] = useState<Period>("week");
 
+  const days = period === "week" ? 7 : 30;
   const recovery = useMemo(() => computeRecovery(history), [history]);
-  const weekly = useMemo(() => weeklySetsByGroup(history), [history]);
-  const series = useMemo(() => weeklyVolumeSeries(history, 6), [history]);
+  const activation = useMemo(() => weeklySetsByGroup(history, days), [history, days]);
+  const series = useMemo(() => weeklyVolumeSeries(history, period === "week" ? 6 : 12), [history, period]);
+  const stats = useMemo(() => periodStats(history, days), [history, days]);
+  const streaks = useMemo(() => computeStreaks(history), [history]);
+  const records = useMemo(() => topPRs(prs, 6), [prs]);
   const maxVol = Math.max(1, ...series.map((s) => s.volume));
-  const maxSets = Math.max(1, ...weekly.list.map((g) => g.sets));
+  const maxSets = Math.max(1, ...activation.list.map((g) => g.sets));
 
   if (history.length === 0) {
     return (
       <View style={[styles.full, styles.empty, { paddingTop: insets.top + 56 }]}>
         <Ionicons name="pulse-outline" size={40} color={T.textFaint} />
         <Text style={styles.emptyText}>No insights yet</Text>
-        <Text style={styles.emptySub}>Finish a few workouts to unlock your recovery heatmap, weekly activation and progression charts.</Text>
+        <Text style={styles.emptySub}>Finish a few workouts to see your recovery map, training stats, records and progress charts.</Text>
       </View>
     );
   }
 
+  const sheetMax = Math.min(height * 0.86, height - insets.top - 108);
+
   return (
     <View style={styles.full}>
-      <View style={{ height: "36%", paddingTop: insets.top + 52 }}>
-        <AnatomyViewer mode="recovery" recovery={recovery.colorMap} />
-      </View>
+      <AnatomyViewer mode="recovery" recovery={recovery.colorMap} />
 
-      <View style={styles.panel}>
-        <View style={styles.handle} />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+      {/* Draggable panel: drag the handle to see more of the 3D recovery map or more stats. */}
+      <DraggableSheet peekHeight={190} maxHeight={sheetMax} initial="half">
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 80 }}
+        >
           {/* recovery legend */}
           <View style={styles.legendRow}>
             {(["red", "orange", "green"] as const).map((s) => (
@@ -50,6 +73,62 @@ export function InsightsView() {
               </View>
             ))}
           </View>
+
+          {FLAGS.insightsV2 && (
+            <>
+              {/* week / month toggle */}
+              <View style={styles.periodSeg}>
+                {(["week", "month"] as Period[]).map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    style={[styles.periodBtn, period === p && styles.periodBtnActive]}
+                    onPress={() => setPeriod(p)}
+                    testID={`insights-period-${p}`}
+                  >
+                    <Text style={[styles.periodText, period === p && styles.periodTextActive]}>
+                      {p === "week" ? "Last 7 days" : "Last 30 days"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* period stats */}
+              <View style={styles.weekStats}>
+                <View style={styles.wStat}>
+                  <Text style={styles.wValue}>{stats.workouts}</Text>
+                  <Text style={styles.wLabel}>Workouts</Text>
+                </View>
+                <View style={styles.wStat}>
+                  <Text style={styles.wValue}>{stats.sets}</Text>
+                  <Text style={styles.wLabel}>Sets</Text>
+                </View>
+                <View style={styles.wStat}>
+                  <Text style={styles.wValue}>{fmtVol(stats.volume)}</Text>
+                  <Text style={styles.wLabel}>Volume (kg)</Text>
+                </View>
+                <View style={styles.wStat}>
+                  <Text style={styles.wValue}>{period === "month" ? stats.perWeek : activation.list.filter((g) => g.sets > 0).length}</Text>
+                  <Text style={styles.wLabel}>{period === "month" ? "Per week" : "Groups hit"}</Text>
+                </View>
+              </View>
+
+              {/* streak */}
+              <View style={styles.streakCard} testID="insights-streak">
+                <View style={styles.streakIcon}>
+                  <Ionicons name="flame" size={22} color="#FF8A3D" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.streakValue}>
+                    {streaks.currentWeeks} week{streaks.currentWeeks === 1 ? "" : "s"} in a row
+                  </Text>
+                  <Text style={styles.streakSub}>
+                    Best streak: {streaks.bestWeeks} week{streaks.bestWeeks === 1 ? "" : "s"} · {streaks.workoutsThisWeek} workout
+                    {streaks.workoutsThisWeek === 1 ? "" : "s"} this week
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
 
           <Text style={styles.section}>Muscle Recovery</Text>
           {recovery.groups.map((g) => (
@@ -62,23 +141,9 @@ export function InsightsView() {
             </View>
           ))}
 
-          {/* weekly activation */}
-          <Text style={styles.section}>This Week</Text>
-          <View style={styles.weekStats}>
-            <View style={styles.wStat}>
-              <Text style={styles.wValue}>{weekly.workouts}</Text>
-              <Text style={styles.wLabel}>Workouts</Text>
-            </View>
-            <View style={styles.wStat}>
-              <Text style={styles.wValue}>{weekly.totalSets}</Text>
-              <Text style={styles.wLabel}>Sets</Text>
-            </View>
-            <View style={styles.wStat}>
-              <Text style={styles.wValue}>{weekly.list.filter((g) => g.sets > 0).length}</Text>
-              <Text style={styles.wLabel}>Groups hit</Text>
-            </View>
-          </View>
-          {weekly.list
+          {/* sets per muscle group */}
+          <Text style={styles.section}>{period === "week" ? "Sets This Week" : "Sets Last 30 Days"}</Text>
+          {activation.list
             .filter((g) => g.sets > 0)
             .map((g) => (
               <View key={g.group} style={styles.barRow}>
@@ -89,15 +154,38 @@ export function InsightsView() {
                 <Text style={styles.barVal}>{g.sets}</Text>
               </View>
             ))}
-          {weekly.neglected.length > 0 && (
+          {activation.neglected.length > 0 && (
             <View style={styles.neglect}>
               <Ionicons name="alert-circle-outline" size={16} color={T.secondary} />
-              <Text style={styles.neglectText}>Neglected this week: {weekly.neglected.join(", ")}</Text>
+              <Text style={styles.neglectText}>
+                Not trained {period === "week" ? "this week" : "in the last 30 days"}: {activation.neglected.join(", ")}
+              </Text>
             </View>
           )}
 
+          {/* personal records */}
+          {FLAGS.insightsV2 && records.length > 0 && (
+            <>
+              <Text style={styles.section}>Personal Records</Text>
+              {records.map((r) => (
+                <View key={r.exerciseId} style={styles.prRow} testID={`pr-${r.exerciseId}`}>
+                  <View style={styles.prBadge}>
+                    <Ionicons name="trophy" size={14} color="#FFB020" />
+                  </View>
+                  <Text style={styles.prName} numberOfLines={1}>
+                    {r.name}
+                  </Text>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={styles.prWeight}>{r.maxWeight > 0 ? `${r.maxWeight} kg` : "—"}</Text>
+                    <Text style={styles.prVol}>{fmtVol(r.maxVolume)} kg best session</Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+
           {/* progression chart */}
-          <Text style={styles.section}>Weekly Volume</Text>
+          <Text style={styles.section}>Volume Trend</Text>
           <View style={styles.chart}>
             {series.map((s, i) => (
               <View key={i} style={styles.chartCol}>
@@ -105,11 +193,11 @@ export function InsightsView() {
                 <View style={styles.chartBarTrack}>
                   <View style={[styles.chartBar, { height: `${(s.volume / maxVol) * 100}%` }]} />
                 </View>
-                <Text style={styles.chartLabel}>{s.label}</Text>
+                <Text style={styles.chartLabel}>{series.length > 8 && (series.length - 1 - i) % 2 !== 0 ? "" : s.label}</Text>
               </View>
             ))}
           </View>
-          <Text style={styles.hint}>Total volume lifted (kg) per week over the last 6 weeks.</Text>
+          <Text style={styles.hint}>Total weight lifted (kg) per week over the last {series.length} weeks.</Text>
 
           {/* Citations — Guideline 1.4.1: sources for recovery timing & training data */}
           <TouchableOpacity
@@ -124,7 +212,7 @@ export function InsightsView() {
             <Text style={styles.srcCta}>View sources</Text>
           </TouchableOpacity>
         </ScrollView>
-      </View>
+      </DraggableSheet>
     </View>
   );
 }
@@ -134,8 +222,20 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", justifyContent: "center", gap: 10, padding: 30 },
   emptyText: { color: T.text, fontSize: 17, fontWeight: "700" },
   emptySub: { color: T.textDim, fontSize: 14, textAlign: "center", lineHeight: 20 },
-  panel: { flex: 1, backgroundColor: T.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: T.border, marginTop: -24, paddingHorizontal: 18, paddingTop: 10 },
-  handle: { alignSelf: "center", width: 42, height: 5, borderRadius: 3, backgroundColor: "rgba(120,160,220,0.25)", marginBottom: 12 },
+  periodSeg: { flexDirection: "row", backgroundColor: T.bg2, borderRadius: 12, padding: 4, gap: 4, marginTop: 12, borderWidth: 1, borderColor: T.border },
+  periodBtn: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" },
+  periodBtnActive: { backgroundColor: T.accent },
+  periodText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
+  periodTextActive: { color: T.bg },
+  streakCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,138,61,0.10)", borderWidth: 1, borderColor: "rgba(255,138,61,0.35)", borderRadius: 14, padding: 14, marginTop: 8 },
+  streakIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,138,61,0.16)", alignItems: "center", justifyContent: "center" },
+  streakValue: { color: T.text, fontSize: 16, fontWeight: "800" },
+  streakSub: { color: T.textDim, fontSize: 12, marginTop: 2 },
+  prRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 7 },
+  prBadge: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,176,32,0.14)", alignItems: "center", justifyContent: "center" },
+  prName: { color: T.text, fontSize: 14, fontWeight: "700", flex: 1 },
+  prWeight: { color: T.accent, fontSize: 15, fontWeight: "800" },
+  prVol: { color: T.textFaint, fontSize: 11, marginTop: 1 },
   legendRow: { flexDirection: "row", justifyContent: "space-around", backgroundColor: T.bg2, borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: T.border },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   dot: { width: 10, height: 10, borderRadius: 5 },

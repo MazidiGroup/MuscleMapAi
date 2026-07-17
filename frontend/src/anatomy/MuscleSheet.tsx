@@ -191,7 +191,7 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
 
         <TouchableOpacity style={styles.askBtn} onPress={askAtlas} testID="muscle-ask-coach">
           <Ionicons name="sparkles" size={16} color={T.bg} />
-          <Text style={styles.askBtnText}>Open full chat with Atlas</Text>
+          <Text style={styles.askBtnText}>Chat with Atlas Coach</Text>
         </TouchableOpacity>
 
         {/* Citations — Guideline 1.4.1: sources for anatomical & recovery info */}

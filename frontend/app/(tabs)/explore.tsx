@@ -62,7 +62,7 @@ export default function ExploreScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 8, pointerEvents: "box-none" }]}>
         <View>
           <Text style={styles.h1}>Explore Anatomy</Text>
-          <Text style={styles.sub}>Tap a muscle to identify it · drag to rotate</Text>
+          <Text style={styles.sub}>Tap a muscle to learn about it · drag to rotate</Text>
         </View>
       </View>
 
@@ -139,7 +139,7 @@ export default function ExploreScreen() {
                     <Text style={styles.smallBtnText}>Fully Shrunken</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.hint}>Scrub to morph muscles between full volume and atrophied state.</Text>
+                <Text style={styles.hint}>Slide to change the muscles from full size to fully shrunken.</Text>
                 <TouchableOpacity style={styles.showAll} onPress={showAll} testID="show-all-btn">
                   <Ionicons name="scan-outline" size={16} color={T.text} />
                   <Text style={styles.showAllText}>Show Full Body</Text>

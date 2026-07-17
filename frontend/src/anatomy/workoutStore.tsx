@@ -314,8 +314,8 @@ export function computeRecovery(history: Workout[]): { colorMap: Record<string, 
 
 export type GroupVolume = { group: string; label: string; sets: number };
 
-export function weeklySetsByGroup(history: Workout[]): { list: GroupVolume[]; neglected: string[]; totalSets: number; workouts: number } {
-  const cutoff = Date.now() - 7 * 24 * 3.6e6;
+export function weeklySetsByGroup(history: Workout[], days = 7): { list: GroupVolume[]; neglected: string[]; totalSets: number; workouts: number } {
+  const cutoff = Date.now() - days * 24 * 3.6e6;
   const counts: Record<string, number> = {};
   let totalSets = 0;
   let workouts = 0;
@@ -360,4 +360,85 @@ export function weeklyVolumeSeries(history: Workout[], weeks = 6): WeekPoint[] {
     out.push({ label: i === 0 ? "This wk" : `${i}w`, volume, workouts });
   }
   return out;
+}
+
+// ---------------- v1.1.0 Insights: streaks, period stats, personal records ----------------
+// All values below are computed from the workout history already stored on this
+// device — no new data is collected or sent anywhere.
+const WEEK_MS = 7 * 24 * 3.6e6;
+
+function startOfWeekTs(ts: number) {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  const day = (d.getDay() + 6) % 7; // Monday = 0
+  d.setDate(d.getDate() - day);
+  return d.getTime();
+}
+
+export type Streaks = { currentWeeks: number; bestWeeks: number; workoutsThisWeek: number };
+
+/** Consecutive calendar weeks (Mon-based) with at least one finished workout. */
+export function computeStreaks(history: Workout[]): Streaks {
+  if (history.length === 0) return { currentWeeks: 0, bestWeeks: 0, workoutsThisWeek: 0 };
+  const weeks = new Set<number>();
+  for (const wk of history) weeks.add(startOfWeekTs(wk.date));
+  const thisWeek = startOfWeekTs(Date.now());
+  const workoutsThisWeek = history.filter((w) => startOfWeekTs(w.date) === thisWeek).length;
+
+  // Current streak: count back from this week (or last week if this week is still empty).
+  let cursor = weeks.has(thisWeek) ? thisWeek : thisWeek - WEEK_MS;
+  let currentWeeks = 0;
+  while (weeks.has(cursor)) {
+    currentWeeks++;
+    cursor -= WEEK_MS;
+  }
+
+  // Best streak ever.
+  const sorted = [...weeks].sort((a, b) => a - b);
+  let bestWeeks = 0;
+  let run = 0;
+  let prev = 0;
+  for (const w of sorted) {
+    run = prev && w - prev === WEEK_MS ? run + 1 : 1;
+    bestWeeks = Math.max(bestWeeks, run);
+    prev = w;
+  }
+  return { currentWeeks, bestWeeks: Math.max(bestWeeks, currentWeeks), workoutsThisWeek };
+}
+
+export type PeriodStats = { workouts: number; sets: number; reps: number; volume: number; perWeek: number };
+
+/** Totals for the last `days` days (7 = week view, 30 = month view). */
+export function periodStats(history: Workout[], days: number): PeriodStats {
+  const cutoff = Date.now() - days * 24 * 3.6e6;
+  let workouts = 0;
+  let sets = 0;
+  let reps = 0;
+  let volume = 0;
+  for (const wk of history) {
+    if (wk.date < cutoff) continue;
+    workouts++;
+    const st = workoutStats(wk.exercises);
+    sets += st.completed;
+    reps += st.reps;
+    volume += st.volume;
+  }
+  const perWeek = Math.round((workouts / (days / 7)) * 10) / 10;
+  return { workouts, sets, reps, volume, perWeek };
+}
+
+export type PRItem = { exerciseId: string; name: string; maxWeight: number; maxVolume: number };
+
+/** Best lifts per exercise, heaviest first. */
+export function topPRs(prs: PRs, limit = 8): PRItem[] {
+  return Object.entries(prs.byExercise)
+    .map(([exerciseId, v]) => ({
+      exerciseId,
+      name: getExercise(exerciseId)?.name || exerciseId,
+      maxWeight: v.maxWeight,
+      maxVolume: v.maxVolume,
+    }))
+    .filter((p) => p.maxWeight > 0 || p.maxVolume > 0)
+    .sort((a, b) => b.maxWeight - a.maxWeight || b.maxVolume - a.maxVolume)
+    .slice(0, limit);
 }
