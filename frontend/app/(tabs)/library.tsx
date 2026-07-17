@@ -30,7 +30,7 @@ export default function LibraryScreen() {
   const router = useRouter();
   const { user, logout, deleteAccount } = useAuth();
   const [query, setQuery] = useState("");
-  const [seg, setSeg] = useState<LibSeg>("muscles");
+  const [seg, setSeg] = useState<LibSeg>(FLAGS.libraryExercises ? "exercises" : "muscles");
   const [groupBy, setGroupBy] = useState<GroupBy>("muscle");
   const [selected, setSelected] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
@@ -173,7 +173,7 @@ export default function LibraryScreen() {
         </View>
         {FLAGS.libraryExercises && (
           <View style={styles.libSeg}>
-            {(["muscles", "exercises"] as LibSeg[]).map((s) => (
+            {(["exercises", "muscles"] as LibSeg[]).map((s) => (
               <TouchableOpacity key={s} style={[styles.libSegBtn, seg === s && styles.libSegActive]} onPress={() => setSeg(s)} testID={`lib-seg-${s}`}>
                 <Ionicons name={s === "muscles" ? "body-outline" : "barbell-outline"} size={15} color={seg === s ? T.bg : T.textDim} />
                 <Text style={[styles.libSegText, seg === s && styles.libSegTextActive]}>{s === "muscles" ? "Muscles" : "Exercises"}</Text>
