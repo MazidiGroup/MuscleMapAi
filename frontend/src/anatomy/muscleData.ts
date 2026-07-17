@@ -82,7 +82,7 @@ export const MUSCLE_DATA: Record<string, MuscleInfo> = {
     origin: "Infraspinous fossa of the scapula.",
     insertion: "Greater tubercle of the humerus.",
     antagonist: "Subscapularis",
-    exercises: ["face-pull", "cuban-rotation"],
+    exercises: ["face-pull", "cable-external-rotation"],
   },
   Supraspinatus: {
     label: "Supraspinatus",
@@ -91,7 +91,7 @@ export const MUSCLE_DATA: Record<string, MuscleInfo> = {
     origin: "Supraspinous fossa of the scapula.",
     insertion: "Greater tubercle of the humerus.",
     antagonist: "Latissimus Dorsi",
-    exercises: ["lateral-raise", "cuban-rotation"],
+    exercises: ["lateral-raise", "cable-external-rotation"],
   },
   Subscapularis: {
     label: "Subscapularis",
@@ -100,7 +100,7 @@ export const MUSCLE_DATA: Record<string, MuscleInfo> = {
     origin: "Subscapular fossa of the scapula.",
     insertion: "Lesser tubercle of the humerus.",
     antagonist: "Infraspinatus / Teres Minor",
-    exercises: ["cuban-rotation"],
+    exercises: ["cable-external-rotation"],
   },
   Serratus_Anterior: {
     label: "Serratus Anterior",
@@ -334,7 +334,7 @@ export const MUSCLE_DATA: Record<string, MuscleInfo> = {
     origin: "Lateral condyle and upper tibia.",
     insertion: "Medial cuneiform and first metatarsal.",
     antagonist: "Gastrocnemius / Soleus",
-    exercises: ["tibialis-raise"],
+    exercises: [],
   },
   Sternocleidomastoid: {
     label: "Sternocleidomastoid",

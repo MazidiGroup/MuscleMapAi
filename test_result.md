@@ -197,6 +197,26 @@
 ##       Backend NOT modified - skip backend testing.
 ##     -agent: "main"
 ##     -message: |
+##       [June 2026 - RepDB exercise animations] Test scope (frontend heavy + 3 new backend endpoints):
+##       BACKEND (light): GET /api/exercise-media/manifest -> 32 entries (31 animation+poster, plank poster-only);
+##       GET /api/exercise-media/bench-press/animation -> 200 image/webp; /poster -> 200; unknown id -> 404.
+##       FRONTEND (guest OK for Library/detail):
+##       1) Library -> Exercises segment: rows show REAL poster thumbnails (not icons) for all exercises
+##       2) Exercise detail /exercise/bench-press: hero animation block (testID anim-hero-bench-press) autoplays,
+##          pause/play toggle (anim-toggle-bench-press) works
+##       3) Plank detail: poster image shown, NO play controls (static hold, poster-only by design)
+##       4) REPLACED EXERCISES: 'cuban-rotation' and 'tibialis-raise' are GONE, replaced by
+##          'cable-external-rotation' (Cable External Rotation, Pull/Cable) and 'single-leg-calf-raise'
+##          (Single Leg Calf Raise, Legs/Bodyweight) - verify they appear in Library, have animations,
+##          detail pages work, and searching 'cuban rotation' still finds Cable External Rotation via alias
+##       5) MuscleSheet (Explore tab -> tap a shoulder muscle e.g. Infraspinatus via Library Muscles seg):
+##          Best Exercises cards show poster thumb with small play badge; tapping thumb (anim-card-<id>)
+##          starts animation; tapping another card stops the first (one-at-a-time)
+##       6) Workout Session (premium not needed): add exercise -> Session seg shows animation block with
+##          play/pause (anim-toggle-<id>) + replay (anim-replay-<id>) controls, paused poster by default
+##       7) Regression: workout logging + finish flow, Insights (premium via applereview@mazidigroup.com/123456)
+##     -agent: "main"
+##     -message: |
 ##       [July 2026 - Apple resubmission fixes] Backend test scope:
 ##         1) DELETE /api/auth/me (new) — no token=401; valid token=200 {ok:true,deleted:true};
 ##            /auth/me with same token AFTER delete=401 (session revoked).

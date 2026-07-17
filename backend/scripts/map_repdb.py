@@ -35,7 +35,6 @@ OURS = {
     "barbell-curl": ("Barbell Curl", ["barbell-curl", "bicep-curl-barbell", "barbell-bicep-curl"]),
     "deadlift": ("Conventional Deadlift", ["deadlift-barbell", "conventional-deadlift", "deadlift"]),
     "shrug": ("Barbell Shrug", ["barbell-shrug", "shrug-barbell"]),
-    "cuban-rotation": ("Cuban Rotation", ["cuban-rotation", "cuban-press", "external-rotation"]),
     "squat": ("Barbell Back Squat", ["squat-barbell", "back-squat", "barbell-squat", "barbell-back-squat"]),
     "leg-press": ("Leg Press", ["leg-press", "machine-leg-press", "leg-press-machine"]),
     "leg-extension": ("Leg Extension", ["leg-extension", "machine-leg-extension", "leg-extension-machine"]),
@@ -46,10 +45,11 @@ OURS = {
     "standing-calf-raise": ("Standing Calf Raise", ["standing-calf-raise", "machine-standing-calf-raise", "standing-calf-raises"]),
     "seated-calf-raise": ("Seated Calf Raise", ["seated-calf-raise", "machine-seated-calf-raise"]),
     "calf-raise": ("Calf Raise", ["calf-raise", "bodyweight-calf-raise", "calf-raises"]),
-    "tibialis-raise": ("Tibialis Raise", ["tibialis-raise", "tib-raise"]),
     "cable-crunch": ("Cable Crunch", ["cable-crunch", "kneeling-cable-crunch"]),
     "hanging-leg-raise": ("Hanging Leg Raise", ["hanging-leg-raise", "hanging-leg-raises", "hanging-knee-raise"]),
     "plank": ("Plank", ["plank", "front-plank", "planks"]),
+    "cable-external-rotation": ("Cable External Rotation", ["cable-external-rotation"]),
+    "single-leg-calf-raise": ("Single Leg Calf Raise", ["single-leg-calf-raise"]),
 }
 
 
@@ -63,6 +63,14 @@ def main():
     rows = con.execute("SELECT id, name_en, synonyms, animation, image_alias FROM exercise").fetchall()
     by_id = {r[0]: r for r in rows}
     anim_files = {p.stem: p for p in ANIM_DIR.glob("*.webp")}
+    CLASSIC_DIR = PACK / "images" / "classic"
+
+    def poster_for(repdb_id: str):
+        for suffix in ("-main", "-start", "-peak"):
+            p = CLASSIC_DIR / f"{repdb_id}{suffix}.webp"
+            if p.exists():
+                return p
+        return None
 
     def anim_for(repdb_row):
         """Resolve the animation file for a RepDB row (animation column or id/alias)."""
@@ -98,10 +106,14 @@ def main():
                 match = scored[0][1]
         if match:
             f = anim_for(match)
-            status = "OK" if f else "NO-FILE(parts 6-7?)"
+            poster = poster_for(match[0])
+            status = ("OK" if f else "POSTER-ONLY" if poster else "NO-FILE") + ("+poster" if f and poster else "")
             results.append((our_id, match[0], match[1], f, status))
-            if copy and f:
-                shutil.copyfile(f, OUT_DIR / f"{our_id}.webp")
+            if copy:
+                if f:
+                    shutil.copyfile(f, OUT_DIR / f"{our_id}.webp")
+                if poster:
+                    shutil.copyfile(poster, OUT_DIR / f"{our_id}_poster.webp")
         else:
             missing.append((our_id, our_name))
 
