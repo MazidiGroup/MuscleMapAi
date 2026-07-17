@@ -205,7 +205,7 @@ export default function LibraryScreen() {
                     return (
                       <TouchableOpacity key={n} style={styles.row} onPress={() => open(n)} testID={`lib-${n}`}>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.rowName}>{info?.label || n}</Text>
+                          <Text style={styles.rowName}>{info?.label || prettyName(n)}</Text>
                           {info && <Text style={styles.rowFn} numberOfLines={1}>{info.fn}</Text>}
                         </View>
                         <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
