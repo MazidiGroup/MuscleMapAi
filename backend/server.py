@@ -9,6 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import certifi
 import os
+import re
 import json
 import uuid
 import logging
@@ -1967,6 +1968,62 @@ async def anatomy_model():
         filename="ecorche.glb",
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+# ------------------ Exercise media (RepDB pack — purchased perpetual license) ------------------
+# Files live in static/exercise_media named by OUR exercise ids:
+#   <id>.webp (animated, primary) | <id>.mp4 | <id>.gif (fallbacks)
+#   <id>_poster.webp | <id>_poster.png (static poster frame)
+EXERCISE_MEDIA_DIR = STATIC_DIR / "exercise_media"
+_MEDIA_ANIM_EXTS = ["webp", "mp4", "gif"]
+_MEDIA_TYPES = {"webp": "image/webp", "mp4": "video/mp4", "gif": "image/gif", "png": "image/png"}
+
+
+@api_router.get("/exercise-media/manifest")
+async def exercise_media_manifest():
+    """Map of exercise id -> which media files exist. Lets the app lazily decide
+    whether to render an animation or fall back to icons."""
+    out: Dict[str, Dict[str, bool]] = {}
+    if EXERCISE_MEDIA_DIR.exists():
+        for f in EXERCISE_MEDIA_DIR.iterdir():
+            if not f.is_file():
+                continue
+            stem = f.stem
+            ext = f.suffix.lstrip(".").lower()
+            if stem.endswith("_poster"):
+                out.setdefault(stem[: -len("_poster")], {})["poster"] = True
+            elif ext in _MEDIA_ANIM_EXTS:
+                out.setdefault(stem, {})["animation"] = True
+    return out
+
+
+def _media_response(exercise_id: str, poster: bool):
+    if not re.fullmatch(r"[a-z0-9-]{1,64}", exercise_id):
+        raise HTTPException(status_code=400, detail="Invalid exercise id")
+    names = (
+        [f"{exercise_id}_poster.webp", f"{exercise_id}_poster.png"]
+        if poster
+        else [f"{exercise_id}.{ext}" for ext in _MEDIA_ANIM_EXTS]
+    )
+    for name in names:
+        path = EXERCISE_MEDIA_DIR / name
+        if path.exists():
+            return FileResponse(
+                str(path),
+                media_type=_MEDIA_TYPES.get(path.suffix.lstrip(".").lower(), "application/octet-stream"),
+                headers={"Cache-Control": "public, max-age=604800"},
+            )
+    raise HTTPException(status_code=404, detail="Media not found")
+
+
+@api_router.get("/exercise-media/{exercise_id}/animation")
+async def exercise_animation(exercise_id: str):
+    return _media_response(exercise_id, poster=False)
+
+
+@api_router.get("/exercise-media/{exercise_id}/poster")
+async def exercise_poster(exercise_id: str):
+    return _media_response(exercise_id, poster=True)
 
 
 # ------------------ Indexes ------------------

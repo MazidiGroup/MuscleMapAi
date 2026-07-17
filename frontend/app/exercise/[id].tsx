@@ -10,6 +10,7 @@ import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { getMuscleInfo } from "@/src/anatomy/muscleData";
 import { prettyName } from "@/src/anatomy/groups";
 import { useWorkout } from "@/src/anatomy/workoutStore";
+import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { T } from "@/src/anatomy/ui";
 
 const label = (n: string) => getMuscleInfo(n)?.label || prettyName(n);
@@ -53,6 +54,9 @@ export default function ExerciseDetail() {
             <Pill icon="construct-outline" text={ex.equipment} />
             <Pill icon="albums-outline" text={ex.category} />
           </View>
+
+          {/* Animated demonstration (RepDB pack) — autoplays, loops, pauses off-screen */}
+          <ExerciseAnimation exerciseId={ex.id} variant="hero" />
 
           <Text style={styles.section}>Instructions</Text>
           <Text style={styles.body}>{ex.cue}</Text>

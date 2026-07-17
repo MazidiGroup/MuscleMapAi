@@ -21,6 +21,7 @@ import { getExercise } from "./exercises";
 import { getGuide, getExerciseMeta, MUSCLE_SUMMARY } from "./gymGuide";
 import { addRecent, isBookmarked, toggleBookmark } from "./storageLists";
 import { askCoach } from "./coachApi";
+import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -49,6 +50,8 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
 
   const [marked, setMarked] = useState(false);
   const [anatomyOpen, setAnatomyOpen] = useState(true);
+  // Only one exercise card animates at a time.
+  const [animId, setAnimId] = useState<string | null>(null);
 
   useEffect(() => {
     addRecent(nodeName);
@@ -181,7 +184,14 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
           <View style={{ marginTop: 4 }}>
             <Text style={[styles.sectionHeading, { marginBottom: 10 }]}>Best Exercises</Text>
             {info.exercises.map((id) => (
-              <ExerciseCard key={id} id={id} accent={accent} onPress={() => onExercise?.(id)} />
+              <ExerciseCard
+                key={id}
+                id={id}
+                accent={accent}
+                onPress={() => onExercise?.(id)}
+                animPlaying={animId === id}
+                onToggleAnim={() => setAnimId((cur) => (cur === id ? null : id))}
+              />
             ))}
           </View>
         )}
@@ -259,7 +269,19 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-function ExerciseCard({ id, accent, onPress }: { id: string; accent: string; onPress: () => void }) {
+function ExerciseCard({
+  id,
+  accent,
+  onPress,
+  animPlaying,
+  onToggleAnim,
+}: {
+  id: string;
+  accent: string;
+  onPress: () => void;
+  animPlaying: boolean;
+  onToggleAnim: () => void;
+}) {
   const ex = getExercise(id);
   const meta = getExerciseMeta(id);
   const [open, setOpen] = useState(false);
@@ -273,9 +295,18 @@ function ExerciseCard({ id, accent, onPress }: { id: string; accent: string; onP
   return (
     <View style={styles.exCard}>
       <TouchableOpacity style={styles.exTop} onPress={onPress} activeOpacity={0.8} testID={`ex-card-${id}`}>
-        <View style={[styles.exIcon, { backgroundColor: accent + "22" }]}>
-          <Ionicons name={meta.icon as any} size={22} color={accent} />
-        </View>
+        <ExerciseAnimation
+          exerciseId={id}
+          variant="card"
+          size={46}
+          playing={animPlaying}
+          onTogglePlay={onToggleAnim}
+          fallback={
+            <View style={[styles.exIcon, { backgroundColor: accent + "22" }]}>
+              <Ionicons name={meta.icon as any} size={22} color={accent} />
+            </View>
+          }
+        />
         <View style={{ flex: 1 }}>
           <Text style={styles.exName}>{ex.name}</Text>
           <View style={styles.exMetaRow}>

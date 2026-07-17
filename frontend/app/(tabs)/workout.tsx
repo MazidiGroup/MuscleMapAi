@@ -11,6 +11,7 @@ import { InsightsView } from "@/src/anatomy/InsightsView";
 import { EXERCISES, getExercise } from "@/src/anatomy/exercises";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { useWorkout, workoutStats, Workout } from "@/src/anatomy/workoutStore";
+import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { T } from "@/src/anatomy/ui";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { Paywall } from "@/src/premium/Paywall";
@@ -260,6 +261,8 @@ export default function WorkoutScreen() {
                           <Ionicons name="trash-outline" size={18} color={T.textFaint} />
                         </TouchableOpacity>
                       </View>
+                      {/* Form demo with play/pause + replay controls (paused poster by default) */}
+                      <ExerciseAnimation exerciseId={se.exerciseId} variant="workout" />
                       <View style={styles.setHeadRow}>
                         <Text style={[styles.setHead, { width: 30 }]}>SET</Text>
                         <Text style={[styles.setHead, { flex: 1 }]}>KG</Text>

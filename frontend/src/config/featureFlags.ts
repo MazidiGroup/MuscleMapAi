@@ -7,4 +7,6 @@ export const FLAGS = {
   libraryExercises: true,
   /** Coach: context-aware suggestions built from local workout history. */
   coachV2: true,
+  /** Exercise animations (RepDB licensed pack) served from the backend. */
+  exerciseAnimations: true,
 } as const;

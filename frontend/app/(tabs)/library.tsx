@@ -11,6 +11,7 @@ import { EXERCISES, Exercise } from "@/src/anatomy/exercises";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { exerciseMatches, exerciseGroup, muscleAliasMatches } from "@/src/anatomy/search";
 import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
+import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { T, GROUP_COLORS } from "@/src/anatomy/ui";
 import { useAuth } from "@/src/auth/AuthContext";
 import { FLAGS } from "@/src/config/featureFlags";
@@ -247,8 +248,17 @@ export default function LibraryScreen() {
                   const meta = getExerciseMeta(e.id);
                   return (
                     <TouchableOpacity key={e.id} style={styles.row} onPress={() => router.push(`/exercise/${e.id}`)} testID={`lib-ex-${e.id}`}>
-                      <View style={[styles.exIcon, { backgroundColor: s.color + "1A" }]}>
-                        <Ionicons name={meta.icon as any} size={18} color={s.color} />
+                      <View style={{ marginRight: 12 }}>
+                        <ExerciseAnimation
+                          exerciseId={e.id}
+                          variant="thumb"
+                          size={36}
+                          fallback={
+                            <View style={[styles.exIcon, { backgroundColor: s.color + "1A", marginRight: 0 }]}>
+                              <Ionicons name={meta.icon as any} size={18} color={s.color} />
+                            </View>
+                          }
+                        />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.rowName}>{e.name}</Text>
