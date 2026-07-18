@@ -194,9 +194,16 @@ export default function WorkoutScreen() {
                 const meta = getExerciseMeta(e.id);
                 return (
                   <TouchableOpacity key={e.id} style={styles.exItem} onPress={() => router.push(`/exercise/${e.id}`)} testID={`ex-${e.id}`}>
-                    <View style={[styles.exIcon, { backgroundColor: T.accent + "1A" }]}>
-                      <Ionicons name={meta.icon as any} size={20} color={T.accent} />
-                    </View>
+                    <ExerciseAnimation
+                      exerciseId={e.id}
+                      variant="thumb"
+                      size={42}
+                      fallback={
+                        <View style={[styles.exIcon, { backgroundColor: T.accent + "1A" }]}>
+                          <Ionicons name={meta.icon as any} size={20} color={T.accent} />
+                        </View>
+                      }
+                    />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.exItemName}>{e.name}</Text>
                       <Text style={styles.exItemMeta}>
