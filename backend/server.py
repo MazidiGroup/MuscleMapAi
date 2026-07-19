@@ -335,6 +335,24 @@ async def _upsert_user(email: str, name: Optional[str] = None, picture: Optional
             upsert=True,
         )
 
+    # Manual premium grant: a small admin-managed collection of emails that should
+    # receive premium at sign-in. Insert docs into `manual_premium_grants` with
+    # {email, tier?, note?} to enroll a user.
+    grant = await db.manual_premium_grants.find_one({"email": email})
+    if grant:
+        await db.subscriptions.update_one(
+            {"user_id": user_id, "source": "manual_grant"},
+            {"$set": {
+                "user_id": user_id,
+                "source": "manual_grant",
+                "status": "active",
+                "tier": grant.get("tier", "premium"),
+                "updated_at": now,
+                "note": grant.get("note", ""),
+            }},
+            upsert=True,
+        )
+
     return await db.users.find_one({"user_id": user_id}, {"_id": 0})
 
 
