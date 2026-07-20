@@ -9,4 +9,6 @@ export const FLAGS = {
   coachV2: true,
   /** Exercise animations (RepDB licensed pack) served from the backend. */
   exerciseAnimations: true,
+  /** Inflate major muscle groups on the anatomy model for a bodybuilder-style physique. */
+  gymPhysique: true,
 } as const;

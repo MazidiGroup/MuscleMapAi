@@ -8,6 +8,7 @@ import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
 import { GYM_GROUPS, GYM_GROUP_ORDER, prettyName } from "@/src/anatomy/groups";
 import { MUSCLE_DATA, getMuscleInfo } from "@/src/anatomy/muscleData";
 import { EXERCISES, Exercise } from "@/src/anatomy/exercises";
+import { DIFFICULTY_ORDER } from "@/src/anatomy/exerciseCatalog";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { exerciseMatches, exerciseGroup, muscleAliasMatches } from "@/src/anatomy/search";
 import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
@@ -18,12 +19,15 @@ import { FLAGS } from "@/src/config/featureFlags";
 
 type LibSeg = "muscles" | "exercises";
 type GroupBy = "muscle" | "equipment" | "movement";
+type DifficultyFilter = "All" | "Beginner" | "Intermediate" | "Advanced";
 
 const GROUP_BY_OPTIONS: { key: GroupBy; label: string }[] = [
   { key: "muscle", label: "By Muscle" },
   { key: "equipment", label: "By Equipment" },
   { key: "movement", label: "By Movement" },
 ];
+
+const DIFFICULTY_FILTERS: DifficultyFilter[] = ["All", ...DIFFICULTY_ORDER];
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
@@ -32,6 +36,7 @@ export default function LibraryScreen() {
   const [query, setQuery] = useState("");
   const [seg, setSeg] = useState<LibSeg>(FLAGS.libraryExercises ? "exercises" : "muscles");
   const [groupBy, setGroupBy] = useState<GroupBy>("muscle");
+  const [difficulty, setDifficulty] = useState<DifficultyFilter>("All");
   const [selected, setSelected] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
@@ -127,9 +132,13 @@ export default function LibraryScreen() {
 
   const exerciseSections = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = EXERCISES.filter((e) => exerciseMatches(e, q));
+    const filtered = EXERCISES.filter((e) => {
+      if (!exerciseMatches(e, q)) return false;
+      if (difficulty !== "All" && e.difficulty !== difficulty) return false;
+      return true;
+    });
     const buckets: Record<string, Exercise[]> = {};
-    const keyOf = (e: Exercise) => (groupBy === "equipment" ? e.equipment : groupBy === "movement" ? e.category : exerciseGroup(e));
+    const keyOf = (e: Exercise) => (groupBy === "equipment" ? e.equipment : groupBy === "movement" ? e.movementPattern : exerciseGroup(e));
     for (const e of filtered) {
       const k = keyOf(e);
       if (!buckets[k]) buckets[k] = [];
@@ -142,7 +151,7 @@ export default function LibraryScreen() {
       color: groupBy === "muscle" ? GROUP_COLORS[k] || T.accent : T.accent,
       items: buckets[k],
     }));
-  }, [query, groupBy]);
+  }, [query, groupBy, difficulty]);
 
   const open = (n: string) => setSelected(n);
   const closeSheet = () => {
@@ -222,6 +231,21 @@ export default function LibraryScreen() {
 
         {seg === "exercises" && (
           <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 10 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {DIFFICULTY_FILTERS.map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[styles.diffChip, difficulty === d && styles.diffChipActive]}
+                    onPress={() => setDifficulty(d)}
+                    testID={`lib-difficulty-${d}`}
+                  >
+                    <Text style={[styles.diffChipText, difficulty === d && styles.diffChipTextActive]}>{d}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 14 }}>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 {GROUP_BY_OPTIONS.map((o) => (
@@ -263,7 +287,7 @@ export default function LibraryScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.rowName}>{e.name}</Text>
                         <Text style={styles.rowFn} numberOfLines={1}>
-                          {meta.difficulty} · {e.equipment} · {e.category}
+                          {e.difficulty} · {e.equipment} · {e.movementPattern}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
@@ -403,6 +427,10 @@ const styles = StyleSheet.create({
   gbChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border },
   gbChipActive: { backgroundColor: T.accent, borderColor: T.accent },
   gbChipText: { color: T.text, fontSize: 13, fontWeight: "700" },
+  diffChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: "transparent", borderWidth: 1, borderColor: T.border },
+  diffChipActive: { backgroundColor: T.accent + "22", borderColor: T.accent },
+  diffChipText: { color: T.textDim, fontSize: 12, fontWeight: "700" },
+  diffChipTextActive: { color: T.accent },
   exIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", marginRight: 12 },
   groupCount: { color: T.textFaint, fontSize: 12, fontWeight: "700", marginLeft: "auto" },
   groupHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },

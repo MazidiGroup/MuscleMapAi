@@ -60,10 +60,21 @@ export const MUSCLE_ALIASES: Record<string, string[]> = {
   Rhomboideus_Major: ["rhomboids", "upper back"],
 };
 
-/** True if the exercise matches the (lowercase) query by name, equipment, movement or alias. */
+/** True if the exercise matches the (lowercase) query by name, equipment, movement, muscles, tags, or alias. */
 export function exerciseMatches(ex: Exercise, q: string): boolean {
   if (!q) return true;
-  const hay = [ex.name, ex.equipment, ex.category, ...(EXERCISE_ALIASES[ex.id] || [])].join(" ").toLowerCase();
+  const hay = [
+    ex.name,
+    ex.equipment,
+    ex.category,
+    ex.movementPattern,
+    ...(ex.primaryMuscles || []),
+    ...(ex.secondaryMuscles || []),
+    ...(ex.tags || []),
+    ...(EXERCISE_ALIASES[ex.id] || []),
+  ]
+    .join(" ")
+    .toLowerCase();
   return hay.includes(q);
 }
 

@@ -17,7 +17,7 @@ import { usePremium } from "@/src/premium/PremiumContext";
 import { Paywall } from "@/src/premium/Paywall";
 
 type Seg = "exercises" | "session" | "history" | "insights";
-const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower"];
+const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower", "Mobility"];
 
 function fmtClock(sec: number) {
   const m = Math.floor(sec / 60);
@@ -69,6 +69,7 @@ export default function WorkoutScreen() {
       if (cat === "All") return true;
       if (cat === "Upper") return e.category === "Push" || e.category === "Pull";
       if (cat === "Lower") return e.category === "Legs";
+      if (cat === "Mobility") return e.category === "Mobility";
       return e.category === cat;
     });
   }, [cat]);

@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
+import { FLAGS } from "@/src/config/featureFlags";
+
 // React Native (Hermes) defines a global `navigator` object but leaves
 // `navigator.userAgent` undefined. three.js GLTFLoader does
 // `navigator.userAgent.match(...)` for browser detection, which throws
@@ -176,6 +178,13 @@ export class AnatomyEngine {
       }
     });
 
+    // Give muscles a gym-style physique by inflating major-group meshes along
+    // their vertex normals. Runs once at load, before framing/scene add so the
+    // updated bounding box is used for the camera fit.
+    if (FLAGS.gymPhysique) {
+      this.applyGymPhysique();
+    }
+
     // centre + frame
     const box = new THREE.Box3().setFromObject(root);
     const center = new THREE.Vector3();
@@ -289,6 +298,108 @@ export class AnatomyEngine {
       const inf = m.morphTargetInfluences!;
       for (let i = 0; i < inf.length; i++) inf[i] = v;
     }
+  }
+
+  // ---------- gym physique (bodybuilder-style inflation) ----------
+  //
+  // For every mesh whose unit name matches one of our known major-group
+  // prefixes, displace each vertex along its own vertex normal by a fraction
+  // of the mesh's smallest bounding-box half-extent. This "inflates" the
+  // muscle uniformly outward: the biceps peak grows, quads swell laterally,
+  // shoulders cap up — exactly the way real gym growth reads. Because we edit
+  // the base position attribute (not any morph target), the shrink morph and
+  // all picking/materials continue to work unchanged.
+  //
+  // We recompute vertex normals afterwards so lighting stays correct.
+  private applyGymPhysique() {
+    // Bodybuilder-tier defaults. Values are a fraction of each mesh's smallest
+    // bounding-box half-extent — so thin muscles inflate less in absolute
+    // world units than beefy ones, which keeps proportions believable.
+    const RULES: [RegExp, number][] = [
+      [/^Pectoralis_Major/i, 0.18],
+      [/^Pectoralis_Minor$/i, 0.10],
+      [/^Serratus_Anterior$/i, 0.10],
+      [/^Deltoid/i, 0.22],
+      [/^Biceps_Brachii$/i, 0.25],
+      [/^Brachialis$/i, 0.18],
+      [/^Brachioradialis$/i, 0.14],
+      [/^Triceps_/i, 0.22],
+      [/^Latissimus_Dorsi$/i, 0.18],
+      [/^Teres_(Major|Minor)$/i, 0.14],
+      [/^Rhomboideus_/i, 0.12],
+      [/^Trapezius$/i, 0.14],
+      [/^Infraspinatus$/i, 0.10],
+      [/^Supraspinatus$/i, 0.08],
+      [/^Rectus_Abdominis$/i, 0.10],
+      [/^External_Oblique$/i, 0.08],
+      [/^Gluteus_Maximus$/i, 0.20],
+      [/^Gluteus_(Medius|Minimus)$/i, 0.14],
+      [/^Rectus_Femoris$/i, 0.20],
+      [/^Vastus_/i, 0.20],
+      [/^Biceps_Femoris_/i, 0.18],
+      [/^Semi(tendinosus|membranosus)$/i, 0.18],
+      [/^Adductor_/i, 0.14],
+      [/^Gracilis$/i, 0.10],
+      [/^Gastrocnemius/i, 0.22],
+      [/^Soleus$/i, 0.20],
+      [/^Tibialis_Anterior$/i, 0.14],
+      [/^Sternocleidomastoid$/i, 0.10],
+      [/^Psoas_Major$/i, 0.08],
+    ];
+
+    const inflatedCount = { n: 0 };
+    for (const mesh of this.meshes) {
+      const ud = mesh.userData.anat as MeshUD | undefined;
+      if (!ud || ud.isBone) continue;
+      let factor = 0;
+      for (const [re, f] of RULES) {
+        if (re.test(ud.unitName)) {
+          factor = f;
+          break;
+        }
+      }
+      if (factor === 0) continue;
+      if (this.inflateMesh(mesh, factor)) inflatedCount.n++;
+    }
+    // Uncomment to debug in dev
+    // console.log(`[gymPhysique] inflated ${inflatedCount.n} muscle meshes`);
+  }
+
+  private inflateMesh(mesh: THREE.Mesh, factor: number): boolean {
+    const geom = mesh.geometry as THREE.BufferGeometry;
+    const posAttr = geom.getAttribute("position") as THREE.BufferAttribute | undefined;
+    if (!posAttr) return false;
+
+    // Ensure we have per-vertex normals (a few pack meshes ship without them).
+    let normAttr = geom.getAttribute("normal") as THREE.BufferAttribute | undefined;
+    if (!normAttr) {
+      geom.computeVertexNormals();
+      normAttr = geom.getAttribute("normal") as THREE.BufferAttribute;
+    }
+
+    // Displacement magnitude = factor × min half-extent of the mesh's local AABB.
+    geom.computeBoundingBox();
+    const bb = geom.boundingBox!;
+    const sx = (bb.max.x - bb.min.x) * 0.5;
+    const sy = (bb.max.y - bb.min.y) * 0.5;
+    const sz = (bb.max.z - bb.min.z) * 0.5;
+    const characteristic = Math.min(sx, sy, sz);
+    if (!isFinite(characteristic) || characteristic <= 0) return false;
+    const delta = characteristic * factor;
+
+    const p = posAttr.array as Float32Array;
+    const n = normAttr.array as Float32Array;
+    for (let i = 0; i < posAttr.count; i++) {
+      const j = i * 3;
+      p[j] += n[j] * delta;
+      p[j + 1] += n[j + 1] * delta;
+      p[j + 2] += n[j + 2] * delta;
+    }
+    posAttr.needsUpdate = true;
+    geom.computeVertexNormals(); // relight the inflated surface
+    geom.computeBoundingBox();
+    geom.computeBoundingSphere();
+    return true;
   }
 
   toggleHidden(container: string) {
