@@ -52,6 +52,12 @@ def _is_review_email(email: str) -> bool:
     return bool(REVIEW_BYPASS_EMAIL) and email.strip().lower() == REVIEW_BYPASS_EMAIL
 
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
+# Fastest chat model for the interactive AI Coach (streaming). Gemini 2.5 Flash
+# Lite has the lowest end-to-end latency / TTFT of any available chat model
+# in June 2026. Kept separate from the anatomy insight endpoint (below), which
+# needs richer reasoning.
+FAST_CHAT_PROVIDER = "gemini"
+FAST_CHAT_MODEL = "gemini-2.5-flash-lite"
 
 # ------------------ DB ------------------
 # For MongoDB Atlas (mongodb+srv / TLS) the deploy container needs an explicit,
@@ -1643,7 +1649,7 @@ async def coach_chat_stream(payload: ChatRequest, user=Depends(get_current_user)
                     api_key=EMERGENT_LLM_KEY,
                     session_id=f"{session_id}_a{attempt}",
                     system_message=system_msg,
-                ).with_model("anthropic", CLAUDE_MODEL)
+                ).with_model(FAST_CHAT_PROVIDER, FAST_CHAT_MODEL)
 
                 async for event in chat.stream_message(UserMessage(text=payload.message)):
                     if isinstance(event, TextDelta):
@@ -1707,7 +1713,7 @@ async def todays_insight(user=Depends(get_current_user)):
             api_key=EMERGENT_LLM_KEY,
             session_id=f"insight_{user['user_id']}_{today}",
             system_message=sys,
-        ).with_model("anthropic", CLAUDE_MODEL)
+        ).with_model(FAST_CHAT_PROVIDER, FAST_CHAT_MODEL)
         text = ""
         async for ev in chat.stream_message(UserMessage(text=prompt)):
             if isinstance(ev, TextDelta):
