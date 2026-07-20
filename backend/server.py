@@ -2021,7 +2021,57 @@ async def exercise_media_manifest():
     return out
 
 
-def _media_response(exercise_id: str, poster: bool):
+def _range_response(path: Path, media_type: str, range_header: str | None):
+    """Serve a file with HTTP Range support so video players can seek/stream
+    the first few hundred KB and start playback before the whole file is
+    downloaded. Falls back to a plain FileResponse for non-Range requests."""
+    file_size = path.stat().st_size
+
+    # Parse a single-range header of the form "bytes=start-end" (RFC 7233).
+    start = 0
+    end = file_size - 1
+    is_range = False
+    if range_header and range_header.startswith("bytes="):
+        try:
+            spec = range_header.split("=", 1)[1].split(",", 1)[0].strip()
+            s, _, e = spec.partition("-")
+            if s:
+                start = int(s)
+            if e:
+                end = int(e)
+            end = min(end, file_size - 1)
+            if start > end or start >= file_size:
+                raise HTTPException(status_code=416, detail="Range not satisfiable")
+            is_range = True
+        except ValueError:
+            # Malformed range → send the whole file.
+            is_range = False
+
+    chunk = 64 * 1024
+
+    def iterfile():
+        with open(path, "rb") as f:
+            f.seek(start)
+            remaining = end - start + 1
+            while remaining > 0:
+                data = f.read(min(chunk, remaining))
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=604800",
+        "Content-Length": str(end - start + 1),
+    }
+    if is_range:
+        headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+        return StreamingResponse(iterfile(), status_code=206, headers=headers, media_type=media_type)
+    return StreamingResponse(iterfile(), status_code=200, headers=headers, media_type=media_type)
+
+
+def _media_response(exercise_id: str, poster: bool, request: Request | None = None):
     if not re.fullmatch(r"[a-z0-9-]{1,64}", exercise_id):
         raise HTTPException(status_code=400, detail="Invalid exercise id")
     names = (
@@ -2032,17 +2082,21 @@ def _media_response(exercise_id: str, poster: bool):
     for name in names:
         path = EXERCISE_MEDIA_DIR / name
         if path.exists():
+            media_type = _MEDIA_TYPES.get(path.suffix.lstrip(".").lower(), "application/octet-stream")
+            # Range support benefits mp4/gif streaming; posters (small webp/jpg/png) don't need it.
+            if not poster and path.suffix.lower() == ".mp4":
+                return _range_response(path, media_type, request.headers.get("range") if request else None)
             return FileResponse(
                 str(path),
-                media_type=_MEDIA_TYPES.get(path.suffix.lstrip(".").lower(), "application/octet-stream"),
-                headers={"Cache-Control": "public, max-age=604800"},
+                media_type=media_type,
+                headers={"Cache-Control": "public, max-age=604800", "Accept-Ranges": "bytes"},
             )
     raise HTTPException(status_code=404, detail="Media not found")
 
 
 @api_router.get("/exercise-media/{exercise_id}/animation")
-async def exercise_animation(exercise_id: str):
-    return _media_response(exercise_id, poster=False)
+async def exercise_animation(exercise_id: str, request: Request):
+    return _media_response(exercise_id, poster=False, request=request)
 
 
 @api_router.get("/exercise-media/{exercise_id}/poster")
