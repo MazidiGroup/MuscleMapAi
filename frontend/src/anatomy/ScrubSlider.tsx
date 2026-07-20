@@ -1,5 +1,5 @@
-import React, { useRef, useState } from "react";
-import { View, StyleSheet, PanResponder, LayoutChangeEvent } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { View, StyleSheet, PanResponder, LayoutChangeEvent, Platform } from "react-native";
 import { T } from "./ui";
 
 type Props = {
@@ -7,34 +7,118 @@ type Props = {
   onChange: (v: number) => void;
 };
 
+// Smooth 1D slider used for the "Shrunken muscle view" percentage.
+//
+// Fixes over the earlier version (which glitched on real devices):
+//  - Uses page-relative geometry (`measureInWindow`) so the value stays anchored
+//    regardless of which sub-child the finger crosses. Previously we relied on
+//    `nativeEvent.locationX`, which snaps between the wrapping View and the
+//    thumb child and produces the "jumping" artifact.
+//  - `pointerEvents="none"` on fill/thumb so touches never re-target them.
+//  - Values are pushed via rAF, coalescing multiple move events into one JS
+//    dispatch per frame — keeps the 3D shrink update in lock-step with the
+//    finger and avoids ordered/dropped updates on iOS.
+//  - Vertical `hitSlop` widens the touch band without visually thickening it.
 export function ScrubSlider({ value, onChange }: Props) {
+  const wrapRef = useRef<View>(null);
+  const wrapXRef = useRef(0);
   const widthRef = useRef(1);
   const [w, setW] = useState(1);
+  const rafRef = useRef<number | null>(null);
+  const latestRef = useRef(value);
 
-  const set = (x: number) => {
-    const v = Math.max(0, Math.min(1, x / widthRef.current));
-    onChange(v);
-  };
+  const flush = useCallback(() => {
+    rafRef.current = null;
+    onChange(latestRef.current);
+  }, [onChange]);
+
+  const schedule = useCallback(
+    (v: number) => {
+      latestRef.current = v;
+      if (rafRef.current == null) {
+        rafRef.current = requestAnimationFrame(flush);
+      }
+    },
+    [flush],
+  );
+
+  const setFromPageX = useCallback(
+    (pageX: number) => {
+      const width = widthRef.current || 1;
+      const raw = (pageX - wrapXRef.current) / width;
+      const clamped = raw < 0 ? 0 : raw > 1 ? 1 : raw;
+      schedule(clamped);
+    },
+    [schedule],
+  );
+
+  const measure = useCallback(() => {
+    wrapRef.current?.measureInWindow((x, _y, width) => {
+      wrapXRef.current = x;
+      if (width > 0) {
+        widthRef.current = width;
+        setW(width);
+      }
+    });
+  }, []);
+
+  const onLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      widthRef.current = e.nativeEvent.layout.width;
+      setW(e.nativeEvent.layout.width);
+      // Re-read absolute page X after the view is on screen.
+      // On web the layout callback fires before geometry stabilizes; a
+      // rAF tick gives the browser one frame to place the element.
+      requestAnimationFrame(measure);
+    },
+    [measure],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => set(e.nativeEvent.locationX),
-      onPanResponderMove: (e) => set(e.nativeEvent.locationX),
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e) => {
+        // Re-measure at gesture start so scroll/keyboard shifts are accounted for.
+        wrapRef.current?.measureInWindow((x, _y, width) => {
+          wrapXRef.current = x;
+          if (width > 0) {
+            widthRef.current = width;
+          }
+          setFromPageX(e.nativeEvent.pageX);
+        });
+      },
+      onPanResponderMove: (e) => setFromPageX(e.nativeEvent.pageX),
+      onPanResponderRelease: (e) => setFromPageX(e.nativeEvent.pageX),
     }),
   ).current;
 
-  const onLayout = (e: LayoutChangeEvent) => {
-    widthRef.current = e.nativeEvent.layout.width;
-    setW(e.nativeEvent.layout.width);
-  };
+  const thumbLeft = Math.max(0, Math.min(w - 24, value * w - 12));
 
   return (
-    <View style={styles.wrap} onLayout={onLayout} {...pan.panHandlers} testID="shrink-slider">
-      <View style={styles.track} />
-      <View style={[styles.fill, { width: Math.max(0, value * w) }]} />
-      <View style={[styles.thumb, { left: Math.max(0, value * w - 12) }]} />
+    <View
+      ref={wrapRef}
+      style={styles.wrap}
+      onLayout={onLayout}
+      hitSlop={{ top: 12, bottom: 12, left: 0, right: 0 }}
+      {...pan.panHandlers}
+      testID="shrink-slider"
+      // On web, prevent the browser from turning drags into text selection.
+      // @ts-ignore RN Web extension
+      dataSet={Platform.OS === "web" ? { userSelect: "none" } : undefined}
+    >
+      <View pointerEvents="none" style={styles.track} />
+      <View pointerEvents="none" style={[styles.fill, { width: Math.max(0, value * w) }]} />
+      <View pointerEvents="none" style={[styles.thumb, { left: thumbLeft }]} />
     </View>
   );
 }
