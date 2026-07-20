@@ -1,13 +1,18 @@
-// Exercise animation player (RepDB licensed pack).
+// Exercise animation player (new MP4 pack, July 2026).
 // Playback rules (per product spec):
 //  - hero (exercise detail): autoplay silently, loop, pause when screen loses focus
 //  - thumb (library rows): static poster only, never autoplays
 //  - card (best-exercise cards): poster by default, animates on tap, parent ensures one at a time
 //  - workout (active session): paused poster by default with play/pause + replay controls
 //  - reduced-motion: never autoplay; explicit play still works
-import React, { useCallback, useState } from "react";
+//
+// Media is served from the backend at /api/exercise-media/<id>/animation (mp4)
+// with a matching /api/exercise-media/<id>/poster (webp). Exercises without a
+// mapped animation fall back to the provided `fallback` node (neutral icon).
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Image } from "expo-image";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useReducedMotion } from "react-native-reanimated";
@@ -35,7 +40,6 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
   const reduced = useReducedMotion();
   const [userPlaying, setUserPlaying] = useState<boolean | null>(null); // null = use variant default
   const [focused, setFocused] = useState(true);
-  const [replayKey, setReplayKey] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -45,6 +49,7 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
   );
 
   if (!FLAGS.exerciseAnimations) return <>{fallback}</>;
+  if (!media.loaded) return <>{fallback}</>;
   if (!media.hasAnimation && !media.hasPoster) return <>{fallback}</>;
 
   const defaultPlaying = variant === "hero" ? !reduced : false;
@@ -53,19 +58,13 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
     focused &&
     (variant === "card" ? !!playing : (userPlaying ?? defaultPlaying));
 
-  // Poster fallback: if no dedicated poster file, show the animation's first frame (autoplay off).
-  const source = isPlaying
-    ? { uri: animationUrl(exerciseId) }
-    : media.hasPoster
-      ? { uri: posterUrl(exerciseId) }
-      : { uri: animationUrl(exerciseId) };
-  const autoplay = isPlaying;
-
+  // ---- Thumb variant: static poster image only, never plays video ----
   if (variant === "thumb") {
+    const src = media.hasPoster ? { uri: posterUrl(exerciseId) } : null;
+    if (!src) return <>{fallback}</>;
     return (
       <Image
-        source={source}
-        autoplay={false}
+        source={src}
         style={[styles.thumb, { width: size, height: size }]}
         contentFit="cover"
         transition={100}
@@ -74,6 +73,7 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
     );
   }
 
+  // ---- Card variant: poster overlay + optional MP4 when playing ----
   if (variant === "card") {
     return (
       <TouchableOpacity
@@ -82,15 +82,13 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
         accessibilityLabel={isPlaying ? "Pause exercise animation" : "Play exercise animation"}
         testID={`anim-card-${exerciseId}`}
       >
-        <View>
-          <Image
-            key={replayKey}
-            source={source}
-            autoplay={autoplay}
-            style={[styles.thumb, { width: size, height: size }]}
-            contentFit="cover"
-            transition={100}
-          />
+        <View style={[styles.thumb, { width: size, height: size, overflow: "hidden" }]}>
+          {media.hasPoster && (
+            <Image source={{ uri: posterUrl(exerciseId) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={100} />
+          )}
+          {isPlaying && (
+            <AnimationPlayer exerciseId={exerciseId} playing loop muted contentFit="cover" />
+          )}
           {!isPlaying && media.hasAnimation && (
             <View style={styles.playBadge}>
               <Ionicons name="play" size={10} color={T.text} />
@@ -101,24 +99,17 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
     );
   }
 
-  // hero + workout: large 16:9-ish block
+  // ---- Hero + workout: large 16:9 block with controls ----
   const toggle = () => setUserPlaying((p) => !(p ?? defaultPlaying));
-  const replay = () => {
-    setReplayKey((k) => k + 1);
-    setUserPlaying(true);
-  };
 
   return (
     <View style={[styles.large, variant === "workout" && styles.largeWorkout]} testID={`anim-${variant}-${exerciseId}`}>
-      <Image
-        key={replayKey}
-        source={source}
-        autoplay={autoplay}
-        style={StyleSheet.absoluteFill}
-        contentFit="contain"
-        transition={150}
-        accessibilityLabel="Exercise animation"
-      />
+      {media.hasPoster && (
+        <Image source={{ uri: posterUrl(exerciseId) }} style={StyleSheet.absoluteFill} contentFit="contain" transition={120} />
+      )}
+      {isPlaying && (
+        <AnimationPlayer exerciseId={exerciseId} playing loop muted contentFit="contain" />
+      )}
       {media.hasAnimation && (
         <View style={styles.controls}>
           <TouchableOpacity
@@ -133,7 +124,7 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
           {variant === "workout" && (
             <TouchableOpacity
               style={styles.ctrlBtn}
-              onPress={replay}
+              onPress={() => setUserPlaying(true)}
               accessibilityRole="button"
               accessibilityLabel="Replay"
               testID={`anim-replay-${exerciseId}`}
@@ -146,6 +137,60 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
     </View>
   );
 }
+
+// ---------------- Internal MP4 player (expo-video) ----------------
+type PlayerProps = {
+  exerciseId: string;
+  playing: boolean;
+  loop?: boolean;
+  muted?: boolean;
+  contentFit: "cover" | "contain";
+};
+
+const AnimationPlayer = React.memo(function AnimationPlayer({ exerciseId, playing, loop = true, muted = true, contentFit }: PlayerProps) {
+  const uri = useMemo(() => animationUrl(exerciseId), [exerciseId]);
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = loop;
+    p.muted = muted;
+    if (playing) p.play();
+  });
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    if (!player) return;
+    try {
+      player.muted = muted;
+      player.loop = loop;
+      if (playing) player.play();
+      else player.pause();
+    } catch {
+      /* player may be transitioning */
+    }
+  }, [player, playing, loop, muted]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      try {
+        player?.pause();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [player]);
+
+  return (
+    <VideoView
+      style={StyleSheet.absoluteFill}
+      player={player}
+      contentFit={contentFit}
+      nativeControls={false}
+      allowsFullscreen={false}
+      allowsPictureInPicture={false}
+    />
+  );
+});
 
 const styles = StyleSheet.create({
   thumb: { borderRadius: 10, backgroundColor: T.surfaceHi },

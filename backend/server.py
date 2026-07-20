@@ -1988,13 +1988,13 @@ async def anatomy_model():
     )
 
 
-# ------------------ Exercise media (RepDB pack — purchased perpetual license) ------------------
+# ------------------ Exercise media (new animation pack — MP4 + JPG posters) ------------------
 # Files live in static/exercise_media named by OUR exercise ids:
-#   <id>.webp (animated, primary) | <id>.mp4 | <id>.gif (fallbacks)
-#   <id>_poster.webp | <id>_poster.png (static poster frame)
+#   <id>.mp4  (animation)
+#   <id>_poster.jpg | <id>_poster.png | <id>_poster.webp (static poster frame)
 EXERCISE_MEDIA_DIR = STATIC_DIR / "exercise_media"
-_MEDIA_ANIM_EXTS = ["webp", "mp4", "gif"]
-_MEDIA_TYPES = {"webp": "image/webp", "mp4": "video/mp4", "gif": "image/gif", "png": "image/png"}
+_MEDIA_ANIM_EXTS = ["mp4", "webp", "gif"]
+_MEDIA_TYPES = {"webp": "image/webp", "mp4": "video/mp4", "gif": "image/gif", "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg"}
 
 
 @api_router.get("/exercise-media/manifest")
@@ -2019,7 +2019,7 @@ def _media_response(exercise_id: str, poster: bool):
     if not re.fullmatch(r"[a-z0-9-]{1,64}", exercise_id):
         raise HTTPException(status_code=400, detail="Invalid exercise id")
     names = (
-        [f"{exercise_id}_poster.webp", f"{exercise_id}_poster.png"]
+        [f"{exercise_id}_poster.jpg", f"{exercise_id}_poster.webp", f"{exercise_id}_poster.png"]
         if poster
         else [f"{exercise_id}.{ext}" for ext in _MEDIA_ANIM_EXTS]
     )
