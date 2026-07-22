@@ -9,7 +9,7 @@ import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { WorkoutProvider } from "@/src/anatomy/workoutStore";
 import { PremiumProvider } from "@/src/premium/PremiumContext";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
-import { ThemeProvider } from "@/src/theme/ThemeContext";
+import { ThemeProvider, useTheme } from "@/src/theme/ThemeContext";
 import { LoadingScreen } from "@/src/theme/LoadingScreen";
 
 LogBox.ignoreAllLogs(true);
@@ -63,6 +63,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ThemedStack() {
+  const { T, mode } = useTheme();
+  return (
+    <>
+      <StatusBar barStyle={mode === "night" ? "light-content" : "dark-content"} />
+      <AuthGate>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: T.bg },
+            animation: "fade",
+          }}
+        />
+      </AuthGate>
+    </>
+  );
+}
+
 export default function RootLayout() {
   const [loaded, error] = useIconFonts();
 
@@ -71,20 +89,11 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#070A0F" }}>
       <SafeAreaProvider>
-        <StatusBar barStyle="light-content" />
         <AuthProvider>
           <WorkoutProvider>
             <PremiumProvider>
               <ThemeProvider>
-                <AuthGate>
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: "#070A0F" },
-                      animation: "fade",
-                    }}
-                  />
-                </AuthGate>
+                <ThemedStack />
               </ThemeProvider>
             </PremiumProvider>
           </WorkoutProvider>

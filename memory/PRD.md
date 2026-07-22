@@ -146,4 +146,16 @@ fitness coach. Built with Expo + expo-gl + three.js (WebGL), FastAPI backend ser
 - UNIVERSAL THEME TOGGLE: new reusable `src/theme/ThemeToggle.tsx` (sun/moon, testID 'theme-toggle'). Placed on every page — Plan weekly + all onboarding steps (OnboardingFlow Shell header), Workout (right of segmented control), Coach header, Explore header, Library header, exercise detail, and inside Paywall (overlay). Paywall gained `showThemeToggle` prop (default true) — passed false from Library & Workout paywalls to avoid a duplicate toggle next to the screen's own header toggle.
 - Verified iteration_19 + main-agent self-test: all 7 guest paywalls correct, perks correct, one toggle per screen (no duplicates), and premium-bypass login (applereview@mazidigroup.com / 123456) unlocks Explore 3D, Library Muscles/Learn, and Workout Muscle Groups.
 
+## v1.1.1 — Loading screen, layout polish & radius system (June 2026, iteration 21)
+- BRANDED LOADING SCREEN: new `src/theme/LoadingScreen.tsx` (theme-aware; pulsing logo, 'Muscle Map AI' wordmark with blue 'AI', subtitle 'Your plan. Built around your muscles.', 3 staggered pulsing dots). Uses tokens `bgRadialFrom/text/textMuted/accent`. Shown by AuthGate during session restore (SplashScreen.hideAsync now fires on mount) and by the Plan tab while its store hydrates. Native splash bg changed #000000 -> #0e1729 to match.
+- LIBRARY search moved BELOW the segment tabs so the tab row stays pinned (no vertical flicker when switching Exercises/Muscles/Learn/Account). Verified tabs stable at y=80 across all 4 segments.
+- WORKOUT COMPLETE (summary.tsx) made theme-aware (was forced dark) — now respects Light mode.
+- PLAN header redesigned: removed 'Muscle Map AI' logo + wordmark; 'Your weekly plan' title moved to the very top-left with theme toggle + Shuffle on the top-right. WorkoutDay got its own `dayHeader` style (kept safe-area top padding after wpHeader was repurposed).
+- ROOT LAYOUT: extracted `ThemedStack` — Stack `contentStyle` background + StatusBar bar style now follow theme (prevents dark bleed during light-mode route transitions).
+- THEME TOGGLE consistent top-right on every page (Plan, onboarding steps, Workout, Coach, Explore, Library, exercise detail, summary, paywalls).
+- RADIUS system applied on touched screens: buttons/inputs/exercise rows 12px, cards/panels 16px, sheets/large containers 20-24px, pills/toggles/tracks 999px.
+- Version bumped to 1.1.1 (ios.buildNumber 2, android.versionCode 2) to clear the Apple 409 duplicate-version upload error.
+- Verified iteration_21: all 5 UI changes PASS; no red screens / console errors.
+
+
 
