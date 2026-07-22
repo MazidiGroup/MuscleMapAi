@@ -176,24 +176,6 @@ export default function LibraryScreen() {
           <ThemeToggle />
         </View>
         <Text style={styles.sub}>Exercises · muscle guide · learn · account</Text>
-        {(seg === "exercises" || (seg === "muscles" && isPremium)) && (
-          <View style={styles.search}>
-            <Ionicons name="search" size={18} color={T.textFaint} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder={seg === "exercises" ? "Search exercises…" : "Search muscles…"}
-              placeholderTextColor={T.textFaint}
-              value={query}
-              onChangeText={setQuery}
-              testID="library-search"
-            />
-            {query.length > 0 && (
-              <TouchableOpacity onPress={() => setQuery("")}>
-                <Ionicons name="close-circle" size={18} color={T.textFaint} />
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
         {FLAGS.libraryExercises && (
           <View style={styles.libSeg}>
             {(["exercises", "muscles", "learn", "account"] as LibSeg[]).map((s) => {
@@ -212,6 +194,24 @@ export default function LibraryScreen() {
                 </TouchableOpacity>
               );
             })}
+          </View>
+        )}
+        {(seg === "exercises" || (seg === "muscles" && isPremium)) && (
+          <View style={styles.search}>
+            <Ionicons name="search" size={18} color={T.textFaint} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={seg === "exercises" ? "Search exercises…" : "Search muscles…"}
+              placeholderTextColor={T.textFaint}
+              value={query}
+              onChangeText={setQuery}
+              testID="library-search"
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery("")}>
+                <Ionicons name="close-circle" size={18} color={T.textFaint} />
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>

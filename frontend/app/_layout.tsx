@@ -10,6 +10,7 @@ import { WorkoutProvider } from "@/src/anatomy/workoutStore";
 import { PremiumProvider } from "@/src/premium/PremiumContext";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
 import { ThemeProvider } from "@/src/theme/ThemeContext";
+import { LoadingScreen } from "@/src/theme/LoadingScreen";
 
 LogBox.ignoreAllLogs(true);
 SplashScreen.preventAutoHideAsync();
@@ -38,6 +39,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const router = useRouter();
 
+  // Reveal our branded (themed) loading screen as soon as JS is ready, instead
+  // of sitting on the static native splash.
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (loading) return;
     SplashScreen.hideAsync();
@@ -51,7 +58,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, segments, router]);
 
-  if (loading) return null; // splash stays visible while restoring session
+  if (loading) return <LoadingScreen />;
 
   return <>{children}</>;
 }

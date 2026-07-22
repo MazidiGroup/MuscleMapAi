@@ -32,10 +32,7 @@ export function WeeklyPlan({ onOpenDay, onEdit }: { onOpenDay: (i: number) => vo
   return (
     <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={styles.wpScroll}>
       <View style={styles.wpHeader}>
-        <View style={styles.wpBrandRow}>
-          <Image source={require("../../assets/images/icon.png")} style={styles.wpLogo} />
-          <Text style={[styles.wpWordmark, { color: T.textCaps }]}>MUSCLE MAP AI</Text>
-        </View>
+        <Text style={[styles.wpTitle, { color: T.text }]}>Your weekly plan</Text>
         <View style={{ flexDirection: "row", gap: 8 }}>
           <TouchableOpacity
             style={[styles.headerBtn, { backgroundColor: T.card, borderColor: T.border }]}
@@ -54,8 +51,6 @@ export function WeeklyPlan({ onOpenDay, onEdit }: { onOpenDay: (i: number) => vo
           </TouchableOpacity>
         </View>
       </View>
-
-      <Text style={[styles.wpTitle, { color: T.text }]}>Your weekly plan</Text>
 
       <View style={styles.chipsRow}>
         <Chip label={GOAL_LABEL[answers.goal]} />
@@ -191,7 +186,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
-      <View style={styles.wpHeader}>
+      <View style={styles.dayHeader}>
         <TouchableOpacity
           style={[styles.headerBtn, { backgroundColor: T.card, borderColor: T.border }]}
           onPress={onBack}
@@ -351,12 +346,13 @@ const styles = StyleSheet.create({
   wpScroll: { padding: 20, paddingTop: 56, paddingBottom: 40 },
   wpHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingBottom: 8,
+  },
+  wpTitle: { fontSize: 26, fontWeight: "700" },
+  dayHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingTop: 56, paddingHorizontal: 20, paddingBottom: 8,
   },
-  wpBrandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  wpLogo: { width: 26, height: 26, borderRadius: 6 },
-  wpWordmark: { fontSize: 11, fontWeight: "700", letterSpacing: 1.5 },
-  wpTitle: { fontSize: 24, fontWeight: "700", marginTop: 22 },
   headerBtn: {
     width: 36, height: 36, borderRadius: 18, borderWidth: 1,
     alignItems: "center", justifyContent: "center",

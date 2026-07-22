@@ -10,17 +10,15 @@
 // user's saved plan.
 
 import React, { useEffect, useState } from "react";
-import { View, ActivityIndicator } from "react-native";
 
 import { usePlanStore } from "@/src/plan/planStore";
 import {
   Welcome, StepGoal, StepExp, StepDays, StepEquip, StepFocus, StepPosture, Building,
 } from "@/src/plan/OnboardingFlow";
 import { WeeklyPlan, WorkoutDay } from "@/src/plan/PlanViews";
-import { useTheme } from "@/src/theme/ThemeContext";
+import { LoadingScreen } from "@/src/theme/LoadingScreen";
 
 export default function PlanTab() {
-  const { T } = useTheme();
   const hydrated = usePlanStore(s => s.hydrated);
   const hydrate = usePlanStore(s => s.hydrate);
   const step = usePlanStore(s => s.step);
@@ -32,11 +30,7 @@ export default function PlanTab() {
   useEffect(() => { hydrate(); }, [hydrate]);
 
   if (!hydrated) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: T.bg }}>
-        <ActivityIndicator color={T.accent} />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   if (step === 0)  return <Welcome />;
