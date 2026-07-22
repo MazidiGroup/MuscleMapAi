@@ -85,3 +85,9 @@ android-sdk/
 .pytest_cache/
 **/.pytest_cache/
 test_reports/
+.env
+.env.*
+*.env
+credentials.json
+*.key
+.credentials
