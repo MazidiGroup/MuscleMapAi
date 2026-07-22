@@ -17,7 +17,8 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { askCoach, CoachTurn, CoachRequestHandle } from "@/src/anatomy/coachApi";
 import { useWorkout, weeklySetsByGroup, topPRs, Workout, PRs } from "@/src/anatomy/workoutStore";
 import { ThinkingDots } from "@/src/components/ThinkingDots";
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
+import { useTheme } from "@/src/theme/ThemeContext";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { Paywall } from "@/src/premium/Paywall";
 import { FLAGS } from "@/src/config/featureFlags";
@@ -85,6 +86,9 @@ export default function CoachScreen() {
 function CoachContent() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const params = useLocalSearchParams<{ q?: string }>();
   const { history: workoutHistory, prs } = useWorkout();
   const [messages, setMessages] = useState<CoachTurn[]>([]);
@@ -246,7 +250,7 @@ function CoachContent() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" },

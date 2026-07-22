@@ -15,8 +15,9 @@ import {
   periodStats,
   topPRs,
 } from "./workoutStore";
-import { T } from "./ui";
+import { legacyPalette, LegacyPalette } from "./ui";
 import { FLAGS } from "@/src/config/featureFlags";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 const STATE_COLOR = { red: "#FF4438", orange: "#FFB020", green: "#2FBF71" } as const;
 const STATE_LABEL = { red: "Recently trained", orange: "Recovering", green: "Recovered" } as const;
@@ -29,6 +30,9 @@ export function InsightsView() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { height } = useWindowDimensions();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const { history, prs } = useWorkout();
   const [period, setPeriod] = useState<Period>("week");
 
@@ -217,7 +221,7 @@ export function InsightsView() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   full: { ...StyleSheet.absoluteFillObject, backgroundColor: T.bg },
   empty: { alignItems: "center", justifyContent: "center", gap: 10, padding: 30 },
   emptyText: { color: T.text, fontSize: 17, fontWeight: "700" },

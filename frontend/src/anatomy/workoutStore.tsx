@@ -249,15 +249,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setStartedAt(null);
   }, []);
 
-  // Auto-tick planStore whenever every set of a plan-linked exercise is done.
-  // Runs on every session change; harmless when nothing is linked.
+  // Keep the Plan tick in sync with the Session in BOTH directions: a plan-linked
+  // exercise is ticked when every set is done, and un-ticked if a set is removed
+  // or unchecked so the sets drop back below complete. Runs on every session change.
   useEffect(() => {
     if (!session || session.length === 0) return;
     const toggle = usePlanStore.getState().toggleCompletion;
     for (const se of session) {
       if (!se.planLink) continue;
       const allDone = se.sets.length > 0 && se.sets.every((s) => s.done);
-      if (allDone) toggle(se.planLink.planDate, se.exerciseId, true);
+      toggle(se.planLink.planDate, se.exerciseId, allDone);
     }
   }, [session]);
 

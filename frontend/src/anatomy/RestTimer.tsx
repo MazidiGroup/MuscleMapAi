@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { T } from "./ui";
+import { legacyPalette, LegacyPalette } from "./ui";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 const PRESETS = [30, 60, 90, 120];
 
@@ -16,6 +17,9 @@ export function RestTimer({
   onClose: () => void;
   onPrefChange: (n: number) => void;
 }) {
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const [total, setTotal] = useState(initial);
   const [left, setLeft] = useState(initial);
   const [paused, setPaused] = useState(false);
@@ -94,7 +98,7 @@ export function RestTimer({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 24 },
   card: { width: "100%", backgroundColor: T.surface, borderRadius: 24, borderWidth: 1, borderColor: T.border, padding: 24, alignItems: "center" },
   label: { color: T.accent, fontSize: 13, fontWeight: "800", letterSpacing: 2 },

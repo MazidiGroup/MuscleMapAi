@@ -1,6 +1,7 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { Animated, PanResponder, StyleSheet, View } from "react-native";
-import { T } from "./ui";
+import { legacyPalette, LegacyPalette } from "./ui";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 export type SheetState = "collapsed" | "expanded";
 export type DraggableSheetHandle = { snapTo: (s: SheetState) => void };
@@ -24,6 +25,8 @@ export const DraggableSheet = forwardRef<DraggableSheetHandle, Props>(function D
   { peekHeight, maxHeight, initial = "collapsed", onSnap, children },
   ref,
 ) {
+  const { mode } = useTheme();
+  const styles = useMemo(() => makeStyles(legacyPalette(mode)), [mode]);
   // translateY travels between 0 (fully expanded, top at maxHeight) and `range`
   // (collapsed, only `peekHeight` visible). Free dragging rests anywhere in between.
   const range = Math.max(1, maxHeight - peekHeight);
@@ -104,7 +107,7 @@ export const DraggableSheet = forwardRef<DraggableSheetHandle, Props>(function D
   );
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   sheet: {
     position: "absolute",
     left: 0,

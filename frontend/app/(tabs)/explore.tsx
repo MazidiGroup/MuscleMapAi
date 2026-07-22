@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,12 +8,16 @@ import { AnatomyViewer, ViewerHandle } from "@/src/anatomy/AnatomyViewer";
 import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
 import { DraggableSheet, DraggableSheetHandle } from "@/src/anatomy/DraggableSheet";
 import { EXPLORER } from "@/src/anatomy/groups";
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { height } = useWindowDimensions();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const viewer = useRef<ViewerHandle>(null);
   const sheet = useRef<DraggableSheetHandle>(null);
 
@@ -57,8 +61,8 @@ export default function ExploreScreen() {
 
       <View style={[styles.header, { paddingTop: insets.top + 8, pointerEvents: "box-none" }]}>
         <View>
-          <Text style={styles.h1}>Explore Anatomy</Text>
-          <Text style={styles.sub}>Tap a muscle to learn about it · drag to rotate</Text>
+          <Text style={[styles.h1, { color: "#EAF1FB" }]}>Explore Anatomy</Text>
+          <Text style={[styles.sub, { color: "#9AA7BD" }]}>Tap a muscle to learn about it · drag to rotate</Text>
         </View>
       </View>
 
@@ -121,7 +125,7 @@ export default function ExploreScreen() {
   );
 }
 
-function SegBtn({ label, active, onPress, icon }: { label: string; active: boolean; onPress: () => void; icon: any }) {
+function SegBtn({ label, active, onPress, icon, styles, T }: { label: string; active: boolean; onPress: () => void; icon: any; styles: any; T: LegacyPalette }) {
   return (
     <TouchableOpacity style={[styles.segBtn, active && styles.segBtnActive]} onPress={onPress}>
       <Ionicons name={icon} size={15} color={active ? T.bg : T.textDim} />
@@ -130,7 +134,7 @@ function SegBtn({ label, active, onPress, icon }: { label: string; active: boole
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   header: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 18 },
   h1: { color: T.text, fontSize: 22, fontWeight: "800" },

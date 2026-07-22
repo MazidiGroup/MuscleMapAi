@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { usePremium, PremiumPackage } from "./PremiumContext";
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 const PERKS: { icon: any; label: string; desc: string }[] = [
   { icon: "school", label: "Learn", desc: "Guided anatomy lessons & quizzes" },
@@ -63,6 +64,9 @@ function pricePerUnit(pkg: PremiumPackage): string {
 export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?: string; headerOffset?: number }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const { packages, purchase, restorePurchases } = usePremium();
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState<"purchase" | "restore" | null>(null);
@@ -210,7 +214,7 @@ export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   scroll: { paddingHorizontal: 24, paddingBottom: 40, alignItems: "center" },
   crown: {

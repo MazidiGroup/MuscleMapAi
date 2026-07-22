@@ -14,7 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import { T, GROUP_COLORS } from "./ui";
+import { legacyPalette, LegacyPalette, GROUP_COLORS } from "./ui";
 import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS } from "./groups";
 import { getExercise } from "./exercises";
@@ -22,9 +22,25 @@ import { getGuide, getExerciseMeta, MUSCLE_SUMMARY } from "./gymGuide";
 import { addRecent, isBookmarked, toggleBookmark } from "./storageLists";
 import { askCoach } from "./coachApi";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// This sheet has many small sub-components that all read the shared `T` palette
+// and `styles`. To flip Day/Night without threading props through every one,
+// we keep module-scoped `T`/`styles` that the top-level MuscleSheet sets (via
+// useThemedStyles) at the start of each render — synchronous, single-instance.
+let T: LegacyPalette = legacyPalette("night");
+const _styleCache: Record<string, ReturnType<typeof makeStyles>> = {};
+let styles = (_styleCache.night = makeStyles(T));
+
+function useThemedStyles() {
+  const { mode } = useTheme();
+  T = legacyPalette(mode);
+  if (!_styleCache[mode]) _styleCache[mode] = makeStyles(T);
+  styles = _styleCache[mode];
 }
 
 type Props = {
@@ -38,6 +54,7 @@ type Props = {
 const muscleLabel = (n: string) => getMuscleInfo(n)?.label || prettyName(n);
 
 export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, fill = false }: Props) {
+  useThemedStyles();
   const router = useRouter();
   const { height } = useWindowDimensions();
   const info = getMuscleInfo(nodeName);
@@ -421,7 +438,7 @@ function AiInsight({ nodeName, title, groupKey, accent }: { nodeName: string; ti
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(T: LegacyPalette) { return StyleSheet.create({
   card: {
     backgroundColor: T.surface,
     borderTopLeftRadius: 22,
@@ -507,4 +524,4 @@ const styles = StyleSheet.create({
   },
   srcText: { flex: 1, color: T.textFaint, fontSize: 11, lineHeight: 15 },
   srcCta: { color: T.accent, fontSize: 11, fontWeight: "800" },
-});
+}); }

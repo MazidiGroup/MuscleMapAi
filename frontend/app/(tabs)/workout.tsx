@@ -12,7 +12,8 @@ import { EXERCISES, getExercise } from "@/src/anatomy/exercises";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { useWorkout, workoutStats, Workout } from "@/src/anatomy/workoutStore";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
+import { useTheme } from "@/src/theme/ThemeContext";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { Paywall } from "@/src/premium/Paywall";
 
@@ -43,6 +44,9 @@ export default function WorkoutScreen() {
   const params = useLocalSearchParams<{ seg?: string; ex?: string }>();
   const w = useWorkout();
   const { isPremium } = usePremium();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
 
   const [seg, setSeg] = useState<Seg>("session");
   const [cat, setCat] = useState("All");
@@ -253,9 +257,9 @@ export default function WorkoutScreen() {
           ) : (
             <>
               <View style={styles.statsBar}>
-                <SBStat label="Exercises" value={`${w.session.length}`} />
-                <SBStat label="Sets" value={`${stats.completed}/${stats.sets}`} />
-                <SBStat label="Volume" value={`${stats.volume}kg`} />
+                <SBStat label="Exercises" value={`${w.session.length}`} styles={styles} />
+                <SBStat label="Sets" value={`${stats.completed}/${stats.sets}`} styles={styles} />
+                <SBStat label="Volume" value={`${stats.volume}kg`} styles={styles} />
               </View>
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
                 {w.session.map((se) => {
@@ -351,7 +355,7 @@ export default function WorkoutScreen() {
   );
 }
 
-function SBStat({ label, value }: { label: string; value: string }) {
+function SBStat({ label, value, styles }: { label: string; value: string; styles: any }) {
   return (
     <View style={styles.sbStat}>
       <Text style={styles.sbValue}>{value}</Text>
@@ -360,11 +364,11 @@ function SBStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   full: { ...StyleSheet.absoluteFillObject, backgroundColor: T.bg },
   segWrap: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 16, zIndex: 10 },
-  seg: { flexDirection: "row", backgroundColor: "rgba(12,17,26,0.92)", borderRadius: 12, padding: 4, gap: 4, borderWidth: 1, borderColor: T.border },
+  seg: { flexDirection: "row", backgroundColor: T.surface, borderRadius: 12, padding: 4, gap: 4, borderWidth: 1, borderColor: T.border },
   segBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 5 },
   segActive: { backgroundColor: T.accent },
   segText: { color: T.textDim, fontSize: 13, fontWeight: "700" },

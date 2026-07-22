@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,13 +11,17 @@ import { getMuscleInfo } from "@/src/anatomy/muscleData";
 import { prettyName } from "@/src/anatomy/groups";
 import { useWorkout } from "@/src/anatomy/workoutStore";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 const label = (n: string) => getMuscleInfo(n)?.label || prettyName(n);
 
 export default function ExerciseDetail() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const ex = getExercise(String(id));
   const meta = ex ? getExerciseMeta(ex.id) : null;
@@ -50,9 +54,9 @@ export default function ExerciseDetail() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}>
           <Text style={styles.title}>{ex.name}</Text>
           <View style={styles.metaRow}>
-            <Pill icon="speedometer-outline" text={meta.difficulty} />
-            <Pill icon="construct-outline" text={ex.equipment} />
-            <Pill icon="albums-outline" text={ex.category} />
+            <Pill icon="speedometer-outline" text={meta.difficulty} styles={styles} T={T} />
+            <Pill icon="construct-outline" text={ex.equipment} styles={styles} T={T} />
+            <Pill icon="albums-outline" text={ex.category} styles={styles} T={T} />
           </View>
 
           {/* Animated demonstration (RepDB pack) — autoplays, loops, pauses off-screen */}
@@ -92,7 +96,7 @@ export default function ExerciseDetail() {
   );
 }
 
-function Pill({ icon, text }: { icon: any; text: string }) {
+function Pill({ icon, text, styles, T }: { icon: any; text: string; styles: any; T: LegacyPalette }) {
   return (
     <View style={styles.pill}>
       <Ionicons name={icon} size={14} color={T.accent} />
@@ -101,7 +105,7 @@ function Pill({ icon, text }: { icon: any; text: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   back: { position: "absolute", left: 14, width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(18,24,34,0.82)", borderWidth: 1, borderColor: T.border, alignItems: "center", justifyContent: "center" },
   panel: { flex: 1, backgroundColor: T.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: T.border, marginTop: -24, paddingHorizontal: 20, paddingTop: 10 },

@@ -107,6 +107,8 @@ function Chip({ label, tone }: { label: string; tone?: "focus" | "posture" }) {
 
 function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
   const { T } = useTheme();
+  const completions = usePlanStore(s => s.completions);
+  const w = useWorkout();
   if (day.rest) {
     return (
       <View style={[styles.restCard, { borderColor: T.borderDashed }]}>
@@ -115,15 +117,30 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
       </View>
     );
   }
+  const dateKey = todayISO();
+  const exs = day.exercises || [];
+  const doneCount = exs.filter((ex) => {
+    const se = w.session?.find((s) => s.exerciseId === ex.id);
+    const live = !!se && se.sets.length > 0 && se.sets.every((s) => s.done);
+    return live || !!completions[`${dateKey}:${ex.id}`];
+  }).length;
+  const allDone = exs.length > 0 && doneCount === exs.length;
   return (
     <TouchableOpacity
-      style={[styles.dayCard, { backgroundColor: T.card, borderColor: T.border }]}
+      style={[styles.dayCard, { backgroundColor: T.card, borderColor: allDone ? T.accent : T.border }]}
       onPress={onPress}
       testID={`day-card-${day.dow}`}
     >
       <View style={styles.dayCardTop}>
         <Text style={[styles.dowCaps, { color: T.textCaps }]}>{day.dow.slice(0, 3).toUpperCase()}</Text>
-        <Text style={[styles.dayMin, { color: T.textMuted }]}>~{day.minutes} min</Text>
+        {doneCount > 0 ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Ionicons name={allDone ? "checkmark-circle" : "ellipse-outline"} size={13} color={allDone ? T.accent : T.textMuted} />
+            <Text style={[styles.dayMin, { color: allDone ? T.accent : T.textMuted }]}>{doneCount}/{exs.length} done</Text>
+          </View>
+        ) : (
+          <Text style={[styles.dayMin, { color: T.textMuted }]}>~{day.minutes} min</Text>
+        )}
       </View>
       <Text style={[styles.dayTitle, { color: T.text }]}>{day.typeName}</Text>
       <View style={styles.posterStack}>
@@ -200,8 +217,10 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         {items.map((ex) => {
-          const done = !!completions[`${dateKey}:${ex.id}`];
-          const inSession = !!w.session?.some((s) => s.exerciseId === ex.id);
+          const sessionEx = w.session?.find((s) => s.exerciseId === ex.id);
+          const sessionDone = !!sessionEx && sessionEx.sets.length > 0 && sessionEx.sets.every((s) => s.done);
+          const done = sessionDone || !!completions[`${dateKey}:${ex.id}`];
+          const inSession = !!sessionEx;
           return (
             <View key={ex.id} style={[styles.exCard, { backgroundColor: T.card, borderColor: T.border }]}>
               <View style={[styles.exPoster, { backgroundColor: T.posterBg, borderColor: T.border }]}>

@@ -14,7 +14,8 @@ import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { exerciseMatches, exerciseGroup, muscleAliasMatches } from "@/src/anatomy/search";
 import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
-import { T, GROUP_COLORS } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette, GROUP_COLORS } from "@/src/anatomy/ui";
+import { useTheme } from "@/src/theme/ThemeContext";
 import { useAuth } from "@/src/auth/AuthContext";
 import { FLAGS } from "@/src/config/featureFlags";
 
@@ -34,6 +35,9 @@ export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout, deleteAccount } = useAuth();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const [query, setQuery] = useState("");
   const [seg, setSeg] = useState<LibSeg>(FLAGS.libraryExercises ? "exercises" : "muscles");
   const [groupBy, setGroupBy] = useState<GroupBy>("muscle");
@@ -152,7 +156,7 @@ export default function LibraryScreen() {
       color: groupBy === "muscle" ? GROUP_COLORS[k] || T.accent : T.accent,
       items: buckets[k],
     }));
-  }, [query, groupBy, difficulty]);
+  }, [query, groupBy, difficulty, T]);
 
   const open = (n: string) => setSelected(n);
   const closeSheet = () => {
@@ -205,10 +209,10 @@ export default function LibraryScreen() {
         {seg === "muscles" && (
           <>
             {query.length === 0 && bookmarks.length > 0 && (
-              <Pills title="Bookmarked" icon="bookmark" data={bookmarks} onPress={open} />
+              <Pills title="Bookmarked" icon="bookmark" data={bookmarks} onPress={open} styles={styles} T={T} />
             )}
             {query.length === 0 && recent.length > 0 && (
-              <Pills title="Recently Viewed" icon="time-outline" data={recent} onPress={open} />
+              <Pills title="Recently Viewed" icon="time-outline" data={recent} onPress={open} styles={styles} T={T} />
             )}
 
             {groups.map((g) => {
@@ -428,7 +432,7 @@ export default function LibraryScreen() {
   );
 }
 
-function Pills({ title, icon, data, onPress }: { title: string; icon: any; data: string[]; onPress: (n: string) => void }) {
+function Pills({ title, icon, data, onPress, styles, T }: { title: string; icon: any; data: string[]; onPress: (n: string) => void; styles: any; T: LegacyPalette }) {
   return (
     <View style={{ marginBottom: 18 }}>
       <View style={styles.groupHead}>
@@ -448,7 +452,7 @@ function Pills({ title, icon, data, onPress }: { title: string; icon: any; data:
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   h1: { color: T.text, fontSize: 26, fontWeight: "800" },
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
