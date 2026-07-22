@@ -381,7 +381,7 @@ export default function LibraryScreen() {
               Muscle Map Ai — explore a life-size 3D muscle model with 270 named structures,
               build a personalized weekly workout plan, and track your training.
             </Text>
-            <Text style={styles.version}>v1.1.0 · Plan · Workout · Coach · Explore · Library</Text>
+            <Text style={styles.version}>v1.1.1 · Plan · Workout · Coach · Explore · Library</Text>
 
             <View style={styles.linkList}>
               <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/references")} testID="link-references">
