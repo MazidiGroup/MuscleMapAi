@@ -16,7 +16,7 @@ import { T } from "@/src/anatomy/ui";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { Paywall } from "@/src/premium/Paywall";
 
-type Seg = "exercises" | "session" | "history" | "insights";
+type Seg = "session" | "exercises" | "insights";
 const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower", "Mobility"];
 
 function fmtClock(sec: number) {
@@ -44,7 +44,7 @@ export default function WorkoutScreen() {
   const w = useWorkout();
   const { isPremium } = usePremium();
 
-  const [seg, setSeg] = useState<Seg>("exercises");
+  const [seg, setSeg] = useState<Seg>("session");
   const [cat, setCat] = useState("All");
   const [restVisible, setRestVisible] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -165,10 +165,10 @@ export default function WorkoutScreen() {
       {/* segmented header */}
       <View style={[styles.segWrap, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
         <View style={styles.seg}>
-          {(["exercises", "session", "history", "insights"] as Seg[]).map((s) => (
+          {(["session", "exercises", "insights"] as Seg[]).map((s) => (
             <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => setSeg(s)} testID={`seg-${s}`}>
               <Text style={[styles.segText, seg === s && styles.segTextActive]}>
-                {s === "exercises" ? "Train" : s === "session" ? "Session" : s === "history" ? "History" : "Insights"}
+                {s === "session" ? "Session" : s === "exercises" ? "Muscle Groups" : "Insights"}
               </Text>
               {s === "insights" && !isPremium && <Ionicons name="lock-closed" size={11} color={T.textFaint} style={{ marginLeft: 4 }} />}
               {s === "session" && w.session && w.session.length > 0 && <View style={styles.dot} />}
@@ -340,75 +340,6 @@ export default function WorkoutScreen() {
                 </TouchableOpacity>
               </View>
             </>
-          )}
-        </View>
-      )}
-
-      {/* HISTORY */}
-      {seg === "history" && (
-        <View style={[styles.full, { paddingTop: insets.top + 56 }]}>
-          {w.history.length === 0 ? (
-            <View style={styles.empty}>
-              <Ionicons name="calendar-outline" size={40} color={T.textFaint} />
-              <Text style={styles.emptyText}>No workouts yet</Text>
-              <Text style={styles.emptySub}>Finished workouts will appear here.</Text>
-            </View>
-          ) : (
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-              {/* This Week */}
-              <Text style={styles.histSectionTitle}>This Week</Text>
-              {thisWeek.length === 0 ? (
-                <Text style={styles.histSectionEmpty}>No workouts logged this week yet.</Text>
-              ) : (
-                thisWeek.map(renderHistCard)
-              )}
-
-              {/* Monthly calendar */}
-              <Text style={[styles.histSectionTitle, { marginTop: 20 }]}>{calLabel}</Text>
-              <View style={styles.calCard}>
-                <View style={styles.calWeekRow}>
-                  {WEEKDAYS.map((d) => (
-                    <Text key={d} style={styles.calWeekday}>
-                      {d}
-                    </Text>
-                  ))}
-                </View>
-                <View style={styles.calGrid}>
-                  {calCells.map((d, i) => {
-                    if (d == null) return <View key={`b${i}`} style={styles.calCell} />;
-                    const marked = workoutDays.has(d);
-                    const isSel = d === selectedDay;
-                    const isToday = d === nowD.getDate();
-                    return (
-                      <TouchableOpacity
-                        key={d}
-                        style={styles.calCell}
-                        disabled={!marked}
-                        activeOpacity={0.7}
-                        onPress={() => setSelectedDay(isSel ? null : d)}
-                        testID={`cal-day-${d}`}
-                      >
-                        <View style={[styles.calDay, marked && styles.calDayMarked, isToday && !isSel && styles.calDayToday, isSel && styles.calDaySel]}>
-                          <Text style={[styles.calDayText, (marked || isSel) && { color: T.bg, fontWeight: "800" }]}>{d}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* Selected day reveal */}
-              {selectedDay != null && selectedDayWorkouts.length > 0 && (
-                <>
-                  <Text style={[styles.histSectionTitle, { marginTop: 20 }]}>{`${calMonthShort} ${selectedDay}`}</Text>
-                  {selectedDayWorkouts.map(renderHistCard)}
-                </>
-              )}
-
-              {/* Full history */}
-              <Text style={[styles.histSectionTitle, { marginTop: 20 }]}>All Workouts</Text>
-              {w.history.map(renderHistCard)}
-            </ScrollView>
           )}
         </View>
       )}

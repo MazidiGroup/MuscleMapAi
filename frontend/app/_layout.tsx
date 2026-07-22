@@ -9,6 +9,7 @@ import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { WorkoutProvider } from "@/src/anatomy/workoutStore";
 import { PremiumProvider } from "@/src/premium/PremiumContext";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
+import { ThemeProvider } from "@/src/theme/ThemeContext";
 
 LogBox.ignoreAllLogs(true);
 SplashScreen.preventAutoHideAsync();
@@ -67,15 +68,17 @@ export default function RootLayout() {
         <AuthProvider>
           <WorkoutProvider>
             <PremiumProvider>
-              <AuthGate>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: "#070A0F" },
-                    animation: "fade",
-                  }}
-                />
-              </AuthGate>
+              <ThemeProvider>
+                <AuthGate>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: "#070A0F" },
+                      animation: "fade",
+                    }}
+                  />
+                </AuthGate>
+              </ThemeProvider>
             </PremiumProvider>
           </WorkoutProvider>
         </AuthProvider>

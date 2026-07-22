@@ -7,6 +7,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
 import { GYM_GROUPS, GYM_GROUP_ORDER, prettyName } from "@/src/anatomy/groups";
 import { MUSCLE_DATA, getMuscleInfo } from "@/src/anatomy/muscleData";
+import { LESSONS } from "@/src/anatomy/lessons";
 import { EXERCISES, Exercise } from "@/src/anatomy/exercises";
 import { DIFFICULTY_ORDER } from "@/src/anatomy/exerciseCatalog";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
@@ -17,7 +18,7 @@ import { T, GROUP_COLORS } from "@/src/anatomy/ui";
 import { useAuth } from "@/src/auth/AuthContext";
 import { FLAGS } from "@/src/config/featureFlags";
 
-type LibSeg = "muscles" | "exercises";
+type LibSeg = "exercises" | "muscles" | "learn" | "account";
 type GroupBy = "muscle" | "equipment" | "movement";
 type DifficultyFilter = "All" | "Beginner" | "Intermediate" | "Advanced";
 
@@ -163,29 +164,37 @@ export default function LibraryScreen() {
     <View style={styles.root}>
       <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 18 }}>
         <Text style={styles.h1}>Library</Text>
-        <Text style={styles.sub}>Exercises · muscle guide · account</Text>
-        <View style={styles.search}>
-          <Ionicons name="search" size={18} color={T.textFaint} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={seg === "exercises" ? "Search exercises…" : "Search muscles…"}
-            placeholderTextColor={T.textFaint}
-            value={query}
-            onChangeText={setQuery}
-            testID="library-search"
-          />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery("")}>
-              <Ionicons name="close-circle" size={18} color={T.textFaint} />
-            </TouchableOpacity>
-          )}
-        </View>
+        <Text style={styles.sub}>Exercises · muscle guide · learn · account</Text>
+        {(seg === "exercises" || seg === "muscles") && (
+          <View style={styles.search}>
+            <Ionicons name="search" size={18} color={T.textFaint} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={seg === "exercises" ? "Search exercises…" : "Search muscles…"}
+              placeholderTextColor={T.textFaint}
+              value={query}
+              onChangeText={setQuery}
+              testID="library-search"
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery("")}>
+                <Ionicons name="close-circle" size={18} color={T.textFaint} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
         {FLAGS.libraryExercises && (
           <View style={styles.libSeg}>
-            {(["exercises", "muscles"] as LibSeg[]).map((s) => (
+            {(["exercises", "muscles", "learn", "account"] as LibSeg[]).map((s) => (
               <TouchableOpacity key={s} style={[styles.libSegBtn, seg === s && styles.libSegActive]} onPress={() => setSeg(s)} testID={`lib-seg-${s}`}>
-                <Ionicons name={s === "muscles" ? "body-outline" : "barbell-outline"} size={15} color={seg === s ? T.bg : T.textDim} />
-                <Text style={[styles.libSegText, seg === s && styles.libSegTextActive]}>{s === "muscles" ? "Muscles" : "Exercises"}</Text>
+                <Ionicons
+                  name={s === "muscles" ? "body-outline" : s === "exercises" ? "barbell-outline" : s === "learn" ? "school-outline" : "person-circle-outline"}
+                  size={15}
+                  color={seg === s ? T.bg : T.textDim}
+                />
+                <Text style={[styles.libSegText, seg === s && styles.libSegTextActive]}>
+                  {s === "muscles" ? "Muscles" : s === "exercises" ? "Exercises" : s === "learn" ? "Learn" : "Account"}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -301,11 +310,17 @@ export default function LibraryScreen() {
         )}
 
         {/* Account */}
-        {query.length === 0 && user && (
+        {seg === "account" && (
           <View style={styles.about}>
             <Text style={styles.aboutTitle}>Account</Text>
             <View style={styles.linkList}>
-              {user.is_guest ? (
+              {!user ? (
+                <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/login")} testID="signin-btn">
+                  <Ionicons name="log-in-outline" size={18} color={T.accent} />
+                  <Text style={[styles.linkRowText, { color: T.accent }]}>Sign In or Create Account</Text>
+                  <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+                </TouchableOpacity>
+              ) : user.is_guest ? (
                 <>
                   <View style={styles.linkRow} testID="account-info">
                     <Ionicons name="person-circle-outline" size={20} color={T.accent} />
@@ -342,18 +357,13 @@ export default function LibraryScreen() {
                 </>
               )}
             </View>
-          </View>
-        )}
 
-        {/* About */}
-        {query.length === 0 && (
-          <View style={styles.about}>
-            <Text style={styles.aboutTitle}>About</Text>
+            <Text style={[styles.aboutTitle, { marginTop: 22 }]}>About</Text>
             <Text style={styles.aboutText}>
               Muscle Map Ai — explore a life-size 3D muscle model with 270 named structures,
-              see how muscles shrink, track your workouts and learn with lessons and an AI coach.
+              build a personalized weekly workout plan, and track your training.
             </Text>
-            <Text style={styles.version}>v1.1.0 · Explore · Workout · Learn · Coach</Text>
+            <Text style={styles.version}>v1.1.0 · Plan · Workout · Coach · Explore · Library</Text>
 
             <View style={styles.linkList}>
               <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/references")} testID="link-references">
@@ -381,6 +391,31 @@ export default function LibraryScreen() {
                 <Ionicons name="open-outline" size={16} color={T.textFaint} />
               </TouchableOpacity>
             </View>
+          </View>
+        )}
+
+        {/* Learn */}
+        {seg === "learn" && (
+          <View>
+            <Text style={styles.h1Small}>Guided anatomy lessons</Text>
+            {LESSONS.map((l, i) => (
+              <TouchableOpacity
+                key={l.id}
+                style={styles.lessonCard}
+                onPress={() => router.push(`/lesson/${l.id}`)}
+                testID={`lesson-${l.id}`}
+              >
+                <View style={styles.lessonIcon}>
+                  <Ionicons name={l.icon as any} size={22} color={T.accent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.lessonNumText}>Lesson {i + 1}</Text>
+                  <Text style={styles.rowName}>{l.title}</Text>
+                  <Text style={styles.rowFn}>{l.subtitle}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
+              </TouchableOpacity>
+            ))}
           </View>
         )}
       </ScrollView>
@@ -448,6 +483,13 @@ const styles = StyleSheet.create({
   version: { color: T.textFaint, fontSize: 12, marginTop: 12 },
   linkList: { marginTop: 16, gap: 8 },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13 },
+  h1Small: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 },
+  lessonCard: {
+    flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border,
+    borderRadius: 16, padding: 14, marginBottom: 10,
+  },
+  lessonIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center" },
+  lessonNumText: { color: T.accent, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 },
   linkRowText: { flex: 1, color: T.text, fontSize: 15, fontWeight: "600" },
   accountEmail: { color: T.textFaint, fontSize: 12, marginTop: 1 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },

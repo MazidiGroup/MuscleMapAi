@@ -312,47 +312,38 @@ export class AnatomyEngine {
   //
   // We recompute vertex normals afterwards so lighting stays correct.
   private applyGymPhysique() {
-    // Bodybuilder-tier defaults. Values are a fraction of each mesh's smallest
-    // bounding-box half-extent — so thin muscles inflate less in absolute
-    // world units than beefy ones, which keeps proportions believable.
-    //
-    // v2 (July 2026): bumped ~15–25 % across the board for a bulkier "off-
-    // season" bodybuilder look. Biceps + Pectoralis + Deltoid are composite
-    // meshes (multiple heads baked into one mesh), so we hold their factor
-    // just below the surrounding groups — going too high fills the natural
-    // grooves and makes them look pillowy. The single-head neighbouring
-    // muscles (Brachialis / Triceps / Vasti) carry the heavier inflation
-    // instead, which visually adds bulk without erasing anatomy.
+    // Athletic-athlete defaults. Values are a fraction of each mesh's smallest
+    // bounding-box half-extent — enough to look lean and trained, not bulky.
     const RULES: [RegExp, number][] = [
-      [/^Pectoralis_Major/i, 0.20],           // composite (clav+sterno+abd)
-      [/^Pectoralis_Minor$/i, 0.14],
-      [/^Serratus_Anterior$/i, 0.14],
-      [/^Deltoid/i, 0.26],                     // composite (ant+mid+post)
-      [/^Biceps_Brachii$/i, 0.18],             // composite (short+long), keep grooved
-      [/^Brachialis$/i, 0.24],                 // single head — carries the arm bulk
-      [/^Brachioradialis$/i, 0.20],
-      [/^Triceps_/i, 0.26],
-      [/^Latissimus_Dorsi$/i, 0.22],
-      [/^Teres_(Major|Minor)$/i, 0.18],
-      [/^Rhomboideus_/i, 0.15],
-      [/^Trapezius$/i, 0.18],
-      [/^Infraspinatus$/i, 0.12],
-      [/^Supraspinatus$/i, 0.10],
-      [/^Rectus_Abdominis$/i, 0.14],
-      [/^External_Oblique$/i, 0.11],
-      [/^Gluteus_Maximus$/i, 0.24],
-      [/^Gluteus_(Medius|Minimus)$/i, 0.17],
-      [/^Rectus_Femoris$/i, 0.24],
-      [/^Vastus_/i, 0.24],
-      [/^Biceps_Femoris_/i, 0.22],
-      [/^Semi(tendinosus|membranosus)$/i, 0.22],
-      [/^Adductor_/i, 0.17],
-      [/^Gracilis$/i, 0.12],
-      [/^Gastrocnemius/i, 0.26],
-      [/^Soleus$/i, 0.24],
-      [/^Tibialis_Anterior$/i, 0.16],
-      [/^Sternocleidomastoid$/i, 0.12],
-      [/^Psoas_Major$/i, 0.10],
+      [/^Pectoralis_Major/i, 0.08],
+      [/^Pectoralis_Minor$/i, 0.06],
+      [/^Serratus_Anterior$/i, 0.06],
+      [/^Deltoid/i, 0.10],
+      [/^Biceps_Brachii$/i, 0.10],
+      [/^Brachialis$/i, 0.10],
+      [/^Brachioradialis$/i, 0.08],
+      [/^Triceps_/i, 0.10],
+      [/^Latissimus_Dorsi$/i, 0.09],
+      [/^Teres_(Major|Minor)$/i, 0.08],
+      [/^Rhomboideus_/i, 0.06],
+      [/^Trapezius$/i, 0.07],
+      [/^Infraspinatus$/i, 0.05],
+      [/^Supraspinatus$/i, 0.04],
+      [/^Rectus_Abdominis$/i, 0.06],
+      [/^External_Oblique$/i, 0.05],
+      [/^Gluteus_Maximus$/i, 0.10],
+      [/^Gluteus_(Medius|Minimus)$/i, 0.07],
+      [/^Rectus_Femoris$/i, 0.09],
+      [/^Vastus_/i, 0.09],
+      [/^Biceps_Femoris_/i, 0.09],
+      [/^Semi(tendinosus|membranosus)$/i, 0.09],
+      [/^Adductor_/i, 0.07],
+      [/^Gracilis$/i, 0.05],
+      [/^Gastrocnemius/i, 0.10],
+      [/^Soleus$/i, 0.09],
+      [/^Tibialis_Anterior$/i, 0.06],
+      [/^Sternocleidomastoid$/i, 0.06],
+      [/^Psoas_Major$/i, 0.05],
     ];
 
     const inflatedCount = { n: 0 };

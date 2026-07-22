@@ -5,7 +5,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { AnatomyViewer, ViewerHandle } from "@/src/anatomy/AnatomyViewer";
-import { ScrubSlider } from "@/src/anatomy/ScrubSlider";
 import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
 import { DraggableSheet, DraggableSheetHandle } from "@/src/anatomy/DraggableSheet";
 import { EXPLORER } from "@/src/anatomy/groups";
@@ -21,8 +20,6 @@ export default function ExploreScreen() {
   const [selected, setSelected] = useState<string | null>(null);
   const [isolate, setIsolate] = useState<string | null>(null);
   const [hidden, setHidden] = useState<string[]>([]);
-  const [shrink, setShrink] = useState(0);
-  const [tab, setTab] = useState<"layers" | "shrink">("layers");
 
   const peek = 158;
   const maxHeight = Math.min(height * 0.86, height - insets.top - 64);
@@ -55,7 +52,6 @@ export default function ExploreScreen() {
         mode="explore"
         hidden={hidden}
         isolate={isolate}
-        shrink={shrink}
         onSelect={(name) => setSelected(name)}
       />
 
@@ -80,13 +76,7 @@ export default function ExploreScreen() {
           />
         ) : (
           <View style={styles.controls}>
-            <View style={styles.segment}>
-              <SegBtn label="Layers" active={tab === "layers"} onPress={() => setTab("layers")} icon="layers-outline" />
-              <SegBtn label="Shrink View" active={tab === "shrink"} onPress={() => setTab("shrink")} icon="contract-outline" />
-            </View>
-
-            {tab === "layers" ? (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
                 {EXPLORER.map((section) => {
                   const sysHidden = hidden.includes(section.container);
                   return (
@@ -124,28 +114,6 @@ export default function ExploreScreen() {
                   <Text style={styles.showAllText}>Show Full Body</Text>
                 </TouchableOpacity>
               </ScrollView>
-            ) : (
-              <View style={{ paddingVertical: 8 }}>
-                <View style={styles.shrinkHead}>
-                  <Text style={styles.shrinkTitle}>Shrunken Muscle View</Text>
-                  <Text style={styles.shrinkPct}>{Math.round(shrink * 100)}%</Text>
-                </View>
-                <ScrubSlider value={shrink} onChange={setShrink} />
-                <View style={styles.shrinkBtns}>
-                  <TouchableOpacity style={styles.smallBtn} onPress={() => setShrink(0)} testID="shrink-normal">
-                    <Text style={styles.smallBtnText}>Normal</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.smallBtn} onPress={() => setShrink(1)} testID="shrink-full">
-                    <Text style={styles.smallBtnText}>Fully Shrunken</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.hint}>Slide to change the muscles from full size to fully shrunken.</Text>
-                <TouchableOpacity style={styles.showAll} onPress={showAll} testID="show-all-btn">
-                  <Ionicons name="scan-outline" size={16} color={T.text} />
-                  <Text style={styles.showAllText}>Show Full Body</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         )}
       </DraggableSheet>

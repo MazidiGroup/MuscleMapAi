@@ -40,25 +40,26 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="explore"
-        options={{ title: "Explore", tabBarIcon: ({ color, size }) => <TabIcon name="cube-outline" size={size} color={color} /> }}
+        name="plan"
+        options={{ title: "Plan", tabBarIcon: ({ color, size }) => <TabIcon name="calendar-outline" size={size} color={color} /> }}
       />
       <Tabs.Screen
         name="workout"
         options={{ title: "Workout", tabBarIcon: ({ color, size }) => <TabIcon name="barbell-outline" size={size} color={color} /> }}
       />
       <Tabs.Screen
-        name="learn"
-        options={{ title: "Learn", tabBarIcon: ({ color, size }) => <TabIcon name="school-outline" size={size} color={color} locked={locked} /> }}
-      />
-      <Tabs.Screen
         name="coach"
         options={{ title: "Coach", tabBarIcon: ({ color, size }) => <TabIcon name="sparkles-outline" size={size} color={color} locked={locked} /> }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{ title: "Explore", tabBarIcon: ({ color, size }) => <TabIcon name="cube-outline" size={size} color={color} /> }}
       />
       <Tabs.Screen
         name="library"
         options={{ title: "Library", tabBarIcon: ({ color, size }) => <TabIcon name="library-outline" size={size} color={color} /> }}
       />
+      <Tabs.Screen name="learn" options={{ href: null }} />
     </Tabs>
   );
 }
