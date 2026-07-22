@@ -84,8 +84,8 @@ export default function ExerciseDetail() {
         </ScrollView>
 
         <TouchableOpacity style={[styles.startBtn, { bottom: insets.bottom + 14 }]} onPress={start} testID="start-workout-btn">
-          <Ionicons name="play" size={18} color={T.bg} />
-          <Text style={styles.startText}>Start Workout</Text>
+          <Ionicons name="add" size={20} color={T.bg} />
+          <Text style={styles.startText}>Add to Session</Text>
         </TouchableOpacity>
       </View>
     </View>

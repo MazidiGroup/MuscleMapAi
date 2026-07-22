@@ -4,6 +4,7 @@ import { Platform, View, StyleSheet } from "react-native";
 
 import { T } from "@/src/anatomy/ui";
 import { usePremium } from "@/src/premium/PremiumContext";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 function TabIcon({ name, color, size, locked }: { name: any; color: string; size: number; locked?: boolean }) {
   return (
@@ -21,22 +22,24 @@ function TabIcon({ name, color, size, locked }: { name: any; color: string; size
 export default function TabsLayout() {
   const { isPremium } = usePremium();
   const locked = !isPremium;
+  const { T: theme } = useTheme();
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: T.accent,
-        tabBarInactiveTintColor: T.textFaint,
+        tabBarActiveTintColor: theme.accent,
+        tabBarInactiveTintColor: theme.textMuted,
         tabBarStyle: {
-          backgroundColor: "#0A0F18",
-          borderTopColor: T.border,
+          backgroundColor: theme.card,
+          borderTopColor: theme.border,
           borderTopWidth: 1,
           height: Platform.OS === "ios" ? 86 : 64,
           paddingTop: 6,
           paddingBottom: Platform.OS === "ios" ? 28 : 8,
         },
         tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
+        sceneStyle: { backgroundColor: theme.bg },
       }}
     >
       <Tabs.Screen

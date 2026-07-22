@@ -253,7 +253,6 @@ export default function WorkoutScreen() {
           ) : (
             <>
               <View style={styles.statsBar}>
-                <SBStat label="Time" value={fmtClock(durationSec)} />
                 <SBStat label="Exercises" value={`${w.session.length}`} />
                 <SBStat label="Sets" value={`${stats.completed}/${stats.sets}`} />
                 <SBStat label="Volume" value={`${stats.volume}kg`} />

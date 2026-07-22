@@ -3,9 +3,17 @@ import { storage } from "@/src/utils/storage";
 import { getExercise } from "./exercises";
 import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS, GYM_GROUP_ORDER } from "./groups";
+import { usePlanStore } from "@/src/plan/planStore";
 
 export type LoggedSet = { id: string; weight: number; reps: number; done: boolean };
-export type SessionExercise = { exerciseId: string; sets: LoggedSet[]; notes: string };
+export type SessionExercise = {
+  exerciseId: string;
+  sets: LoggedSet[];
+  notes: string;
+  /** When the exercise was added via the Plan tab, this remembers the plan-day
+   *  it belongs to so we can auto-tick it once every set is done. */
+  planLink?: { planDate: string };
+};
 export type Workout = { id: string; date: number; durationSec: number; exercises: SessionExercise[] };
 export type PRs = { byExercise: Record<string, { maxWeight: number; maxVolume: number }>; longestSec: number };
 
@@ -88,6 +96,8 @@ type Ctx = {
   prs: PRs;
   startWorkout: () => void;
   addExercise: (id: string) => void;
+  /** Add an exercise from a Plan day. Auto-ticks the Plan when all sets complete. */
+  addExerciseFromPlan: (id: string, planDate: string) => void;
   hasExercise: (id: string) => boolean;
   addSet: (exId: string) => void;
   updateSet: (exId: string, setId: string, patch: Partial<LoggedSet>) => void;
@@ -126,6 +136,30 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       const base = prev || [];
       if (base.some((e) => e.exerciseId === id)) return base;
       return [...base, { exerciseId: id, sets: [{ id: uid(), weight: 0, reps: 0, done: false }], notes: "" }];
+    });
+    setStartedAt((s) => s ?? Date.now());
+  }, []);
+
+  const addExerciseFromPlan = useCallback((id: string, planDate: string) => {
+    setSession((prev) => {
+      const base = prev || [];
+      if (base.some((e) => e.exerciseId === id)) {
+        // If already there, ensure the planLink is stamped so completion ticks.
+        return base.map((e) =>
+          e.exerciseId === id
+            ? { ...e, planLink: e.planLink || { planDate } }
+            : e,
+        );
+      }
+      return [
+        ...base,
+        {
+          exerciseId: id,
+          sets: [{ id: uid(), weight: 0, reps: 0, done: false }],
+          notes: "",
+          planLink: { planDate },
+        },
+      ];
     });
     setStartedAt((s) => s ?? Date.now());
   }, []);
@@ -215,6 +249,18 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setStartedAt(null);
   }, []);
 
+  // Auto-tick planStore whenever every set of a plan-linked exercise is done.
+  // Runs on every session change; harmless when nothing is linked.
+  useEffect(() => {
+    if (!session || session.length === 0) return;
+    const toggle = usePlanStore.getState().toggleCompletion;
+    for (const se of session) {
+      if (!se.planLink) continue;
+      const allDone = se.sets.length > 0 && se.sets.every((s) => s.done);
+      if (allDone) toggle(se.planLink.planDate, se.exerciseId, true);
+    }
+  }, [session]);
+
   return (
     <WorkoutContext.Provider
       value={{
@@ -225,6 +271,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         prs,
         startWorkout,
         addExercise,
+        addExerciseFromPlan,
         hasExercise,
         addSet,
         updateSet,

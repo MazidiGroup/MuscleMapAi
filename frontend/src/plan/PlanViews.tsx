@@ -10,6 +10,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import { useTheme } from "@/src/theme/ThemeContext";
 import { R } from "@/src/theme/tokens";
@@ -17,6 +18,7 @@ import { usePlanStore, todayISO } from "./planStore";
 import { entryFor, alternativesFor, MUSCLE_LABEL, GOAL_LABEL, REGION_LABEL } from "./planAdapter";
 import type { PlanDay, PlanExerciseEntry } from "./exercises";
 import { posterUrl } from "@/src/anatomy/media";
+import { useWorkout } from "@/src/anatomy/workoutStore";
 
 const DOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -152,9 +154,10 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
 // ---- Workout Day view ----------------------------------------------------
 export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () => void }) {
   const { T } = useTheme();
+  const router = useRouter();
+  const w = useWorkout();
   const plan = usePlanStore(s => s.plan);
   const completions = usePlanStore(s => s.completions);
-  const toggleCompletion = usePlanStore(s => s.toggleCompletion);
   const [swapId, setSwapId] = useState<string | null>(null);
   const [replaced, setReplaced] = useState<Record<string, PlanExerciseEntry>>({});
   if (!plan) return null;
@@ -163,6 +166,11 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
   const dateKey = todayISO();
 
   const items = (day.exercises || []).map(e => replaced[e.id] || e);
+
+  const addAllToSession = () => {
+    for (const it of items) w.addExerciseFromPlan(it.id, dateKey);
+    router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
@@ -178,15 +186,22 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
             {day.dow} · {day.typeName}
           </Text>
           <Text style={[styles.dayHeaderMeta, { color: T.textMuted }]}>
-            {items.length} exercises · ~{day.minutes} min
+            {items.length} exercises
           </Text>
         </View>
-        <View style={styles.headerBtn} />
+        <TouchableOpacity
+          style={[styles.startAllBtn, { backgroundColor: T.accent }]}
+          onPress={addAllToSession}
+          testID="add-all-to-session"
+        >
+          <Text style={{ color: T.ctaText, fontWeight: "800", fontSize: 12 }}>Start</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         {items.map((ex) => {
           const done = !!completions[`${dateKey}:${ex.id}`];
+          const inSession = !!w.session?.some((s) => s.exerciseId === ex.id);
           return (
             <View key={ex.id} style={[styles.exCard, { backgroundColor: T.card, borderColor: T.border }]}>
               <View style={[styles.exPoster, { backgroundColor: T.posterBg, borderColor: T.border }]}>
@@ -211,19 +226,28 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
                 </View>
                 <Text style={[styles.exName, { color: T.text }]}>{ex.name}</Text>
                 <Text style={[styles.exMeta, { color: T.textMuted }]}>
-                  {ex.sets} sets · {ex.repsOrTime} · rest {ex.rest}
+                  {ex.sets} sets · {ex.repsOrTime}
                 </Text>
               </View>
-              <View style={{ gap: 8 }}>
+              <View style={{ gap: 8, alignItems: "center" }}>
+                {/* Read-only tick — becomes solid once every set is completed in Session. */}
+                <View style={[
+                  styles.tickBtn,
+                  { borderColor: done ? T.accent : T.border, backgroundColor: done ? T.accent : "transparent" },
+                ]}>
+                  <Ionicons name={done ? "checkmark" : "ellipse-outline"} size={18} color={done ? T.ctaText : T.textMuted} />
+                </View>
                 <TouchableOpacity
                   style={[
-                    styles.tickBtn,
-                    { borderColor: done ? T.accent : T.border, backgroundColor: done ? T.accent : "transparent" },
+                    styles.addBtn,
+                    { borderColor: inSession ? T.accent : T.border, backgroundColor: inSession ? T.accent + "22" : "transparent" },
                   ]}
-                  onPress={() => toggleCompletion(dateKey, ex.id, !done)}
-                  testID={`tick-${ex.id}`}
+                  onPress={() => {
+                    if (!inSession) w.addExerciseFromPlan(ex.id, dateKey);
+                  }}
+                  testID={`add-${ex.id}`}
                 >
-                  <Ionicons name={done ? "checkmark" : "ellipse-outline"} size={18} color={done ? T.ctaText : T.text2} />
+                  <Ionicons name={inSession ? "checkmark-circle" : "add"} size={16} color={inSession ? T.accent : T.text2} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.swapBtn, { borderColor: T.border }]}
@@ -366,7 +390,9 @@ const styles = StyleSheet.create({
   exName: { fontSize: 14.5, fontWeight: "600", marginTop: 4 },
   exMeta: { fontSize: 12, marginTop: 4 },
   tickBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  addBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   swapBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  startAllBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: R.pill },
 
   sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
   sheet: {
