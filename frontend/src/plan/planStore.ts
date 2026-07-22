@@ -9,7 +9,8 @@ import { create } from "zustand";
 
 import { storage } from "@/src/utils/storage";
 
-import { Answers, Plan, buildPlan } from "./exercises";
+import { Answers, Plan } from "./exercises";
+import { buildPlan } from "./planAdapter";
 
 const KEY_PLAN = "mma.plan.v1";
 const KEY_ANSWERS = "mma.plan.answers.v1";

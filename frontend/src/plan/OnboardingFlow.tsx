@@ -23,9 +23,9 @@ const GOAL_OPTS: { k: Goal; label: string; sub: string }[] = [
   { k: "general",  label: "General fitness",  sub: "Feel and move better" },
 ];
 const EXP_OPTS: { k: Experience; label: string; sub: string }[] = [
-  { k: "new",  label: "New to lifting",   sub: "Less than 6 months" },
-  { k: "some", label: "Some experience",  sub: "6 months – 2 years" },
-  { k: "exp",  label: "Experienced",      sub: "2+ years training" },
+  { k: "beginner",     label: "New to lifting",   sub: "Less than 6 months" },
+  { k: "intermediate", label: "Some experience",  sub: "6 months – 2 years" },
+  { k: "advanced",     label: "Experienced",      sub: "2+ years training" },
 ];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -74,9 +74,11 @@ export function Welcome() {
       </TouchableOpacity>
 
       <View style={styles.center}>
-        <View style={[styles.brandBadge, { backgroundColor: T.card, borderColor: T.border, shadowColor: T.accent }]}>
-          <Image source={require("../../assets/images/icon.png")} style={styles.brandLogo} />
-        </View>
+        <Image
+          source={require("../../assets/images/adaptive-icon.png")}
+          style={styles.brandMark}
+          resizeMode="contain"
+        />
         <Text style={[styles.brandName, { color: T.text }]}>Muscle Map <Text style={{ color: T.accent }}>AI</Text></Text>
         <Text style={[styles.brandTag, { color: T.text2 }]}>Learn your body. Train it smarter.</Text>
 
@@ -405,7 +407,7 @@ export function StepPosture() {
   const finish = (posture: boolean) => {
     const final: Answers = {
       goal: (answers.goal || "general") as Goal,
-      exp: (answers.exp || "new") as Experience,
+      exp: (answers.exp || "beginner") as Experience,
       days: answers.days && answers.days.length ? answers.days : [1, 3, 5],
       equip: answers.equip || [],
       focus: answers.focus || [],
@@ -413,7 +415,17 @@ export function StepPosture() {
     };
     setAnswers({ posture });
     setStep(7);
-    setTimeout(() => rebuildFromAnswers(final), 2400);
+    setTimeout(() => {
+      try {
+        rebuildFromAnswers(final);
+      } catch (e) {
+        // Keep the user on the Building screen and log; a shipping error boundary
+        // in the tab shell recovers to Welcome on next open.
+        // eslint-disable-next-line no-console
+        console.error("[Plan] buildPlan failed:", e);
+        setStep(0);
+      }
+    }, 2400);
   };
 
   return (
@@ -458,9 +470,11 @@ export function Building() {
   return (
     <View style={[styles.root, { backgroundColor: T.bg, alignItems: "center", justifyContent: "center" }]}>
       <Animated.View style={{ transform: [{ scale }], opacity }}>
-        <View style={[styles.brandBadge, { backgroundColor: T.card, borderColor: T.border, shadowColor: T.accent }]}>
-          <Image source={require("../../assets/images/icon.png")} style={styles.brandLogo} />
-        </View>
+        <Image
+          source={require("../../assets/images/adaptive-icon.png")}
+          style={styles.brandMark}
+          resizeMode="contain"
+        />
       </Animated.View>
       <Text style={[styles.brandName, { color: T.text, marginTop: 22 }]}>Building your plan…</Text>
       <Text style={[styles.brandTag, { color: T.text2, marginTop: 8 }]}>{BUILD_LINES[i]}</Text>
@@ -476,12 +490,7 @@ const styles = StyleSheet.create({
     position: "absolute", top: 60, right: 24, width: 36, height: 36, borderRadius: 18,
     borderWidth: 1, alignItems: "center", justifyContent: "center", zIndex: 10,
   },
-  brandBadge: {
-    width: 112, height: 112, borderRadius: 28, borderWidth: 1,
-    alignItems: "center", justifyContent: "center", overflow: "hidden",
-    shadowOffset: { width: 0, height: 10 }, shadowRadius: 30, shadowOpacity: 0.35,
-  },
-  brandLogo: { width: 112, height: 112 },
+  brandMark: { width: 132, height: 132 },
   brandName: { fontSize: 29, fontWeight: "700", marginTop: 22, letterSpacing: 0.2 },
   brandTag: { fontSize: 15, marginTop: 8, textAlign: "center" },
   brandFoot: { fontSize: 12, marginTop: 14 },

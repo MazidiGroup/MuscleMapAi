@@ -72,7 +72,7 @@ export default function LoginScreen() {
     setBusy("guest");
     try {
       const res = await continueAsGuest();
-      if (res.ok) router.replace("/(tabs)/explore");
+      if (res.ok) router.replace("/(tabs)/plan");
       else if (res.error) setError(res.error);
     } finally {
       setBusy(null);
@@ -154,7 +154,7 @@ export default function LoginScreen() {
             {user?.is_guest ? (
               <TouchableOpacity
                 style={styles.guestLink}
-                onPress={() => router.replace("/(tabs)/explore")}
+                onPress={() => router.replace("/(tabs)/plan")}
                 testID="login-guest-back"
               >
                 <Text style={styles.guestLinkText}>Not now — keep browsing as guest</Text>

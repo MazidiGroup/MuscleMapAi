@@ -4,7 +4,7 @@
 // autocompletion and safety at call sites.
 
 export type Goal = "muscle" | "strength" | "fatloss" | "general";
-export type Experience = "new" | "some" | "exp";
+export type Experience = "beginner" | "intermediate" | "advanced";
 export type Region = "chest" | "shoulders" | "arms" | "back" | "core" | "glutes" | "legs";
 export type MuscleKey =
   | "chest" | "back" | "shoulders" | "biceps" | "triceps" | "forearms"

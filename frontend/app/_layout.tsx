@@ -47,7 +47,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace("/login");
     } else if (user && !user.is_guest && seg === "login") {
       // Guests may visit /login to upgrade to a real account
-      router.replace("/(tabs)/explore");
+      router.replace("/(tabs)/plan");
     }
   }, [user, loading, segments, router]);
 

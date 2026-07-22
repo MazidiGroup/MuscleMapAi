@@ -14,9 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { R } from "@/src/theme/tokens";
 import { usePlanStore, todayISO } from "./planStore";
-import {
-  MUSCLE_LABEL, GOAL_LABEL, REGION_LABEL, entryFor, alternativesFor,
-} from "./exercises";
+import { entryFor, alternativesFor, MUSCLE_LABEL, GOAL_LABEL, REGION_LABEL } from "./planAdapter";
 import type { PlanDay, PlanExerciseEntry } from "./exercises";
 import { posterUrl } from "@/src/anatomy/media";
 
