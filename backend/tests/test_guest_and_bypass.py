@@ -16,7 +16,7 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("EXPO_BACKEND_URL") or os.environ.get(
-    "EXPO_PUBLIC_BACKEND_URL", "https://ai-coach-trainer-2.preview.emergentagent.com"
+    "EXPO_PUBLIC_BACKEND_URL", "https://anatomy-coach-1.preview.emergentagent.com"
 )
 BASE_URL = BASE_URL.rstrip("/")
 BYPASS_EMAIL = "applereview@mazidigroup.com"
