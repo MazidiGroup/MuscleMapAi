@@ -10,12 +10,16 @@ import { DraggableSheet, DraggableSheetHandle } from "@/src/anatomy/DraggableShe
 import { EXPLORER } from "@/src/anatomy/groups";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { ThemeToggle } from "@/src/theme/ThemeToggle";
+import { usePremium } from "@/src/premium/PremiumContext";
+import { Paywall } from "@/src/premium/Paywall";
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { height } = useWindowDimensions();
   const { mode } = useTheme();
+  const { isPremium } = usePremium();
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
   const viewer = useRef<ViewerHandle>(null);
@@ -49,6 +53,14 @@ export default function ExploreScreen() {
     viewer.current?.resetView();
   };
 
+  if (!isPremium) {
+    return (
+      <View style={{ flex: 1, backgroundColor: T.bg }}>
+        <Paywall title="Unlock 3D Explore" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <AnatomyViewer
@@ -60,10 +72,11 @@ export default function ExploreScreen() {
       />
 
       <View style={[styles.header, { paddingTop: insets.top + 8, pointerEvents: "box-none" }]}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[styles.h1, { color: "#EAF1FB" }]}>Explore Anatomy</Text>
           <Text style={[styles.sub, { color: "#9AA7BD" }]}>Tap a muscle to learn about it · drag to rotate</Text>
         </View>
+        <ThemeToggle />
       </View>
 
       <DraggableSheet ref={sheet} peekHeight={peek} maxHeight={maxHeight} initial="collapsed">
@@ -136,7 +149,7 @@ function SegBtn({ label, active, onPress, icon, styles, T }: { label: string; ac
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
-  header: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 18 },
+  header: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 18, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   h1: { color: T.text, fontSize: 22, fontWeight: "800" },
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
   controls: { flex: 1, paddingHorizontal: 16, paddingTop: 2 },

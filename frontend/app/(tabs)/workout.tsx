@@ -14,6 +14,7 @@ import { useWorkout, workoutStats, Workout } from "@/src/anatomy/workoutStore";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { Paywall } from "@/src/premium/Paywall";
 
@@ -164,25 +165,29 @@ export default function WorkoutScreen() {
 
   return (
     <View style={styles.root}>
-      {seg === "exercises" && <AnatomyViewer mode="workout" primary={catHighlight.primary} secondary={catHighlight.secondary} />}
+      {seg === "exercises" && isPremium && <AnatomyViewer mode="workout" primary={catHighlight.primary} secondary={catHighlight.secondary} />}
 
       {/* segmented header */}
       <View style={[styles.segWrap, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
-        <View style={styles.seg}>
-          {(["session", "exercises", "insights"] as Seg[]).map((s) => (
-            <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => setSeg(s)} testID={`seg-${s}`}>
-              <Text style={[styles.segText, seg === s && styles.segTextActive]}>
-                {s === "session" ? "Session" : s === "exercises" ? "Muscle Groups" : "Insights"}
-              </Text>
-              {s === "insights" && !isPremium && <Ionicons name="lock-closed" size={11} color={T.textFaint} style={{ marginLeft: 4 }} />}
-              {s === "session" && w.session && w.session.length > 0 && <View style={styles.dot} />}
-            </TouchableOpacity>
-          ))}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={[styles.seg, { flex: 1 }]}>
+            {(["session", "exercises", "insights"] as Seg[]).map((s) => (
+              <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => setSeg(s)} testID={`seg-${s}`}>
+                <Text style={[styles.segText, seg === s && styles.segTextActive]}>
+                  {s === "session" ? "Session" : s === "exercises" ? "Muscle Groups" : "Insights"}
+                </Text>
+                {s === "insights" && !isPremium && <Ionicons name="lock-closed" size={11} color={T.textFaint} style={{ marginLeft: 4 }} />}
+                {s === "exercises" && !isPremium && <Ionicons name="lock-closed" size={11} color={T.textFaint} style={{ marginLeft: 4 }} />}
+                {s === "session" && w.session && w.session.length > 0 && <View style={styles.dot} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+          <ThemeToggle />
         </View>
       </View>
 
       {/* EXERCISES */}
-      {seg === "exercises" && (
+      {seg === "exercises" && (isPremium ? (
         <DraggableSheet peekHeight={230} maxHeight={Math.min(height * 0.82, height - insets.top - 60)} initial="collapsed">
           <View style={{ flex: 1, paddingHorizontal: 16 }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 10 }}>
@@ -236,7 +241,9 @@ export default function WorkoutScreen() {
             </ScrollView>
           </View>
         </DraggableSheet>
-      )}
+      ) : (
+        <Paywall title="Unlock Muscle Groups" headerOffset={40} showThemeToggle={false} />
+      ))}
 
       {/* SESSION */}
       {seg === "session" && (
@@ -348,7 +355,7 @@ export default function WorkoutScreen() {
       )}
 
       {/* INSIGHTS */}
-      {seg === "insights" && (isPremium ? <InsightsView /> : <Paywall title="Unlock Insights" headerOffset={40} />)}
+      {seg === "insights" && (isPremium ? <InsightsView /> : <Paywall title="Unlock Insights" headerOffset={40} showThemeToggle={false} />)}
 
       <RestTimer visible={restVisible} initial={w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />
     </View>

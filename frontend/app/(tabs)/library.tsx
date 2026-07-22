@@ -16,6 +16,9 @@ import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette, GROUP_COLORS } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { ThemeToggle } from "@/src/theme/ThemeToggle";
+import { usePremium } from "@/src/premium/PremiumContext";
+import { Paywall } from "@/src/premium/Paywall";
 import { useAuth } from "@/src/auth/AuthContext";
 import { FLAGS } from "@/src/config/featureFlags";
 
@@ -35,6 +38,7 @@ export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout, deleteAccount } = useAuth();
+  const { isPremium } = usePremium();
   const { mode } = useTheme();
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
@@ -167,9 +171,12 @@ export default function LibraryScreen() {
   return (
     <View style={styles.root}>
       <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 18 }}>
-        <Text style={styles.h1}>Library</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={styles.h1}>Library</Text>
+          <ThemeToggle />
+        </View>
         <Text style={styles.sub}>Exercises · muscle guide · learn · account</Text>
-        {(seg === "exercises" || seg === "muscles") && (
+        {(seg === "exercises" || (seg === "muscles" && isPremium)) && (
           <View style={styles.search}>
             <Ionicons name="search" size={18} color={T.textFaint} />
             <TextInput
@@ -189,22 +196,29 @@ export default function LibraryScreen() {
         )}
         {FLAGS.libraryExercises && (
           <View style={styles.libSeg}>
-            {(["exercises", "muscles", "learn", "account"] as LibSeg[]).map((s) => (
-              <TouchableOpacity key={s} style={[styles.libSegBtn, seg === s && styles.libSegActive]} onPress={() => setSeg(s)} testID={`lib-seg-${s}`}>
-                <Ionicons
-                  name={s === "muscles" ? "body-outline" : s === "exercises" ? "barbell-outline" : s === "learn" ? "school-outline" : "person-circle-outline"}
-                  size={15}
-                  color={seg === s ? T.bg : T.textDim}
-                />
-                <Text style={[styles.libSegText, seg === s && styles.libSegTextActive]}>
-                  {s === "muscles" ? "Muscles" : s === "exercises" ? "Exercises" : s === "learn" ? "Learn" : "Account"}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {(["exercises", "muscles", "learn", "account"] as LibSeg[]).map((s) => {
+              const isLocked = (s === "muscles" || s === "learn") && !isPremium;
+              return (
+                <TouchableOpacity key={s} style={[styles.libSegBtn, seg === s && styles.libSegActive]} onPress={() => setSeg(s)} testID={`lib-seg-${s}`}>
+                  <Ionicons
+                    name={s === "muscles" ? "body-outline" : s === "exercises" ? "barbell-outline" : s === "learn" ? "school-outline" : "person-circle-outline"}
+                    size={15}
+                    color={seg === s ? T.bg : T.textDim}
+                  />
+                  <Text style={[styles.libSegText, seg === s && styles.libSegTextActive]}>
+                    {s === "muscles" ? "Muscles" : s === "exercises" ? "Exercises" : s === "learn" ? "Learn" : "Account"}
+                  </Text>
+                  {isLocked && <Ionicons name="lock-closed" size={10} color={seg === s ? T.bg : T.textFaint} style={{ marginLeft: 3 }} />}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
       </View>
 
+      {(!isPremium && (seg === "muscles" || seg === "learn")) ? (
+        <Paywall title={seg === "learn" ? "Unlock Guided Lessons" : "Unlock the Muscle Library"} showThemeToggle={false} />
+      ) : (
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {seg === "muscles" && (
           <>
@@ -423,6 +437,7 @@ export default function LibraryScreen() {
           </View>
         )}
       </ScrollView>
+      )}
 
       <Modal visible={!!selected} transparent animationType="slide" onRequestClose={closeSheet}>
         <Pressable style={styles.backdrop} onPress={closeSheet} />

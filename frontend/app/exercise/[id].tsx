@@ -13,6 +13,7 @@ import { useWorkout } from "@/src/anatomy/workoutStore";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { ThemeToggle } from "@/src/theme/ThemeToggle";
 
 const label = (n: string) => getMuscleInfo(n)?.label || prettyName(n);
 
@@ -48,6 +49,7 @@ export default function ExerciseDetail() {
       <TouchableOpacity style={[styles.back, { top: insets.top + 8 }]} onPress={() => router.back()} testID="exercise-back">
         <Ionicons name="chevron-back" size={24} color={T.text} />
       </TouchableOpacity>
+      <ThemeToggle style={{ position: "absolute", right: 14, top: insets.top + 8, zIndex: 20 }} />
 
       <View style={styles.panel}>
         <View style={styles.handle} />

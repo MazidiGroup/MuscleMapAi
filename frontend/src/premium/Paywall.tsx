@@ -6,9 +6,12 @@ import { useRouter } from "expo-router";
 import { usePremium, PremiumPackage } from "./PremiumContext";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { ThemeToggle } from "@/src/theme/ThemeToggle";
 
 const PERKS: { icon: any; label: string; desc: string }[] = [
-  { icon: "school", label: "Learn", desc: "Guided anatomy lessons & quizzes" },
+  { icon: "cube", label: "3D Explore", desc: "Full interactive 3D anatomy explorer" },
+  { icon: "body", label: "Muscle Library", desc: "Muscle guide + guided anatomy lessons" },
+  { icon: "barbell", label: "Muscle Groups", desc: "3D muscle-group view in your workout" },
   { icon: "sparkles", label: "AI Coach", desc: "Personalised coaching, anytime" },
   { icon: "pulse", label: "Insights", desc: "Recovery heatmap & weekly analytics" },
 ];
@@ -61,7 +64,7 @@ function pricePerUnit(pkg: PremiumPackage): string {
   return months === 1 ? `${priceStrPerMonth} / month` : `${priceStrPerMonth} / month`;
 }
 
-export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?: string; headerOffset?: number }) {
+export function Paywall({ title = "Unlock Premium", headerOffset = 0, showThemeToggle = true }: { title?: string; headerOffset?: number; showThemeToggle?: boolean }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { mode } = useTheme();
@@ -111,6 +114,7 @@ export function Paywall({ title = "Unlock Premium", headerOffset = 0 }: { title?
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 24 + headerOffset }]}>
+      {showThemeToggle && <ThemeToggle style={{ position: "absolute", top: insets.top + 8, right: 16, zIndex: 30 }} />}
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.crown}>
           <Ionicons name="star" size={30} color={T.accent} />

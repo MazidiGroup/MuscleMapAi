@@ -56,7 +56,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="explore"
-        options={{ title: "Explore", tabBarIcon: ({ color, size }) => <TabIcon name="cube-outline" size={size} color={color} /> }}
+        options={{ title: "Explore", tabBarIcon: ({ color, size }) => <TabIcon name="cube-outline" size={size} color={color} locked={locked} /> }}
       />
       <Tabs.Screen
         name="library"

@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 import { useTheme } from "@/src/theme/ThemeContext";
+import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { S, R } from "@/src/theme/tokens"; // eslint-disable-line @typescript-eslint/no-unused-vars
 import { usePlanStore } from "./planStore";
 import type { Answers, Goal, Experience, Equipment, Region } from "./exercises";
@@ -131,6 +132,7 @@ function Shell({ step, canContinue, onContinue, onBack, autoAdvance, children }:
           ))}
         </View>
         <Text style={[styles.stepCount, { color: T.textMuted }]}>{step}/6</Text>
+        <ThemeToggle />
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.stepScroll} keyboardShouldPersistTaps="handled">
         {children}
