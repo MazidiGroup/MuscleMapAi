@@ -239,6 +239,9 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
         <TouchableOpacity
           style={[styles.headerBtn, { backgroundColor: T.card, borderColor: T.border }]}
           onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="Back to my weekly plan"
+          testID="day-back"
         >
           <Ionicons name="chevron-back" size={18} color={T.text2} />
         </TouchableOpacity>
