@@ -8,10 +8,21 @@ import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
 import { GYM_GROUPS, GYM_GROUP_ORDER, prettyName } from "@/src/anatomy/groups";
 import { MUSCLE_DATA, getMuscleInfo } from "@/src/anatomy/muscleData";
 import { LESSONS } from "@/src/anatomy/lessons";
-import { EXERCISES, Exercise } from "@/src/anatomy/exercises";
-import { DIFFICULTY_ORDER } from "@/src/anatomy/exerciseCatalog";
+import { getCatalogExercise } from "@/src/anatomy/exerciseCatalog";
+import { useWorkout } from "@/src/anatomy/workoutStore";
+import {
+  CatalogFilters,
+  activeFilterCount,
+  catalogIntegrity,
+  noMatchCopy,
+  queryCatalogue,
+  resultCountLabel,
+  searchPlaceholder,
+} from "@/src/library/catalogQuery";
+import { FilterSheet } from "@/src/library/FilterSheet";
+import { DestructiveConfirm, EmptyState } from "@/src/ui/state";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
-import { exerciseMatches, exerciseGroup, muscleAliasMatches } from "@/src/anatomy/search";
+import { muscleAliasMatches } from "@/src/anatomy/search";
 import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette, GROUP_COLORS } from "@/src/anatomy/ui";
@@ -23,16 +34,9 @@ import { useAuth } from "@/src/auth/AuthContext";
 import { FLAGS } from "@/src/config/featureFlags";
 
 type LibSeg = "exercises" | "muscles" | "learn" | "account";
-type GroupBy = "muscle" | "equipment" | "movement";
-type DifficultyFilter = "All" | "Beginner" | "Intermediate" | "Advanced";
 
-const GROUP_BY_OPTIONS: { key: GroupBy; label: string }[] = [
-  { key: "muscle", label: "By Muscle" },
-  { key: "equipment", label: "By Equipment" },
-  { key: "movement", label: "By Movement" },
-];
-
-const DIFFICULTY_FILTERS: DifficultyFilter[] = ["All", ...DIFFICULTY_ORDER];
+/** Derived from the catalogue, never hardcoded in user-facing copy. */
+const CATALOGUE_COUNT = catalogIntegrity().count;
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
@@ -42,15 +46,26 @@ export default function LibraryScreen() {
   const { mode } = useTheme();
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
+  const w = useWorkout();
   const [query, setQuery] = useState("");
   const [seg, setSeg] = useState<LibSeg>(FLAGS.libraryExercises ? "exercises" : "muscles");
-  const [groupBy, setGroupBy] = useState<GroupBy>("muscle");
-  const [difficulty, setDifficulty] = useState<DifficultyFilter>("All");
+  const [filters, setFilters] = useState<CatalogFilters>({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [signOutGuard, setSignOutGuard] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
 
+  /**
+   * Signing out while a workout is being logged needs an explicit confirmation:
+   * the session stays on this device, scoped to this profile, and is simply not
+   * visible to whoever signs in next.
+   */
   const confirmLogout = useCallback(() => {
+    if (w.session !== null) {
+      setSignOutGuard(true);
+      return;
+    }
     if (Platform.OS === "web") {
       // eslint-disable-next-line no-alert
       if (window.confirm("Log out of Muscle Map Ai?")) logout();
@@ -60,7 +75,7 @@ export default function LibraryScreen() {
       { text: "Cancel", style: "cancel" },
       { text: "Log Out", style: "destructive", onPress: () => logout() },
     ]);
-  }, [logout]);
+  }, [logout, w.session]);
 
   const runDelete = useCallback(async () => {
     const res = await deleteAccount();
@@ -139,28 +154,26 @@ export default function LibraryScreen() {
     }).filter((g) => g.items.length > 0);
   }, [query]);
 
-  const exerciseSections = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = EXERCISES.filter((e) => {
-      if (!exerciseMatches(e, q)) return false;
-      if (difficulty !== "All" && e.difficulty !== difficulty) return false;
-      return true;
-    });
-    const buckets: Record<string, Exercise[]> = {};
-    const keyOf = (e: Exercise) => (groupBy === "equipment" ? e.equipment : groupBy === "movement" ? e.movementPattern : exerciseGroup(e));
-    for (const e of filtered) {
-      const k = keyOf(e);
-      if (!buckets[k]) buckets[k] = [];
-      buckets[k].push(e);
+  // Search + filters run locally over the real catalogue: no network call is made
+  // to browse, and results are deterministic.
+  const results = useMemo(() => queryCatalogue(query, filters), [query, filters]);
+  const activeFilters = activeFilterCount(filters);
+
+  /**
+   * Recent exercises come only from this owner's verified local History. An owner
+   * with no History sees no "recent" section at all — nothing is fabricated.
+   */
+  const recentExercises = useMemo(() => {
+    const ids: string[] = [];
+    for (const workout of w.history) {
+      for (const e of workout.exercises) {
+        if ((e.idSpace ?? "anatomy") !== "anatomy") continue;
+        if (!ids.includes(e.exerciseId) && getCatalogExercise(e.exerciseId)) ids.push(e.exerciseId);
+      }
+      if (ids.length >= 6) break;
     }
-    const order = groupBy === "muscle" ? [...GYM_GROUP_ORDER, "other"].filter((k) => buckets[k]) : Object.keys(buckets).sort();
-    return order.map((k) => ({
-      key: k,
-      label: groupBy === "muscle" ? GYM_GROUPS[k]?.label || "Other" : k,
-      color: groupBy === "muscle" ? GROUP_COLORS[k] || T.accent : T.accent,
-      items: buckets[k],
-    }));
-  }, [query, groupBy, difficulty, T]);
+    return ids.slice(0, 6);
+  }, [w.history]);
 
   const open = (n: string) => setSelected(n);
   const closeSheet = () => {
@@ -201,7 +214,7 @@ export default function LibraryScreen() {
             <Ionicons name="search" size={18} color={T.textFaint} />
             <TextInput
               style={styles.searchInput}
-              placeholder={seg === "exercises" ? "Search exercises…" : "Search muscles…"}
+              placeholder={seg === "exercises" ? searchPlaceholder(CATALOGUE_COUNT) : "Search muscles…"}
               placeholderTextColor={T.textFaint}
               value={query}
               onChangeText={setQuery}
@@ -258,72 +271,109 @@ export default function LibraryScreen() {
 
         {seg === "exercises" && (
           <>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 10 }}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {DIFFICULTY_FILTERS.map((d) => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[styles.diffChip, difficulty === d && styles.diffChipActive]}
-                    onPress={() => setDifficulty(d)}
-                    testID={`lib-difficulty-${d}`}
-                  >
-                    <Text style={[styles.diffChipText, difficulty === d && styles.diffChipTextActive]}>{d}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            <View style={styles.filterRow}>
+              <TouchableOpacity
+                style={[styles.filterBtn, activeFilters > 0 && styles.filterBtnActive]}
+                onPress={() => setFiltersOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  activeFilters > 0 ? `Filters, ${activeFilters} applied` : "Filters, none applied"
+                }
+                testID="lib-filters"
+              >
+                <Ionicons name="options-outline" size={15} color={activeFilters > 0 ? T.bg : T.text} />
+                <Text style={[styles.filterBtnText, activeFilters > 0 && { color: T.bg }]}>
+                  {activeFilters > 0 ? `Filters · ${activeFilters}` : "Filters"}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.resultCount} accessibilityLiveRegion="polite" testID="lib-result-count">
+                {query.trim()
+                  ? resultCountLabel(results.length, query.trim())
+                  : `${results.length} of ${CATALOGUE_COUNT} exercises`}
+              </Text>
+            </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 14 }}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {GROUP_BY_OPTIONS.map((o) => (
-                  <TouchableOpacity
-                    key={o.key}
-                    style={[styles.gbChip, groupBy === o.key && styles.gbChipActive]}
-                    onPress={() => setGroupBy(o.key)}
-                    testID={`lib-groupby-${o.key}`}
-                  >
-                    <Text style={[styles.gbChipText, groupBy === o.key && { color: T.bg }]}>{o.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-
-            {exerciseSections.map((s) => (
-              <View key={s.key} style={{ marginBottom: 18 }}>
-                <View style={styles.groupHead}>
-                  <View style={[styles.gdot, { backgroundColor: s.color }]} />
-                  <Text style={styles.groupTitle}>{s.label}</Text>
-                  <Text style={styles.groupCount}>{s.items.length}</Text>
-                </View>
-                {s.items.map((e) => {
-                  const meta = getExerciseMeta(e.id);
-                  return (
-                    <TouchableOpacity key={e.id} style={styles.row} onPress={() => router.push(`/exercise/${e.id}`)} testID={`lib-ex-${e.id}`}>
-                      <View style={{ marginRight: 12 }}>
-                        <ExerciseAnimation
-                          exerciseId={e.id}
-                          variant="thumb"
-                          size={36}
-                          fallback={
-                            <View style={[styles.exIcon, { backgroundColor: s.color + "1A", marginRight: 0 }]}>
-                              <Ionicons name={meta.icon as any} size={18} color={s.color} />
-                            </View>
-                          }
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.rowName}>{e.name}</Text>
-                        <Text style={styles.rowFn} numberOfLines={1}>
-                          {e.difficulty} · {e.equipment} · {e.movementPattern}
-                        </Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
+            {recentExercises.length > 0 && !query.trim() && activeFilters === 0 && (
+              <View style={{ marginBottom: 16 }} testID="lib-recent">
+                <Text style={styles.groupTitle}>Recent</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                  {recentExercises.map((id) => (
+                    <TouchableOpacity
+                      key={id}
+                      style={styles.recentChip}
+                      onPress={() => router.push(`/exercise/${id}`)}
+                      testID={`lib-recent-${id}`}
+                    >
+                      <Text style={styles.recentChipText}>{getCatalogExercise(id)?.name}</Text>
                     </TouchableOpacity>
-                  );
-                })}
+                  ))}
+                </View>
               </View>
-            ))}
-            {exerciseSections.length === 0 && <Text style={styles.empty}>No exercises match “{query}”.</Text>}
+            )}
+
+            {results.length === 0 ? (
+              <View style={{ paddingVertical: 12 }} testID="lib-no-results">
+                <EmptyState
+                  icon="search-outline"
+                  title={query.trim() ? "No matches" : "No exercises match these filters"}
+                  body={query.trim() ? noMatchCopy(query.trim()) : "Remove a filter to see more of the catalogue."}
+                  primary={
+                    activeFilters > 0
+                      ? { label: "Clear all filters", onPress: () => setFilters({}), testID: "lib-clear-filters" }
+                      : undefined
+                  }
+                  secondary={
+                    query.trim()
+                      ? { label: "Clear search", onPress: () => setQuery(""), testID: "lib-clear-search" }
+                      : undefined
+                  }
+                />
+              </View>
+            ) : (
+              results.map((e) => {
+                const meta = getExerciseMeta(e.id);
+                return (
+                  <TouchableOpacity
+                    key={e.id}
+                    style={styles.row}
+                    onPress={() => router.push(`/exercise/${e.id}`)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${e.name}, ${e.equipment}, ${(e.primaryMuscles || []).join(", ")}`}
+                    testID={`lib-ex-${e.id}`}
+                  >
+                    <View style={{ marginRight: 12 }}>
+                      <ExerciseAnimation
+                        exerciseId={e.id}
+                        exerciseName={e.name}
+                        variant="thumb"
+                        size={36}
+                        fallback={
+                          <View style={[styles.exIcon, { backgroundColor: T.accent + "1A", marginRight: 0 }]}>
+                            <Ionicons name={meta.icon as any} size={18} color={T.accent} />
+                          </View>
+                        }
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowName}>{e.name}</Text>
+                      <Text style={styles.rowFn} numberOfLines={1}>
+                        {e.equipment} · {(e.primaryMuscles || []).join(", ") || e.movementPattern}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
+                  </TouchableOpacity>
+                );
+              })
+            )}
+
+            <FilterSheet
+              visible={filtersOpen}
+              filters={filters}
+              query={query}
+              onChange={setFilters}
+              onClear={() => setFilters({})}
+              onClose={() => setFiltersOpen(false)}
+            />
           </>
         )}
 
@@ -443,6 +493,20 @@ export default function LibraryScreen() {
         <Pressable style={styles.backdrop} onPress={closeSheet} />
         <View style={styles.modalBottom}>{selected && <MuscleSheet nodeName={selected} onClose={closeSheet} />}</View>
       </Modal>
+
+      <DestructiveConfirm
+        visible={signOutGuard}
+        title="Sign out with a workout in progress?"
+        body="Your logged sets stay saved on this device for this profile. They will not be visible to another profile, and signing back in brings them back. Your Plan and History are unaffected."
+        confirmLabel="Sign out"
+        cancelLabel="Keep logging"
+        onConfirm={() => {
+          setSignOutGuard(false);
+          logout();
+        }}
+        onCancel={() => setSignOutGuard(false)}
+        testID="signout-active-guard"
+      />
     </View>
   );
 }
@@ -495,6 +559,19 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   rowFn: { color: T.textFaint, fontSize: 12, marginTop: 2 },
   pill: { backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
   pillText: { color: T.text, fontSize: 13, fontWeight: "600" },
+  filterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 12 },
+  filterBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 14,
+    borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface,
+  },
+  filterBtnActive: { backgroundColor: T.accent, borderColor: T.accent },
+  filterBtnText: { color: T.text, fontSize: 13, fontWeight: "700" },
+  resultCount: { color: T.textDim, fontSize: 12.5, fontWeight: "600", flexShrink: 1, textAlign: "right" },
+  recentChip: {
+    minHeight: 44, justifyContent: "center", paddingHorizontal: 14, borderRadius: 999,
+    borderWidth: 1, borderColor: T.border, backgroundColor: T.surface,
+  },
+  recentChipText: { color: T.text, fontSize: 13, fontWeight: "600" },
   empty: { color: T.textDim, fontSize: 14, textAlign: "center", marginTop: 40 },
   about: { marginTop: 6, paddingTop: 16, borderTopWidth: 1, borderTopColor: T.border },
   aboutTitle: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },

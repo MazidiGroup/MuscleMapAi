@@ -10,11 +10,17 @@ import {
   useWorkout,
   computeRecovery,
   weeklySetsByGroup,
-  weeklyVolumeSeries,
+
   computeStreaks,
   periodStats,
   topPRs,
 } from "./workoutStore";
+import {
+  CONSISTENCY_NOTE,
+  VOLUME_CHART_TITLE,
+  performanceUnitSafe,
+  rollingVolumeSeries,
+} from "@/src/history/metrics";
 import { legacyPalette, LegacyPalette } from "./ui";
 import { FLAGS } from "@/src/config/featureFlags";
 import { useTheme } from "@/src/theme/ThemeContext";
@@ -39,7 +45,13 @@ export function InsightsView() {
   const days = period === "week" ? 7 : 30;
   const recovery = useMemo(() => computeRecovery(history), [history]);
   const activation = useMemo(() => weeklySetsByGroup(history, days), [history, days]);
-  const series = useMemo(() => weeklyVolumeSeries(history, period === "week" ? 6 : 12), [history, period]);
+  // Discrete rolling 7-day windows — deliberately NOT calendar weeks, and the
+  // exact same series feeds the chart and its table alternative.
+  const series = useMemo(
+    () => rollingVolumeSeries(history, period === "week" ? 6 : 12),
+    [history, period],
+  );
+  const [showTable, setShowTable] = useState(false);
   const stats = useMemo(() => periodStats(history, days), [history, days]);
   const streaks = useMemo(() => computeStreaks(history), [history]);
   const records = useMemo(() => topPRs(prs, 6), [prs]);
@@ -126,9 +138,10 @@ export function InsightsView() {
                     {streaks.currentWeeks} week{streaks.currentWeeks === 1 ? "" : "s"} in a row
                   </Text>
                   <Text style={styles.streakSub}>
-                    Best streak: {streaks.bestWeeks} week{streaks.bestWeeks === 1 ? "" : "s"} · {streaks.workoutsThisWeek} workout
-                    {streaks.workoutsThisWeek === 1 ? "" : "s"} this week
+                    Best: {streaks.bestWeeks} week{streaks.bestWeeks === 1 ? "" : "s"} · {streaks.workoutsThisWeek} workout
+                    {streaks.workoutsThisWeek === 1 ? "" : "s"} this Monday–Sunday week
                   </Text>
+                  <Text style={styles.streakNote}>{CONSISTENCY_NOTE}</Text>
                 </View>
               </View>
             </>
@@ -188,20 +201,62 @@ export function InsightsView() {
             </>
           )}
 
-          {/* progression chart */}
-          <Text style={styles.section}>Volume Trend</Text>
-          <View style={styles.chart}>
-            {series.map((s, i) => (
-              <View key={i} style={styles.chartCol}>
-                <Text style={styles.chartVal}>{s.volume > 0 ? Math.round(s.volume / 1000 * 10) / 10 + "k" : ""}</Text>
-                <View style={styles.chartBarTrack}>
-                  <View style={[styles.chartBar, { height: `${(s.volume / maxVol) * 100}%` }]} />
-                </View>
-                <Text style={styles.chartLabel}>{series.length > 8 && (series.length - 1 - i) % 2 !== 0 ? "" : s.label}</Text>
-              </View>
-            ))}
+          {/* Volume trend — rolling 7-day periods, with an equivalent table. */}
+          <View style={styles.chartHead}>
+            <Text style={[styles.section, { flex: 1 }]}>{VOLUME_CHART_TITLE}</Text>
+            <TouchableOpacity
+              style={styles.tableToggle}
+              onPress={() => setShowTable((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel={showTable ? "Show chart" : "Show volume as a table"}
+              testID="insights-chart-toggle"
+            >
+              <Ionicons name={showTable ? "stats-chart" : "list"} size={14} color={T.text} />
+              <Text style={styles.tableToggleText}>{showTable ? "Chart" : "Table"}</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.hint}>{`Total weight lifted (${unit}) per week over the last ${series.length} weeks.`}</Text>
+
+          <Text style={styles.hint} testID="insights-chart-summary">
+            {`Completed volume in ${unit} for the last ${series.length} rolling 7-day periods, ${series[0].rangeLabel} through ${series[series.length - 1].rangeLabel}.`}
+          </Text>
+
+          {showTable ? (
+            <View style={styles.table} testID="insights-volume-table">
+              {series.map((point) => (
+                <View key={point.startTs} style={styles.tableRow}>
+                  <Text style={styles.tableRange}>{point.rangeLabel}</Text>
+                  <Text style={styles.tableValue}>
+                    {performanceUnitSafe(point.volume, unit)}
+                    {point.workouts === 0 ? " · no workouts" : ` · ${point.workouts} workout${point.workouts === 1 ? "" : "s"}`}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View
+              style={styles.chart}
+              accessible
+              accessibilityRole="image"
+              accessibilityLabel={series
+                .map((p) => `${p.rangeLabel}: ${performanceUnitSafe(p.volume, unit)}`)
+                .join("; ")}
+              testID="insights-volume-chart"
+            >
+              {series.map((point, i) => (
+                <View key={point.startTs} style={styles.chartCol}>
+                  <Text style={styles.chartVal}>
+                    {point.volume > 0 ? Math.round((point.volume / 1000) * 10) / 10 + "k" : ""}
+                  </Text>
+                  <View style={styles.chartBarTrack}>
+                    <View style={[styles.chartBar, { height: `${(point.volume / maxVol) * 100}%` }]} />
+                  </View>
+                  <Text style={styles.chartLabel}>
+                    {series.length > 8 && (series.length - 1 - i) % 2 !== 0 ? "" : point.rangeLabel.split(" – ")[1]}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Citations — Guideline 1.4.1: sources for recovery timing & training data */}
           <TouchableOpacity
@@ -234,6 +289,17 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   streakCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,138,61,0.10)", borderWidth: 1, borderColor: "rgba(255,138,61,0.35)", borderRadius: 14, padding: 14, marginTop: 8 },
   streakIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,138,61,0.16)", alignItems: "center", justifyContent: "center" },
   streakValue: { color: T.text, fontSize: 16, fontWeight: "800" },
+  streakNote: { color: T.textFaint, fontSize: 11.5, marginTop: 2 },
+  chartHead: { flexDirection: "row", alignItems: "center", gap: 10 },
+  tableToggle: {
+    flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 12,
+    borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface,
+  },
+  tableToggleText: { color: T.text, fontSize: 12.5, fontWeight: "700" },
+  table: { borderWidth: 1, borderColor: T.border, borderRadius: 14, overflow: "hidden" },
+  tableRow: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border },
+  tableRange: { color: T.textDim, fontSize: 12, fontWeight: "700" },
+  tableValue: { color: T.text, fontSize: 14, fontWeight: "700", marginTop: 2 },
   streakSub: { color: T.textDim, fontSize: 12, marginTop: 2 },
   prRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 7 },
   prBadge: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,176,32,0.14)", alignItems: "center", justifyContent: "center" },

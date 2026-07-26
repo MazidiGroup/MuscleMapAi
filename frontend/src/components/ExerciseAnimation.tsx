@@ -1,10 +1,9 @@
 // Exercise animation player (July 2026 MP4 pack).
 //
 // Playback rules:
-//  - hero (exercise detail): **always autoplay silently on mount**, loop, still
-//    respects the parent's pause button. Exercise demonstrations are
-//    essential media, not gratuitous animation — `prefers-reduced-motion` does
-//    NOT block them (the user explicitly navigated here to see the movement).
+//  - hero (exercise detail): autoplays silently and loops, unless Reduce Motion
+//    is on — then the poster is shown with an explicit Play control, so motion
+//    never starts without the user asking for it.
 //  - thumb (library rows): static poster only, never plays.
 //  - card (best-exercise cards): poster by default, plays on tap; parent
 //    coordinates so only one card animates at a time.
@@ -16,7 +15,8 @@
 // play()/pause() control. The poster is drawn as a background layer so there
 // is never a black flash while the video buffers.
 import React, { useEffect, useMemo, useState } from "react";
-import { View, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useFocusEffect } from "expo-router";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,6 +24,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useExerciseMedia, animationUrl, posterUrl } from "@/src/anatomy/media";
 import { T } from "@/src/anatomy/ui";
 import { FLAGS } from "@/src/config/featureFlags";
+import { useReducedMotion } from "./useReducedMotion";
+import { MEDIA_UNAVAILABLE, altText, mediaKind, shouldPlay as decideShouldPlay } from "./mediaState";
 
 type Variant = "hero" | "thumb" | "card" | "workout";
 
@@ -37,14 +39,38 @@ type Props = {
   size?: number;
   /** Rendered instead when this exercise has no media (e.g. the old icon). */
   fallback?: React.ReactNode;
+  /** Real exercise name — used for meaningful alternative text. */
+  exerciseName?: string;
 };
 
 const AUTOPLAY_VARIANTS: Variant[] = ["hero", "workout"];
 
-export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, size = 40, fallback = null }: Props) {
+export function ExerciseAnimation({
+  exerciseId,
+  variant,
+  playing,
+  onTogglePlay,
+  size = 40,
+  fallback = null,
+  exerciseName,
+}: Props) {
   const media = useExerciseMedia(exerciseId);
-  const defaultPlaying = AUTOPLAY_VARIANTS.includes(variant);
+  const reducedMotion = useReducedMotion();
   const [userPlaying, setUserPlaying] = useState<boolean | null>(null); // null = variant default
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [focused, setFocused] = useState(true);
+
+  // Playback stops when the screen is no longer active, so navigating away can
+  // never leave animations running or accumulating.
+  useFocusEffect(
+    React.useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, []),
+  );
+
+  const alt = altText(exerciseName);
 
   if (!FLAGS.exerciseAnimations) return <>{fallback}</>;
   // While the manifest is being fetched we don't know yet whether this
@@ -53,20 +79,33 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
   if (!media.loaded) return <>{fallback}</>;
   if (!media.hasAnimation && !media.hasPoster) return <>{fallback}</>;
 
-  const controlledPlaying = variant === "card" ? !!playing : (userPlaying ?? defaultPlaying);
-  const shouldPlay = media.hasAnimation && controlledPlaying;
+  const kind = mediaKind(media.hasPoster, media.hasAnimation);
+  const shouldPlay = decideShouldPlay({
+    kind,
+    variantAutoplays: AUTOPLAY_VARIANTS.includes(variant),
+    reducedMotion,
+    focused,
+    failed,
+    userPlaying: variant === "card" ? !!playing : userPlaying,
+  });
 
   // ---- Thumb variant: static poster only, no video ----
   if (variant === "thumb") {
     const src = media.hasPoster ? { uri: posterUrl(exerciseId) } : null;
     if (!src) return <>{fallback}</>;
+    if (failed) {
+      // Layout dimensions are preserved so rows never jump when media fails.
+      return <View style={[styles.thumb, { width: size, height: size }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />;
+    }
     return (
       <Image
+        key={attempt}
         source={src}
         style={[styles.thumb, { width: size, height: size }]}
         contentFit="cover"
         transition={100}
-        accessibilityLabel="Exercise preview"
+        onError={() => setFailed(true)}
+        accessibilityLabel={alt}
       />
     );
   }
@@ -98,15 +137,53 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
   }
 
   // ---- Hero + Workout: large block, autoplay by default ----
-  const toggle = () => setUserPlaying((prev) => !(prev ?? defaultPlaying));
+  const toggle = () => setUserPlaying(!shouldPlay);
+
+  if (failed) {
+    return (
+      <View
+        style={[styles.large, variant === "workout" && styles.largeWorkout, styles.failed]}
+        testID={`anim-failed-${exerciseId}`}
+      >
+        <Ionicons name="cloud-offline-outline" size={22} color={T.textDim} />
+        <Text style={styles.failedText}>{MEDIA_UNAVAILABLE}</Text>
+        <TouchableOpacity
+          style={styles.retryBtn}
+          onPress={() => {
+            setFailed(false);
+            setAttempt((a) => a + 1);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Try loading the animation again"
+          testID={`anim-retry-${exerciseId}`}
+        >
+          <Text style={styles.retryText}>Try again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.large, variant === "workout" && styles.largeWorkout]} testID={`anim-${variant}-${exerciseId}`}>
       {media.hasPoster && (
-        <Image source={{ uri: posterUrl(exerciseId) }} style={StyleSheet.absoluteFill} contentFit="contain" transition={120} />
+        <Image
+          key={`poster-${attempt}`}
+          source={{ uri: posterUrl(exerciseId) }}
+          style={StyleSheet.absoluteFill}
+          contentFit="contain"
+          transition={120}
+          onError={() => !media.hasAnimation && setFailed(true)}
+          accessibilityLabel={alt}
+        />
       )}
       {media.hasAnimation && (
-        <AnimationPlayer exerciseId={exerciseId} playing={shouldPlay} contentFit="contain" />
+        <AnimationPlayer
+          key={`anim-${attempt}`}
+          exerciseId={exerciseId}
+          playing={shouldPlay}
+          contentFit="contain"
+          onError={() => setFailed(true)}
+        />
       )}
       {media.hasAnimation && (
         <View style={styles.controls} pointerEvents="box-none">
@@ -114,7 +191,8 @@ export function ExerciseAnimation({ exerciseId, variant, playing, onTogglePlay, 
             style={styles.ctrlBtn}
             onPress={toggle}
             accessibilityRole="button"
-            accessibilityLabel={shouldPlay ? "Pause" : "Play"}
+            accessibilityLabel={shouldPlay ? `Pause ${alt}` : `Play ${alt}`}
+            accessibilityState={{ selected: shouldPlay }}
             testID={`anim-toggle-${exerciseId}`}
           >
             <Ionicons name={shouldPlay ? "pause" : "play"} size={16} color={T.text} />
@@ -141,9 +219,10 @@ type PlayerProps = {
   exerciseId: string;
   playing: boolean;
   contentFit: "cover" | "contain";
+  onError?: () => void;
 };
 
-const AnimationPlayer = React.memo(function AnimationPlayer({ exerciseId, playing, contentFit }: PlayerProps) {
+const AnimationPlayer = React.memo(function AnimationPlayer({ exerciseId, playing, contentFit, onError }: PlayerProps) {
   const uri = useMemo(() => animationUrl(exerciseId), [exerciseId]);
   // Configure the player at construction so `.play()` fires as soon as the
   // media element receives the source — no waiting on a second effect tick.
@@ -183,6 +262,16 @@ const AnimationPlayer = React.memo(function AnimationPlayer({ exerciseId, playin
     };
   }, [player]);
 
+  // One subscription per player: a failed request is reported once, never retried
+  // in a loop.
+  useEffect(() => {
+    if (!player || !onError) return;
+    const sub = player.addListener("statusChange", (payload: { status: string }) => {
+      if (payload?.status === "error") onError();
+    });
+    return () => sub.remove();
+  }, [player, onError]);
+
   return (
     <VideoView
       style={StyleSheet.absoluteFill}
@@ -221,10 +310,17 @@ const styles = StyleSheet.create({
   },
   largeWorkout: { aspectRatio: 16 / 9, marginTop: 0, marginBottom: 10 },
   controls: { position: "absolute", right: 8, bottom: 8, flexDirection: "row", gap: 8 },
+  failed: { alignItems: "center", justifyContent: "center", gap: 8, padding: 16 },
+  failedText: { color: T.textDim, fontSize: 12.5, lineHeight: 18, textAlign: "center" },
+  retryBtn: {
+    minHeight: 44, justifyContent: "center", paddingHorizontal: 16, borderRadius: 999,
+    borderWidth: 1, borderColor: T.border, backgroundColor: T.surface,
+  },
+  retryText: { color: T.text, fontSize: 13, fontWeight: "700" },
   ctrlBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(7,10,15,0.72)",
     borderWidth: 1,
     borderColor: T.border,

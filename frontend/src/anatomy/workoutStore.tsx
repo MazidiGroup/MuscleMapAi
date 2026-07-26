@@ -118,6 +118,10 @@ type Ctx = {
   setUnit: (u: WeightUnit) => void;
   /** False until this owner's scope has hydrated. */
   hydrated: boolean;
+  /** True when this owner's local records could not be read at all. */
+  readFailed: boolean;
+  /** Re-attempts the owner-scoped read. Safe: reading is idempotent. */
+  retryRead: () => void;
 };
 
 export type FinishResult =
@@ -137,6 +141,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [prs, setPRs] = useState<PRs>(EMPTY_PRS);
   const [unit, setUnitState] = useState<WeightUnit>("kg");
   const [hydratedFor, setHydratedFor] = useState<string | null>(null);
+  const [readFailed, setReadFailed] = useState(false);
+  const [reloadNonce, setReloadNonce] = useState(0);
   const sessionIdRef = useRef<string | null>(null);
 
   // Owner-scoped hydration. Stale values are dropped the moment the owner
@@ -150,12 +156,25 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setStartedAt(null);
     setUnitState("kg");
     setHydratedFor(null);
+    setReadFailed(false);
     sessionIdRef.current = null;
     if (!ready || !owner) return;
 
     (async () => {
-      const snap = await hydrateWorkoutScope(store, owner);
+      let snap;
+      try {
+        snap = await hydrateWorkoutScope(store, owner);
+      } catch (e) {
+        // A local read failure is surfaced instead of looking like "no history".
+        if (!cancelled) {
+          console.error("[Workout] local read failed:", e);
+          setReadFailed(true);
+          setHydratedFor(ownerKey);
+        }
+        return;
+      }
       if (cancelled) return;
+      setReadFailed(false);
       setHistory(snap.history);
       setPRs(snap.prs);
       setRestPrefState(snap.restPref);
@@ -179,7 +198,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [ownerKey, ready, owner, store]);
+  }, [ownerKey, ready, owner, store, reloadNonce]);
 
   // Persist the active session so an interruption cannot lose it. One key per
   // owner means one active session per owner.
@@ -366,6 +385,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         unit,
         setUnit,
         hydrated: hydratedFor === ownerKey,
+        readFailed,
+        retryRead: () => {
+          setReadFailed(false);
+          setHydratedFor(null);
+          setReloadNonce((n) => n + 1);
+        },
       }}
     >
       {children}

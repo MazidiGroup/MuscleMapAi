@@ -6,7 +6,15 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { AnatomyViewer } from "@/src/anatomy/AnatomyViewer";
 import { getExercise } from "@/src/anatomy/exercises";
-import { useWorkout, getWorkoutById, workoutStats, muscleActivation } from "@/src/anatomy/workoutStore";
+import { useWorkout, getWorkoutById, muscleActivation } from "@/src/anatomy/workoutStore";
+import {
+  NOT_COMPLETED_COPY,
+  exerciseStatus,
+  incompleteCopy,
+  setProgressLabel,
+  workoutTitle,
+  workoutTotals,
+} from "@/src/history/metrics";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { ThemeToggle } from "@/src/theme/ThemeToggle";
@@ -24,7 +32,7 @@ export default function SummaryScreen() {
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
   const { id, prs } = useLocalSearchParams<{ id: string; prs?: string }>();
-  const { history } = useWorkout();
+  const { history, unit } = useWorkout();
   const workout = getWorkoutById(history, String(id));
 
   let newPRs: string[] = [];
@@ -43,7 +51,7 @@ export default function SummaryScreen() {
     );
   }
 
-  const stats = workoutStats(workout.exercises);
+  const stats = workoutTotals(workout.exercises);
   const act = muscleActivation(workout.exercises);
 
   return (
@@ -58,15 +66,21 @@ export default function SummaryScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           <View style={styles.badge}>
             <Ionicons name="checkmark-circle" size={18} color="#3DDC97" />
-            <Text style={styles.badgeText}>Workout Complete</Text>
+            <Text style={styles.badgeText}>{workoutTitle(workout)}</Text>
           </View>
 
           <View style={styles.statGrid}>
             <Stat label="Duration" value={fmt(workout.durationSec)} icon="time" styles={styles} T={T} />
             <Stat label="Exercises" value={`${workout.exercises.length}`} icon="list" styles={styles} T={T} />
-            <Stat label="Sets" value={`${stats.completed}`} icon="layers" styles={styles} T={T} />
+            <Stat
+              label="Sets completed"
+              value={setProgressLabel(stats.completedSets, stats.totalSets)}
+              icon="layers"
+              styles={styles}
+              T={T}
+            />
             <Stat label="Reps" value={`${stats.reps}`} icon="repeat" styles={styles} T={T} />
-            <Stat label="Volume" value={`${stats.volume} kg`} icon="barbell" styles={styles} T={T} />
+            <Stat label="Volume" value={`${stats.volume} ${unit}`} icon="barbell" styles={styles} T={T} />
             <Stat label="Muscles" value={`${act.list.length}`} icon="body" styles={styles} T={T} />
           </View>
 
@@ -102,12 +116,35 @@ export default function SummaryScreen() {
           <Text style={styles.section}>Exercises</Text>
           {workout.exercises.map((e) => {
             const ex = getExercise(e.exerciseId);
+            const status = exerciseStatus(e);
             const done = e.sets.filter((s) => s.done).length;
+            const icon = status === "Completed" ? "checkmark-done" : status === "Incomplete" ? "remove-circle-outline" : "ellipse-outline";
+            const tint = status === "Completed" ? T.accent : status === "Incomplete" ? "#FFB020" : T.textDim;
             return (
-              <View key={e.exerciseId} style={styles.exRow}>
-                <Ionicons name="checkmark-done" size={16} color={T.accent} />
-                <Text style={styles.exName}>{ex?.name || e.exerciseId}</Text>
-                <Text style={styles.exSets}>{done} sets</Text>
+              <View
+                key={`${e.exerciseId}-${e.idSpace ?? "anatomy"}`}
+                style={styles.exBlock}
+                accessibilityLabel={`${ex?.name || e.exerciseId}, ${status}, ${setProgressLabel(done, e.sets.length)} sets`}
+                testID={`sum-ex-${e.exerciseId}`}
+              >
+                <View style={styles.exRow}>
+                  <Ionicons name={icon as any} size={16} color={tint} />
+                  <Text style={styles.exName}>{ex?.name || e.exerciseId}</Text>
+                  <Text style={[styles.exStatus, { color: tint }]}>{status}</Text>
+                </View>
+                <Text style={styles.exSets}>{setProgressLabel(done, e.sets.length)} sets</Text>
+                {status === "Not completed" && <Text style={styles.exNote}>{NOT_COMPLETED_COPY}</Text>}
+                {status === "Incomplete" && <Text style={styles.exNote}>{incompleteCopy(e.sets.length - done)}</Text>}
+                {e.sets.length > 0 && (
+                  <View style={{ gap: 2, marginTop: 6 }}>
+                    {e.sets.map((set, i) => (
+                      <Text key={set.id} style={[styles.setLine, !set.done && { color: T.textDim }]}>
+                        {`Set ${i + 1}: ${set.weight > 0 ? `${set.weight} ${unit}` : "BW"} × ${set.reps}`}
+                        {set.done ? "" : " · not completed"}
+                      </Text>
+                    ))}
+                  </View>
+                )}
               </View>
             );
           })}
@@ -156,5 +193,9 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   exName: { color: T.text, fontSize: 15, fontWeight: "600", flex: 1 },
   exSets: { color: T.textDim, fontSize: 13 },
   doneBtn: { position: "absolute", left: 18, right: 18, backgroundColor: T.accent, borderRadius: 12, paddingVertical: 15, alignItems: "center" },
+  exBlock: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border },
+  exStatus: { fontSize: 12, fontWeight: "800" },
+  exNote: { color: T.textDim, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
+  setLine: { color: T.text, fontSize: 13, fontWeight: "600" },
   doneText: { color: T.bg, fontSize: 16, fontWeight: "800" },
 });

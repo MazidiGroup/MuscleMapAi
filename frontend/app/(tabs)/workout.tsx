@@ -8,6 +8,7 @@ import { AnatomyViewer } from "@/src/anatomy/AnatomyViewer";
 import { DraggableSheet } from "@/src/anatomy/DraggableSheet";
 import { RestTimer } from "@/src/anatomy/RestTimer";
 import { InsightsView } from "@/src/anatomy/InsightsView";
+import { HistoryView } from "@/src/history/HistoryView";
 import { EXERCISES, getExercise } from "@/src/anatomy/exercises";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { useWorkout, workoutStats, Workout } from "@/src/anatomy/workoutStore";
@@ -18,7 +19,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { EmptyState, ErrorBanner } from "@/src/ui/state";
 
-type Seg = "session" | "exercises" | "insights";
+type Seg = "session" | "history" | "insights" | "exercises";
 const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower", "Mobility"];
 
 function fmtClock(sec: number) {
@@ -114,65 +115,6 @@ export default function WorkoutScreen() {
     setFinishError("We couldn't save this workout to your device. Every set you logged is still here — try again.");
   };
 
-  // ---- History: This Week + monthly calendar (derived from existing w.history) ----
-  const nowD = new Date();
-  const calYear = nowD.getFullYear();
-  const calMonth = nowD.getMonth();
-  const calLabel = nowD.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  const calMonthShort = nowD.toLocaleDateString(undefined, { month: "short" });
-  const weekStart = startOfWeekMonday(nowD);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
-
-  const thisWeek = useMemo(() => w.history.filter((wk) => wk.date >= weekStart), [w.history, weekStart]);
-
-  const workoutDays = useMemo(() => {
-    const set = new Set<number>();
-    w.history.forEach((wk) => {
-      const d = new Date(wk.date);
-      if (d.getFullYear() === calYear && d.getMonth() === calMonth) set.add(d.getDate());
-    });
-    return set;
-  }, [w.history, calYear, calMonth]);
-
-  const calCells = useMemo(() => {
-    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-    const firstWeekday = (new Date(calYear, calMonth, 1).getDay() + 6) % 7; // Mon-based
-    return [...Array(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
-  }, [calYear, calMonth]);
-
-  const selectedDayWorkouts = useMemo(() => {
-    if (selectedDay == null) return [];
-    return w.history.filter((wk) => {
-      const d = new Date(wk.date);
-      return d.getFullYear() === calYear && d.getMonth() === calMonth && d.getDate() === selectedDay;
-    });
-  }, [selectedDay, w.history, calYear, calMonth]);
-
-  const renderHistCard = (wk: Workout) => {
-    const st = workoutStats(wk.exercises);
-    return (
-      <TouchableOpacity
-        key={wk.id}
-        style={styles.histCard}
-        onPress={() => router.push({ pathname: "/summary", params: { id: wk.id } })}
-        testID={`hist-${wk.id}`}
-      >
-        <View style={styles.histTop}>
-          <Text style={styles.histDate}>{fmtDate(wk.date)}</Text>
-          <Text style={styles.histDur}>{fmtClock(wk.durationSec)}</Text>
-        </View>
-        <Text style={styles.histEx} numberOfLines={1}>
-          {wk.exercises.map((e) => getExercise(e.exerciseId)?.name).filter(Boolean).join(" · ")}
-        </Text>
-        <View style={styles.histStats}>
-          <Text style={styles.histStat}>{wk.exercises.length} exercises</Text>
-          <Text style={styles.histStat}>{st.completed} sets</Text>
-          <Text style={styles.histStat}>{`${st.volume} ${w.unit}`}</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   return (
     <View style={styles.root}>
       {seg === "exercises" && <AnatomyViewer mode="workout" primary={catHighlight.primary} secondary={catHighlight.secondary} />}
@@ -181,10 +123,10 @@ export default function WorkoutScreen() {
       <View style={[styles.segWrap, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <View style={[styles.seg, { flex: 1 }]}>
-            {(["session", "exercises", "insights"] as Seg[]).map((s) => (
+            {(["session", "history", "insights", "exercises"] as Seg[]).map((s) => (
               <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => setSeg(s)} testID={`seg-${s}`}>
                 <Text style={[styles.segText, seg === s && styles.segTextActive]}>
-                  {s === "session" ? "Session" : s === "exercises" ? "Muscle Groups" : "Insights"}
+                  {s === "session" ? "Session" : s === "history" ? "History" : s === "insights" ? "Insights" : "Muscle Groups"}
                 </Text>
                 {s === "session" && w.session && w.session.length > 0 && <View style={styles.dot} />}
               </TouchableOpacity>
@@ -303,7 +245,7 @@ export default function WorkoutScreen() {
                         </TouchableOpacity>
                       </View>
                       {/* Form demo with play/pause + replay controls (paused poster by default) */}
-                      <ExerciseAnimation exerciseId={se.exerciseId} variant="workout" />
+                      <ExerciseAnimation exerciseId={se.exerciseId} exerciseName={ex?.name} variant="workout" />
                       <View style={styles.setHeadRow}>
                         <Text style={[styles.setHead, { width: 30 }]}>SET</Text>
                         <Text style={[styles.setHead, { flex: 1 }]}>{loadColumnLabel(w.unit, bodyweight)}</Text>
@@ -384,6 +326,8 @@ export default function WorkoutScreen() {
       )}
 
       {/* INSIGHTS */}
+      {seg === "history" && <HistoryView scrollPadding={insets.bottom + 96} />}
+
       {seg === "insights" && <InsightsView />}
 
       <RestTimer visible={restVisible} initial={w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />
