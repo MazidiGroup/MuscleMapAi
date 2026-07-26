@@ -136,7 +136,12 @@ class TestDeleteEmailVerifiedAccount:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 200, r.text
-        assert r.json() == {"ok": True, "deleted": True}
+        body = r.json()
+        assert body.get("ok") is True
+        assert body.get("deleted") is True
+        # Apple is not linked for an email account: no manual step must be asked for.
+        assert body.get("apple_revocation") == "not_applicable"
+        assert body.get("manual_revocation_required") is False
 
         # Session revoked
         me = api.get(f"{BASE_URL}/api/auth/me",
@@ -173,7 +178,10 @@ class TestDeleteReviewBypassAccount:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert d.status_code == 200, d.text
-        assert d.json() == {"ok": True, "deleted": True}
+        d_body = d.json()
+        assert d_body.get("ok") is True and d_body.get("deleted") is True
+        assert d_body.get("apple_revocation") == "not_applicable"
+        assert d_body.get("manual_revocation_required") is False
 
         # Session revoked
         me = api.get(f"{BASE_URL}/api/auth/me",

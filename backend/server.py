@@ -41,6 +41,18 @@ RESEND_FALLBACK_SENDER = 'Muscle Map Ai <onboarding@resend.dev>'
 APPLE_BUNDLE_ID = os.environ.get('APPLE_BUNDLE_ID', 'com.mazidigroup.apexai')
 APPLE_ALLOW_EXPO_GO = os.environ.get('APPLE_ALLOW_EXPO_GO', '1') == '1'
 REVENUECAT_SECRET_KEY = os.environ.get('REVENUECAT_SECRET_KEY', '')
+# Apple Sign-in token lifecycle (client secret, code exchange, revocation).
+# Server-only configuration; no value is ever logged or returned to the app.
+from apple_tokens import (  # noqa: E402
+    apple_config_status,
+    apple_token_flow_configured,
+    decrypt_token,
+    encrypt_token,
+    exchange_authorization_code,
+    revocation_guidance_needed,
+    revoke_refresh_token,
+    token_encryption_available,
+)
 # Phase 4: the ONE designated RevenueCat entitlement identifier. This is the
 # existing entitlement name — it is only interpreted here, never created or
 # renamed by this code. The client applies the identical rule.
@@ -261,12 +273,66 @@ async def logout(authorization: Optional[str] = Header(None)):
     return {"ok": True}
 
 
+async def _store_apple_refresh_token(user_id: str, apple_sub: Optional[str], refresh_token: str) -> str:
+    """Store (encrypted) the Apple refresh token for exactly this account.
+
+    Replaces any previous token for the account. Returns a non-sensitive status.
+    """
+    if not refresh_token:
+        return "no_token"
+    if not token_encryption_available():
+        # Fail closed: a refresh token is never written in plaintext.
+        logger.warning("apple refresh token discarded: encryption key not configured")
+        return "encryption_not_configured"
+    try:
+        sealed = encrypt_token(refresh_token)
+    except Exception:
+        logger.warning("apple refresh token encryption failed")
+        return "encryption_failed"
+    await db.apple_tokens.replace_one(
+        {"user_id": user_id},
+        {
+            "user_id": user_id,
+            "apple_sub": apple_sub,
+            "refresh_token_enc": sealed,
+            "updated_at": datetime.now(timezone.utc),
+        },
+        upsert=True,
+    )
+    return "stored"
+
+
+async def _revoke_apple_for_account(user_id: str, apple_sub: Optional[str]) -> str:
+    """Revoke Apple access for exactly this account. Returns a non-sensitive status."""
+    record = await db.apple_tokens.find_one({"user_id": user_id}, {"_id": 0})
+    if not record:
+        return "no_token"
+    # Never revoke a token recorded against a different Apple subject.
+    if apple_sub and record.get("apple_sub") and record["apple_sub"] != apple_sub:
+        logger.warning("apple revocation skipped: subject mismatch for this account")
+        return "subject_mismatch"
+    raw = decrypt_token(record.get("refresh_token_enc") or "")
+    if not raw:
+        return "no_token"
+    return await revoke_refresh_token(raw, APPLE_BUNDLE_ID)
+
+
 @api_router.delete("/auth/me")
 async def delete_account(user=Depends(get_current_user)):
     """Permanently deletes the current user's account and all associated data.
     Required by Apple App Store Guideline 5.1.1(v). This is not reversible."""
     user_id = user["user_id"]
     email = user.get("email")
+
+    # Guideline 5.1.1(v): attempt Apple token revocation for THIS account before the
+    # data goes, then delete regardless of the outcome. Never blocks deletion.
+    apple_revocation = "not_applicable"
+    if user.get("apple_sub") or await db.apple_tokens.find_one({"user_id": user_id}, {"_id": 1}):
+        try:
+            apple_revocation = await _revoke_apple_for_account(user_id, user.get("apple_sub"))
+        except Exception:
+            logger.warning("apple revocation raised; continuing with deletion")
+            apple_revocation = "temporary_failure"
 
     # Delete every collection tied to this user. Missing collections are ignored.
     ops = [
@@ -279,6 +345,8 @@ async def delete_account(user=Depends(get_current_user)):
         db.workout_sessions.delete_many({"user_id": user_id}),
         db.workout_logs.delete_many({"user_id": user_id}),
         db.status_checks.delete_many({"user_id": user_id}),
+        # Token material is removed whatever the revocation outcome was.
+        db.apple_tokens.delete_many({"user_id": user_id}),
     ]
     if email:
         # Also purge any pending magic-link codes tied to this email so a fresh
@@ -288,8 +356,15 @@ async def delete_account(user=Depends(get_current_user)):
         await asyncio.gather(*ops, return_exceptions=True)
     except Exception as e:
         logger.warning(f"account deletion partial failure for {user_id}: {e}")
-    logger.info(f"account deleted: user_id={user_id} email={email}")
-    return {"ok": True, "deleted": True}
+    logger.info(f"account deleted: user_id={user_id} apple_revocation={apple_revocation}")
+    return {
+        "ok": True,
+        "deleted": True,
+        # Honest status: only "revoked"/"already_invalid" mean Apple access is gone.
+        "apple_revocation": apple_revocation,
+        "manual_revocation_required": apple_revocation != "not_applicable"
+        and revocation_guidance_needed(apple_revocation),
+    }
 
 
 # NOTE: The unverified /auth/email/login and /auth/demo/login endpoints were removed
@@ -421,6 +496,9 @@ _apple_jwks = PyJWKClient("https://appleid.apple.com/auth/keys")
 class AppleSessionRequest(BaseModel):
     identity_token: str
     full_name: Optional[str] = None
+    # One-time Apple authorisation code. Required to obtain the refresh token that
+    # Guideline 5.1.1(v) revocation depends on. Absence is an explicit state.
+    authorization_code: Optional[str] = None
 
 
 def _verify_apple_token(identity_token: str) -> Dict[str, Any]:
@@ -461,8 +539,28 @@ async def apple_session(payload: AppleSessionRequest):
         email = existing["email"]
 
     user = await _upsert_user(email, name=(payload.full_name or None), provider="apple", apple_sub=apple_sub)
-    token = await _new_session(user["user_id"])
-    return {"session_token": token, "user": _user_out(user)}
+
+    # Exchange the one-time authorisation code so this account can later be revoked
+    # with Apple on deletion. Never blocks sign-in, never returns token material.
+    token_out = await _new_session(user["user_id"])
+    apple_link = "no_code"
+    if payload.authorization_code:
+        result = await exchange_authorization_code(payload.authorization_code, APPLE_BUNDLE_ID)
+        apple_link = result["status"]
+        code_sub = result.get("sub")
+        if result["ok"] and code_sub and apple_sub and code_sub != apple_sub:
+            # The code must belong to the same Apple subject as the identity token.
+            logger.warning("apple authorization code subject mismatch; discarding")
+            apple_link = "subject_mismatch"
+        elif result["ok"]:
+            await _store_apple_refresh_token(user["user_id"], apple_sub, result["refresh_token"])
+            apple_link = "linked"
+    return {
+        "session_token": token_out,
+        "user": _user_out(user),
+        # Non-sensitive status only, so the client can reason about revocation later.
+        "apple_link": apple_link,
+    }
 
 
 # ------------------ Email Magic Link (Resend) ------------------
@@ -2133,6 +2231,7 @@ async def startup():
         await db.workouts.create_index([("user_id", 1), ("completed_at", -1)])
         await db.coach_messages.create_index([("user_id", 1), ("created_at", 1)])
         await db.subscriptions.create_index("user_id")
+        await db.apple_tokens.create_index("user_id", unique=True)
         await db.daily_insights.create_index([("user_id", 1), ("date", 1)], unique=True)
         logger.info("Indexes created")
     except Exception as e:

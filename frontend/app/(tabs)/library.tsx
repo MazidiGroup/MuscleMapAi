@@ -31,7 +31,7 @@ import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { PremiumGate } from "@/src/premium/PremiumGate";
 import { gate } from "@/src/premium/entitlement";
-import { useAuth } from "@/src/auth/AuthContext";
+import { MANUAL_APPLE_REVOCATION_COPY, useAuth } from "@/src/auth/AuthContext";
 import { FLAGS } from "@/src/config/featureFlags";
 
 type LibSeg = "exercises" | "muscles" | "learn" | "account";
@@ -92,10 +92,16 @@ export default function LibraryScreen() {
     const res = await deleteAccount();
     if (res.ok) {
       // On success AuthProvider has already cleared session; the root layout
-      // will redirect to /login. Give the user a small confirmation on web.
+      // will redirect to /login. Only when automatic Apple revocation could not be
+      // verified do we show the manual-revocation guidance — never otherwise.
+      const message = res.manualAppleRevocation
+        ? MANUAL_APPLE_REVOCATION_COPY
+        : "Your account has been deleted.";
       if (Platform.OS === "web") {
         // eslint-disable-next-line no-alert
-        window.alert("Your account has been deleted.");
+        window.alert(message);
+      } else if (res.manualAppleRevocation) {
+        Alert.alert("Account deleted", MANUAL_APPLE_REVOCATION_COPY);
       }
     } else {
       const msg = res.error || "Couldn't delete your account. Please try again.";

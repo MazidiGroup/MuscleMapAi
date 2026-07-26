@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 import os
 import pytest
 import requests
@@ -5,6 +7,21 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "asyncio: run this coroutine test with asyncio.run")
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_pyfunc_call(pyfuncitem):
+    """Run `async def` tests without adding a test-only dependency to the release
+    requirements. Each coroutine test gets its own event loop."""
+    if inspect.iscoroutinefunction(pyfuncitem.obj):
+        kwargs = {name: pyfuncitem.funcargs[name] for name in pyfuncitem._fixtureinfo.argnames}
+        asyncio.run(pyfuncitem.obj(**kwargs))
+        return True
+    return None
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://anatomy-coach-1.preview.emergentagent.com").rstrip("/")
 

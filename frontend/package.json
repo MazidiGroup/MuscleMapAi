@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "scripts": {
     "preinstall": "./scripts/cmd-guard.js --preinstall",
+    "eas-build-pre-install": "node ./scripts/verify-release-source.mjs --eas-pre-install && ./scripts/cmd-guard.js --preinstall",
+    "verify:release-source": "node ./scripts/verify-release-source.mjs",
+    "release:manifest": "node ./scripts/generate-release-manifest.mjs",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",

@@ -28,7 +28,22 @@ export type AuthUser = {
   [key: string]: any;
 };
 
-export type AuthResult = { ok: boolean; cancelled?: boolean; error?: string };
+export type AuthResult = {
+  ok: boolean;
+  cancelled?: boolean;
+  error?: string;
+  /**
+   * Set after an account deletion when Apple access could NOT be verified as
+   * revoked (legacy account with no stored token, or a temporary Apple failure).
+   * The UI then tells the user how to revoke access themselves. It is never set
+   * when revocation was confirmed, and it carries no technical detail.
+   */
+  manualAppleRevocation?: boolean;
+};
+
+/** Neutral guidance shown only when automatic Apple revocation was not verified. */
+export const MANUAL_APPLE_REVOCATION_COPY =
+  "Your account and data have been deleted. To also remove this app from Sign in with Apple, open Settings, tap your name, then Sign-In & Security, Sign in with Apple, and stop using Apple ID for Muscle Map Ai.";
 
 type AuthCtx = {
   user: AuthUser | null;
@@ -248,10 +263,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .filter(Boolean)
         .join(" ")
         .trim();
-      const res = await apiPost<{ session_token: string; user: AuthUser }>("/auth/apple/session", {
-        identity_token: credential.identityToken,
-        full_name: fullName || null,
-      });
+      // The one-time authorisation code lets the server obtain the refresh token
+      // needed to revoke Apple access when the account is deleted (5.1.1(v)).
+      // It is sent straight to our HTTPS endpoint and never stored or logged here;
+      // an absent code is reported explicitly rather than fabricated.
+      const res = await apiPost<{ session_token: string; user: AuthUser; apple_link?: string }>(
+        "/auth/apple/session",
+        {
+          identity_token: credential.identityToken,
+          full_name: fullName || null,
+          authorization_code: credential.authorizationCode ?? null,
+        },
+      );
       await establishSession(res.session_token);
       return { ok: true };
     } catch (e: any) {
@@ -337,8 +360,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteAccount = useCallback(async (): Promise<AuthResult> => {
+    let manualAppleRevocation = false;
     try {
-      await apiDelete("/auth/me");
+      const res = await apiDelete<{ manual_revocation_required?: boolean }>("/auth/me");
+      // Honest status only: never claim Apple access was revoked when it was not.
+      manualAppleRevocation = res?.manual_revocation_required === true;
     } catch (e: any) {
       console.warn("[auth] delete account failed", e);
       return { ok: false, error: "Couldn't delete your account. Please check your connection and try again." };
@@ -358,7 +384,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     setUser(null);
-    return { ok: true };
+    return { ok: true, manualAppleRevocation };
   }, []);
 
   return (

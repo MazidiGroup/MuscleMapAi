@@ -114,7 +114,15 @@ for (const rel of JS_PASSTHROUGH) {
   fs.copyFileSync(path.join(root, rel), dest);
 }
 
-const res = spawnSync(process.execPath, ["--test", path.join(out, "__tests__")], {
+// The release-source gate is an ESM script that must run with Node built-ins only
+// (EAS pre-install phase), so its tests are plain .mjs run from the repo itself.
+const esmTests = fs
+  .readdirSync(path.join(root, "__tests__"))
+  .filter((f) => f.endsWith(".test.mjs"))
+  .sort()
+  .map((f) => path.join(root, "__tests__", f));
+
+const res = spawnSync(process.execPath, ["--test", path.join(out, "__tests__"), ...esmTests], {
   cwd: root,
   stdio: "inherit",
   env: {

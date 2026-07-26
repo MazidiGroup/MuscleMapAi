@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { WorkoutProvider } from "@/src/anatomy/workoutStore";
 import { PremiumProvider } from "@/src/premium/PremiumContext";
+import { RootErrorBoundary } from "@/src/ui/RootErrorBoundary";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
 import { OwnerProvider, useOwner } from "@/src/owner/OwnerContext";
 import { ScopeBridge } from "@/src/owner/ScopeBridge";
@@ -106,17 +107,20 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#070A0F" }}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <OwnerProvider>
-            <WorkoutProvider>
-              <PremiumProvider>
-                <ThemeProvider>
-                  <ThemedStack />
-                </ThemeProvider>
-              </PremiumProvider>
-            </WorkoutProvider>
-          </OwnerProvider>
-        </AuthProvider>
+        {/* A render failure anywhere below must never leave a blank screen. */}
+        <RootErrorBoundary>
+          <AuthProvider>
+            <OwnerProvider>
+              <WorkoutProvider>
+                <PremiumProvider>
+                  <ThemeProvider>
+                    <ThemedStack />
+                  </ThemeProvider>
+                </PremiumProvider>
+              </WorkoutProvider>
+            </OwnerProvider>
+          </AuthProvider>
+        </RootErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
