@@ -9,6 +9,7 @@ import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { WorkoutProvider } from "@/src/anatomy/workoutStore";
 import { PremiumProvider } from "@/src/premium/PremiumContext";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
+import { OwnerProvider, useOwner } from "@/src/owner/OwnerContext";
 import { ThemeProvider, useTheme } from "@/src/theme/ThemeContext";
 import { LoadingScreen } from "@/src/theme/LoadingScreen";
 
@@ -63,12 +64,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Blocks rendering until the central owner resolver has settled. This is what
+ * guarantees no owner-scoped read happens before resolution and that an account
+ * switch never shows a frame of the previous owner's content.
+ */
+function OwnerGate({ children }: { children: React.ReactNode }) {
+  const { ready } = useOwner();
+  if (!ready) return <LoadingScreen />;
+  return <>{children}</>;
+}
+
 function ThemedStack() {
   const { T, mode } = useTheme();
   return (
     <>
       <StatusBar barStyle={mode === "night" ? "light-content" : "dark-content"} />
       <AuthGate>
+        <OwnerGate>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -76,6 +89,7 @@ function ThemedStack() {
             animation: "fade",
           }}
         />
+        </OwnerGate>
       </AuthGate>
     </>
   );
@@ -90,13 +104,15 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#070A0F" }}>
       <SafeAreaProvider>
         <AuthProvider>
-          <WorkoutProvider>
-            <PremiumProvider>
-              <ThemeProvider>
-                <ThemedStack />
-              </ThemeProvider>
-            </PremiumProvider>
-          </WorkoutProvider>
+          <OwnerProvider>
+            <WorkoutProvider>
+              <PremiumProvider>
+                <ThemeProvider>
+                  <ThemedStack />
+                </ThemeProvider>
+              </PremiumProvider>
+            </WorkoutProvider>
+          </OwnerProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
