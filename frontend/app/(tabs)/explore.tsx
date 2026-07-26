@@ -11,15 +11,21 @@ import { EXPLORER } from "@/src/anatomy/groups";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { ThemeToggle } from "@/src/theme/ThemeToggle";
-import { usePremium } from "@/src/premium/PremiumContext";
-import { Paywall } from "@/src/premium/Paywall";
+import { PremiumGate } from "@/src/premium/PremiumGate";
 
 export default function ExploreScreen() {
+  return (
+    <PremiumGate surface="explore">
+      <ExploreContent />
+    </PremiumGate>
+  );
+}
+
+function ExploreContent() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { height } = useWindowDimensions();
   const { mode } = useTheme();
-  const { isPremium } = usePremium();
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
   const viewer = useRef<ViewerHandle>(null);
@@ -52,14 +58,6 @@ export default function ExploreScreen() {
     setSelected(null);
     viewer.current?.resetView();
   };
-
-  if (!isPremium) {
-    return (
-      <View style={{ flex: 1, backgroundColor: T.bg }}>
-        <Paywall title="Unlock 3D Explore" />
-      </View>
-    );
-  }
 
   return (
     <View style={styles.root}>

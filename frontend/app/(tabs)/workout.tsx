@@ -11,7 +11,7 @@ import { InsightsView } from "@/src/anatomy/InsightsView";
 import { HistoryView } from "@/src/history/HistoryView";
 import { EXERCISES, getExercise } from "@/src/anatomy/exercises";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
-import { useWorkout, workoutStats, Workout } from "@/src/anatomy/workoutStore";
+import { useWorkout, workoutStats } from "@/src/anatomy/workoutStore";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { formatSetLoad, isBodyweightEquipment, loadColumnLabel, loadPlaceholder } from "@/src/anatomy/bodyweight";
@@ -21,23 +21,6 @@ import { EmptyState, ErrorBanner } from "@/src/ui/state";
 
 type Seg = "session" | "history" | "insights" | "exercises";
 const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower", "Mobility"];
-
-function fmtClock(sec: number) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-function fmtDate(ts: number) {
-  return new Date(ts).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-}
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-function startOfWeekMonday(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  const day = (x.getDay() + 6) % 7; // 0 = Monday
-  x.setDate(x.getDate() - day);
-  return x.getTime();
-}
 
 export default function WorkoutScreen() {
   const insets = useSafeAreaInsets();
@@ -92,7 +75,6 @@ export default function WorkoutScreen() {
   }, [list]);
 
   const stats = w.session ? workoutStats(w.session) : { sets: 0, completed: 0, reps: 0, volume: 0 };
-  const durationSec = w.startedAt ? Math.round((now - w.startedAt) / 1000) : 0;
 
   const onToggleDone = (exId: string, setId: string, willBeDone: boolean) => {
     w.toggleDone(exId, setId);
@@ -120,7 +102,7 @@ export default function WorkoutScreen() {
       {seg === "exercises" && <AnatomyViewer mode="workout" primary={catHighlight.primary} secondary={catHighlight.secondary} />}
 
       {/* segmented header */}
-      <View style={[styles.segWrap, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+      <View style={[styles.segWrap, { paddingTop: insets.top + 8, pointerEvents: "box-none" }]}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <View style={[styles.seg, { flex: 1 }]}>
             {(["session", "history", "insights", "exercises"] as Seg[]).map((s) => (

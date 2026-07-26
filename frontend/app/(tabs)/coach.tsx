@@ -20,8 +20,7 @@ import { ThinkingDots } from "@/src/components/ThinkingDots";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { ThemeToggle } from "@/src/theme/ThemeToggle";
-import { usePremium } from "@/src/premium/PremiumContext";
-import { Paywall } from "@/src/premium/Paywall";
+import { PremiumGate } from "@/src/premium/PremiumGate";
 import { FLAGS } from "@/src/config/featureFlags";
 
 const DEFAULT_SUGGESTIONS = [
@@ -79,9 +78,11 @@ function renderMessageWithLinks(text: string, baseStyle: any, linkStyle: any) {
 }
 
 export default function CoachScreen() {
-  const { isPremium } = usePremium();
-  if (!isPremium) return <Paywall title="Unlock AI Coach" />;
-  return <CoachContent />;
+  return (
+    <PremiumGate surface="coach">
+      <CoachContent />
+    </PremiumGate>
+  );
 }
 
 function CoachContent() {

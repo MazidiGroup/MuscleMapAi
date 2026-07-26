@@ -186,7 +186,7 @@ export function ExerciseAnimation({
         />
       )}
       {media.hasAnimation && (
-        <View style={styles.controls} pointerEvents="box-none">
+        <View style={[styles.controls, { pointerEvents: "box-none" }]}>
           <TouchableOpacity
             style={styles.ctrlBtn}
             onPress={toggle}

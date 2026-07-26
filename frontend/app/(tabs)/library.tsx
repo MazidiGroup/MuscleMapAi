@@ -29,11 +29,19 @@ import { legacyPalette, LegacyPalette, GROUP_COLORS } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { usePremium } from "@/src/premium/PremiumContext";
-import { Paywall } from "@/src/premium/Paywall";
+import { PremiumGate } from "@/src/premium/PremiumGate";
+import { gate } from "@/src/premium/entitlement";
 import { useAuth } from "@/src/auth/AuthContext";
 import { FLAGS } from "@/src/config/featureFlags";
 
 type LibSeg = "exercises" | "muscles" | "learn" | "account";
+
+const SEG_LABELS: Record<LibSeg, string> = {
+  exercises: "Exercises",
+  muscles: "Muscles",
+  learn: "Learn",
+  account: "Account",
+};
 
 /** Derived from the catalogue, never hardcoded in user-facing copy. */
 const CATALOGUE_COUNT = catalogIntegrity().count;
@@ -42,7 +50,10 @@ export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout, deleteAccount } = useAuth();
-  const { isPremium } = usePremium();
+  const { resolution } = usePremium();
+  // One gating contract — the Library never re-derives entitlement rules.
+  const musclesDecision = gate("library.muscles", resolution);
+  const learnDecision = gate("library.learn", resolution);
   const { mode } = useTheme();
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
@@ -192,24 +203,31 @@ export default function LibraryScreen() {
         {FLAGS.libraryExercises && (
           <View style={styles.libSeg}>
             {(["exercises", "muscles", "learn", "account"] as LibSeg[]).map((s) => {
-              const isLocked = (s === "muscles" || s === "learn") && !isPremium;
+              const isLocked =
+                (s === "muscles" && musclesDecision !== "allow") || (s === "learn" && learnDecision !== "allow");
               return (
-                <TouchableOpacity key={s} style={[styles.libSegBtn, seg === s && styles.libSegActive]} onPress={() => setSeg(s)} testID={`lib-seg-${s}`}>
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.libSegBtn, seg === s && styles.libSegActive]}
+                  onPress={() => setSeg(s)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: seg === s }}
+                  accessibilityLabel={isLocked ? `${SEG_LABELS[s]}, Premium` : SEG_LABELS[s]}
+                  testID={`lib-seg-${s}`}
+                >
                   <Ionicons
                     name={s === "muscles" ? "body-outline" : s === "exercises" ? "barbell-outline" : s === "learn" ? "school-outline" : "person-circle-outline"}
                     size={15}
                     color={seg === s ? T.bg : T.textDim}
                   />
-                  <Text style={[styles.libSegText, seg === s && styles.libSegTextActive]}>
-                    {s === "muscles" ? "Muscles" : s === "exercises" ? "Exercises" : s === "learn" ? "Learn" : "Account"}
-                  </Text>
+                  <Text style={[styles.libSegText, seg === s && styles.libSegTextActive]}>{SEG_LABELS[s]}</Text>
                   {isLocked && <Ionicons name="lock-closed" size={10} color={seg === s ? T.bg : T.textFaint} style={{ marginLeft: 3 }} />}
                 </TouchableOpacity>
               );
             })}
           </View>
         )}
-        {(seg === "exercises" || (seg === "muscles" && isPremium)) && (
+        {(seg === "exercises" || (seg === "muscles" && musclesDecision === "allow")) && (
           <View style={styles.search}>
             <Ionicons name="search" size={18} color={T.textFaint} />
             <TextInput
@@ -229,8 +247,10 @@ export default function LibraryScreen() {
         )}
       </View>
 
-      {(!isPremium && (seg === "muscles" || seg === "learn")) ? (
-        <Paywall title={seg === "learn" ? "Unlock Guided Lessons" : "Unlock the Muscle Library"} showThemeToggle={false} />
+      {((seg === "muscles" && musclesDecision !== "allow") || (seg === "learn" && learnDecision !== "allow")) ? (
+        <PremiumGate surface={seg === "learn" ? "library.learn" : "library.muscles"} showThemeToggle={false}>
+          <View />
+        </PremiumGate>
       ) : (
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {seg === "muscles" && (

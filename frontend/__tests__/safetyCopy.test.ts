@@ -186,8 +186,13 @@ test("no Premium lock is attached to an individual exercise row", () => {
   const exercisesSection = library.slice(start, end);
   assert.ok(start > 0 && exercisesSection.length > 0);
   assert.ok(!/isPremium|Paywall|lock-closed/i.test(exercisesSection), "the Exercises section is entirely free");
-  // The premium sections gate themselves, and only themselves.
-  assert.ok(/\(!isPremium && \(seg === "muscles" \|\| seg === "learn"\)\)/.test(library));
+  // Phase 4: the premium sections gate themselves through the single gating
+  // contract (src/premium/entitlement.ts), and only themselves.
+  assert.ok(/gate\("library\.muscles", resolution\)/.test(library));
+  assert.ok(/gate\("library\.learn", resolution\)/.test(library));
+  assert.ok(
+    /\(seg === "muscles" && musclesDecision !== "allow"\) \|\| \(seg === "learn" && learnDecision !== "allow"\)/.test(library),
+  );
 });
 
 test("no RevenueCat, EAS, version or identifier change was introduced by Phase 3", () => {

@@ -41,6 +41,12 @@ RESEND_FALLBACK_SENDER = 'Muscle Map Ai <onboarding@resend.dev>'
 APPLE_BUNDLE_ID = os.environ.get('APPLE_BUNDLE_ID', 'com.mazidigroup.apexai')
 APPLE_ALLOW_EXPO_GO = os.environ.get('APPLE_ALLOW_EXPO_GO', '1') == '1'
 REVENUECAT_SECRET_KEY = os.environ.get('REVENUECAT_SECRET_KEY', '')
+# Phase 4: the ONE designated RevenueCat entitlement identifier. This is the
+# existing entitlement name — it is only interpreted here, never created or
+# renamed by this code. The client applies the identical rule.
+PREMIUM_ENTITLEMENT_ID = "premium"
+# Premium precedence, highest first. Mirrors frontend src/premium/entitlement.ts.
+PREMIUM_SOURCE_PRECEDENCE = ["review_bypass", "manual_grant", "revenuecat"]
 # App Store review bypass — ONLY the exact reserved reviewer email (env-gated) skips
 # Resend and accepts a fixed static code, and is granted premium directly. Empty = disabled.
 REVIEW_BYPASS_EMAIL = os.environ.get('APPLE_REVIEW_BYPASS_EMAIL', '').strip().lower()
@@ -230,8 +236,18 @@ async def create_google_session(payload: GoogleSessionRequest):
 async def me(user=Depends(get_current_user)):
     user["created_at"] = user["created_at"].isoformat() if isinstance(user.get("created_at"), datetime) else user.get("created_at")
     user["last_login"] = user["last_login"].isoformat() if isinstance(user.get("last_login"), datetime) else user.get("last_login")
-    sub = await db.subscriptions.find_one({"user_id": user["user_id"], "status": "active"}, {"_id": 0})
+    subs = await db.subscriptions.find({"user_id": user["user_id"], "status": "active"}, {"_id": 0}).to_list(20)
+    # Phase 4: report WHICH grant applies, using the shared precedence, so the
+    # client resolver and the server agree on both access and its source.
+    sub = None
+    for source in PREMIUM_SOURCE_PRECEDENCE:
+        sub = next((s for s in subs if s.get("source") == source), None)
+        if sub:
+            break
+    if sub is None and subs:
+        sub = subs[0]
     user["is_premium"] = sub is not None
+    user["premium_source"] = sub.get("source") if sub else None
     user["subscription_tier"] = sub.get("tier") if sub else None
     user["subscription_interval"] = sub.get("interval") if sub else None
     return user
@@ -679,11 +695,13 @@ async def _validate_revenuecat_entitlement(app_user_id: str) -> Dict[str, Any]:
             logger.warning(f"revenuecat lookup {app_user_id} -> {r.status_code}")
             return {"active": False, "product_id": None, "expires_at": None}
         data = r.json()
-        # Name-agnostic: accept ANY active entitlement (single-tier app). This avoids
-        # silent lockout if the RevenueCat dashboard entitlement isn't named "premium".
+        # Phase 4: EXACT designated entitlement only. An unrelated active
+        # entitlement must never grant Premium, and the client applies the same
+        # rule (see frontend src/premium/entitlement.ts).
         ents = (data.get("subscriber", {}).get("entitlements", {}) or {})
-        now_utc = datetime.now(timezone.utc)
-        for ent in ents.values():
+        ent = ents.get(PREMIUM_ENTITLEMENT_ID)
+        if ent:
+            now_utc = datetime.now(timezone.utc)
             expires = ent.get("expires_date")  # ISO8601 or null (null = lifetime)
             active = True
             if expires:

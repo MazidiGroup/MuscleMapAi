@@ -275,7 +275,7 @@ function StorageDialog({ visible, onClose }: { visible: boolean; onClose: () => 
         accessibilityRole="button"
         accessibilityLabel="Close"
       />
-      <View style={styles.dialogWrap} pointerEvents="box-none">
+      <View style={[styles.dialogWrap, { pointerEvents: "box-none" }]}>
         <View
           style={[styles.card, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.xl, gap: t.space.md }]}
           accessibilityViewIsModal

@@ -5,6 +5,7 @@ import * as WebBrowser from "expo-web-browser";
 
 import { apiGet, apiPost, apiDelete, setToken, getToken, clearToken } from "@/src/api";
 import { runOwnerTeardown } from "@/src/owner/teardown";
+import { PREMIUM_ENTITLEMENT_ID, hasDesignatedEntitlement } from "@/src/premium/entitlement";
 
 /**
  * App-wide authentication.
@@ -21,6 +22,8 @@ export type AuthUser = {
   name: string;
   picture?: string;
   is_premium?: boolean;
+  /** Which grant the server applied: "review_bypass" | "manual_grant" | "revenuecat". */
+  premium_source?: string | null;
   is_guest?: boolean;
   [key: string]: any;
 };
@@ -68,9 +71,11 @@ async function syncPurchases(userId: string) {
   if (Platform.OS !== "ios" || !Purchases) return;
   try {
     const { customerInfo } = await Purchases.logIn(userId);
-    const ent = customerInfo?.entitlements?.active?.premium;
+    // The shared contract decides what counts as Premium (exact entitlement only).
+    const active = hasDesignatedEntitlement(customerInfo);
+    const ent = customerInfo?.entitlements?.active?.[PREMIUM_ENTITLEMENT_ID];
     await apiPost("/billing/revenuecat/sync", {
-      is_premium: !!ent,
+      is_premium: active,
       product_id: ent?.productIdentifier ?? null,
       expires_at: ent?.expirationDate ?? null,
     });

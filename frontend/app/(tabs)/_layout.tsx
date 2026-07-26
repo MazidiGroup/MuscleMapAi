@@ -4,6 +4,7 @@ import { Platform, View, StyleSheet } from "react-native";
 
 import { T } from "@/src/anatomy/ui";
 import { usePremium } from "@/src/premium/PremiumContext";
+import { gate } from "@/src/premium/entitlement";
 import { useTheme } from "@/src/theme/ThemeContext";
 
 function TabIcon({ name, color, size, locked }: { name: any; color: string; size: number; locked?: boolean }) {
@@ -20,8 +21,10 @@ function TabIcon({ name, color, size, locked }: { name: any; color: string; size
 }
 
 export default function TabsLayout() {
-  const { isPremium } = usePremium();
-  const locked = !isPremium;
+  const { resolution } = usePremium();
+  // One gating contract decides the lock affordance too.
+  const coachLocked = gate("coach", resolution) !== "allow";
+  const exploreLocked = gate("explore", resolution) !== "allow";
   const { T: theme } = useTheme();
 
   return (
@@ -52,11 +55,20 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="coach"
-        options={{ title: "Coach", tabBarIcon: ({ color, size }) => <TabIcon name="sparkles-outline" size={size} color={color} locked={locked} /> }}
+        options={{
+          title: "Coach",
+          // The lock is never icon-only: the accessible name says "Premium".
+          tabBarAccessibilityLabel: coachLocked ? "Coach, Premium" : "Coach",
+          tabBarIcon: ({ color, size }) => <TabIcon name="sparkles-outline" size={size} color={color} locked={coachLocked} />,
+        }}
       />
       <Tabs.Screen
         name="explore"
-        options={{ title: "Explore", tabBarIcon: ({ color, size }) => <TabIcon name="cube-outline" size={size} color={color} locked={locked} /> }}
+        options={{
+          title: "Explore",
+          tabBarAccessibilityLabel: exploreLocked ? "Explore, Premium" : "Explore",
+          tabBarIcon: ({ color, size }) => <TabIcon name="cube-outline" size={size} color={color} locked={exploreLocked} />,
+        }}
       />
       <Tabs.Screen
         name="library"

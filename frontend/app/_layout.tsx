@@ -1,7 +1,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { LogBox, StatusBar, Platform } from "react-native";
+import { StatusBar, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -14,7 +14,9 @@ import { ScopeBridge } from "@/src/owner/ScopeBridge";
 import { ThemeProvider, useTheme } from "@/src/theme/ThemeContext";
 import { LoadingScreen } from "@/src/theme/LoadingScreen";
 
-LogBox.ignoreAllLogs(true);
+// Phase 4: the previous blanket LogBox suppression has been removed. Runtime
+// warnings are surfaced in development so application-owned problems cannot hide,
+// and no replacement blanket filter has been added under another name.
 SplashScreen.preventAutoHideAsync();
 
 // Configure RevenueCat once, at module load (before any component mounts), so the

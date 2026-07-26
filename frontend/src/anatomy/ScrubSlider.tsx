@@ -14,7 +14,7 @@ type Props = {
 //    regardless of which sub-child the finger crosses. Previously we relied on
 //    `nativeEvent.locationX`, which snaps between the wrapping View and the
 //    thumb child and produces the "jumping" artifact.
-//  - `pointerEvents="none"` on fill/thumb so touches never re-target them.
+//  - style.pointerEvents "none" on fill/thumb so touches never re-target them.
 //  - Values are pushed via rAF, coalescing multiple move events into one JS
 //    dispatch per frame — keeps the 3D shrink update in lock-step with the
 //    finger and avoids ordered/dropped updates on iOS.
@@ -116,9 +116,9 @@ export function ScrubSlider({ value, onChange }: Props) {
       // @ts-ignore RN Web extension
       dataSet={Platform.OS === "web" ? { userSelect: "none" } : undefined}
     >
-      <View pointerEvents="none" style={styles.track} />
-      <View pointerEvents="none" style={[styles.fill, { width: Math.max(0, value * w) }]} />
-      <View pointerEvents="none" style={[styles.thumb, { left: thumbLeft }]} />
+      <View style={[styles.track, { pointerEvents: "none" }]} />
+      <View style={[styles.fill, { width: Math.max(0, value * w), pointerEvents: "none" }]} />
+      <View style={[styles.thumb, { left: thumbLeft, pointerEvents: "none" }]} />
     </View>
   );
 }

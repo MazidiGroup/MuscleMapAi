@@ -81,8 +81,8 @@ function MuscleOverlay({ region, status, size }: { region: any; status: MuscleSt
   if (!status || status === "none") return null;
   return (
     <View
-      pointerEvents="none"
       style={{
+        pointerEvents: "none",
         position: "absolute",
         top: `${region.top}%`,
         left: `${region.left}%`,
@@ -144,7 +144,7 @@ export function Body3D({ muscles, size = 280, viewSnap }: Props) {
         resizeMode="contain"
       />
       {/* Muscle highlight overlays */}
-      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFillObject, { pointerEvents: "none" }]}>
         {overlays.map((r, i) => (
           <MuscleOverlay key={i} region={r} status={muscles[r.group] || "none"} size={{ w: size, h: size * 1.85 }} />
         ))}

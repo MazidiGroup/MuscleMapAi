@@ -1,55 +1,81 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 import { useAuth } from "@/src/auth/AuthContext";
 import { apiPost } from "@/src/api";
 
+import {
+  EntitlementState,
+  PremiumResolution,
+  PurchaseOutcome,
+  RestoreOutcome,
+  TrialEligibility,
+  classifyPurchase,
+  classifyRestore,
+  hasDesignatedEntitlement,
+  resolvePremium,
+  serverGrant,
+} from "./entitlement";
+
 /**
- * Central premium entitlement, backed by RevenueCat (react-native-purchases).
+ * The single Premium provider. It owns the RevenueCat read, and delegates every
+ * *decision* to the shared contract in ./entitlement.
  *
- * `isPremium` is the SINGLE source of truth the whole app reads. It unlocks when
- * EITHER (a) ANY active RevenueCat entitlement exists on-device (name-agnostic, so
- * dashboard naming can't silently break gating) or (b) the backend reports
- * `is_premium` via /auth/me (server-validated sync or App Store review bypass).
- * After purchase/restore we immediately sync the entitlement to the backend and
- * re-fetch the user so premium reflects without an app restart.
+ * Rules enforced here:
+ *  - only the exact designated entitlement counts (see hasDesignatedEntitlement);
+ *  - loading never unlocks Premium, and a failed read never fabricates it;
+ *  - an owner change (sign-in, switch, sign-out, deletion) invalidates the
+ *    previous owner's entitlement state before anything is shown;
+ *  - purchase and restore verify the entitlement before reporting success, and
+ *    overlapping taps cannot start a second operation.
  *
- * NOTE: react-native-purchases requires a native (dev/production) build. It does
- * NOT run in Expo Go or on web, so the SDK is only loaded off-web and every call
- * is guarded. On web/Expo Go the app simply behaves as a free (non-premium) user.
+ * react-native-purchases requires a native build; it is not available on web or
+ * in Expo Go, so the SDK is only required off-web and every call is guarded. In
+ * that case the app behaves as a free user and every free feature still works.
  */
 
-// Only load the native module off-web to avoid breaking the web bundle.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const Purchases: any = Platform.OS === "web" ? null : require("react-native-purchases").default;
 
 export type PremiumPackage = {
-  identifier: string; // RevenueCat package identifier
-  label: string; // friendly label e.g. "Monthly"
-  priceString: string; // live localized store price e.g. "£9.99"
-  packageType: string; // WEEKLY | MONTHLY | ANNUAL | LIFETIME | ...
-  raw: any; // underlying PurchasesPackage passed back to purchasePackage
+  identifier: string;
+  label: string;
+  packageType: string;
+  /** The underlying StoreProduct — the only source of price and terms. */
+  product: any;
+  /** The underlying PurchasesPackage, passed straight back to purchasePackage. */
+  raw: any;
 };
 
+export type OfferingState = "loading" | "ready" | "empty" | "error";
+
 type PremiumCtx = {
+  /** The one boolean the app gates on. */
   isPremium: boolean;
+  resolution: PremiumResolution;
   loading: boolean;
   packages: PremiumPackage[];
-  purchase: (pkg: PremiumPackage) => Promise<boolean>;
-  restorePurchases: () => Promise<boolean>;
+  offeringState: OfferingState;
+  trialEligibility: Record<string, TrialEligibility>;
+  busy: "purchase" | "restore" | null;
+  purchase: (pkg: PremiumPackage) => Promise<PurchaseOutcome>;
+  restorePurchases: () => Promise<RestoreOutcome>;
   refreshOfferings: () => Promise<void>;
-  /** Manual override — reserved for future/dev use. */
-  setPremium: (v: boolean) => void;
 };
+
+const IDLE: PremiumResolution = { access: false, source: "none", state: "ready" };
 
 const Ctx = createContext<PremiumCtx>({
   isPremium: false,
+  resolution: IDLE,
   loading: false,
   packages: [],
-  purchase: async () => false,
-  restorePurchases: async () => false,
+  offeringState: "empty",
+  trialEligibility: {},
+  busy: null,
+  purchase: async () => "unavailable",
+  restorePurchases: async () => "failed",
   refreshOfferings: async () => {},
-  setPremium: () => {},
 });
 
 const PACKAGE_LABELS: Record<string, string> = {
@@ -57,122 +83,192 @@ const PACKAGE_LABELS: Record<string, string> = {
   MONTHLY: "Monthly",
   ANNUAL: "Yearly",
   LIFETIME: "Lifetime",
-  TWO_MONTH: "2 Months",
-  THREE_MONTH: "3 Months",
-  SIX_MONTH: "6 Months",
+  TWO_MONTH: "2 months",
+  THREE_MONTH: "3 months",
+  SIX_MONTH: "6 months",
 };
 
-function hasPremium(customerInfo: any): boolean {
-  // Name-agnostic: ANY active entitlement unlocks premium (single-tier app).
-  const active = customerInfo?.entitlements?.active ?? {};
-  return Object.keys(active).length > 0;
-}
-
 function mapPackage(p: any): PremiumPackage {
-  const product = p?.product ?? {};
   const type = p?.packageType ?? "CUSTOM";
   return {
     identifier: p?.identifier ?? type,
-    label: PACKAGE_LABELS[type] ?? product?.title ?? p?.identifier ?? "Plan",
-    priceString: product?.priceString ?? "",
+    label: PACKAGE_LABELS[type] ?? p?.product?.title ?? p?.identifier ?? "Option",
     packageType: type,
+    product: p?.product ?? {},
     raw: p,
   };
 }
 
 export function PremiumProvider({ children }: { children: React.ReactNode }) {
-  const { user, refreshUser } = useAuth();
-  const [rcPremium, setRcPremium] = useState(false);
-  const [loading, setLoading] = useState(!!Purchases);
+  const { user, loading: authLoading, refreshUser } = useAuth();
+  const [rcActive, setRcActive] = useState(false);
+  const [rcState, setRcState] = useState<EntitlementState>(Purchases ? "loading" : "ready");
   const [packages, setPackages] = useState<PremiumPackage[]>([]);
+  const [offeringState, setOfferingState] = useState<OfferingState>(Purchases ? "loading" : "empty");
+  const [trialEligibility, setTrialEligibility] = useState<Record<string, TrialEligibility>>({});
+  const [busy, setBusy] = useState<"purchase" | "restore" | null>(null);
+  const busyRef = useRef<"purchase" | "restore" | null>(null);
 
-  // Premium if EITHER the on-device RevenueCat entitlement is active OR the backend
-  // says so via /auth/me (server-validated RevenueCat sync or App Store review bypass).
-  const isPremium = rcPremium || !!user?.is_premium;
+  const owner = user?.user_id ?? null;
 
-  // Persist the entitlement server-side (backend re-validates against RevenueCat's
-  // REST API — the payload is just a trigger) then refresh /auth/me so is_premium
-  // updates immediately, not on next launch.
-  const syncToBackend = useCallback(async (premium: boolean) => {
+  const resolution = resolvePremium({
+    user,
+    designatedEntitlementActive: rcActive,
+    revenueCatState: rcState,
+    authLoading,
+  });
+  const isPremium = resolution.access;
+
+  /** Read the freshest CustomerInfo and apply the exact-entitlement rule. */
+  const readEntitlement = useCallback(async (): Promise<boolean> => {
+    if (!Purchases) {
+      setRcState("ready");
+      return false;
+    }
     try {
-      await apiPost("/billing/revenuecat/sync", { is_premium: premium });
-    } catch (e) {
-      console.warn("[premium] backend sync failed", e);
+      const info = await Purchases.getCustomerInfo();
+      const active = hasDesignatedEntitlement(info);
+      setRcActive(active);
+      setRcState("ready");
+      return active;
+    } catch {
+      // A failed read must never fabricate access.
+      setRcActive(false);
+      setRcState("error");
+      return false;
+    }
+  }, []);
+
+  const syncToBackend = useCallback(async () => {
+    try {
+      // The backend re-validates against RevenueCat; this is only a trigger.
+      await apiPost("/billing/revenuecat/sync", {});
+    } catch {
+      // Sync failure is not user-facing: the local entitlement still applies.
     } finally {
       refreshUser();
     }
   }, [refreshUser]);
 
   const refreshOfferings = useCallback(async () => {
-    if (!Purchases) return;
+    if (!Purchases) {
+      setOfferingState("empty");
+      return;
+    }
+    setOfferingState("loading");
     try {
       const offerings = await Purchases.getOfferings();
-      const current = offerings?.current;
-      const available = current?.availablePackages ?? [];
-      if (available.length) setPackages(available.map(mapPackage));
-    } catch (e) {
-      console.warn("[premium] getOfferings failed", e);
+      const available = offerings?.current?.availablePackages ?? [];
+      const mapped: PremiumPackage[] = available.map(mapPackage);
+      setPackages(mapped);
+      setOfferingState(mapped.length ? "ready" : "empty");
+
+      // Trial language is only allowed when eligibility is verified.
+      if (mapped.length && Purchases.checkTrialOrIntroductoryPriceEligibility) {
+        try {
+          const ids = mapped.map((m: PremiumPackage) => m.product?.identifier).filter(Boolean);
+          const res = await Purchases.checkTrialOrIntroductoryPriceEligibility(ids);
+          const next: Record<string, TrialEligibility> = {};
+          for (const m of mapped) {
+            const status = res?.[m.product?.identifier]?.status;
+            next[m.identifier] =
+              status === 2 ? "eligible" : status === 1 ? "ineligible" : status === 3 ? "none" : "unknown";
+          }
+          setTrialEligibility(next);
+        } catch {
+          setTrialEligibility({});
+        }
+      }
+    } catch {
+      setPackages([]);
+      setOfferingState("error");
     }
   }, []);
 
+  // Owner transitions: the previous owner's entitlement must never remain
+  // visible. Reset first, then read again for whoever is now signed in.
   useEffect(() => {
     if (!Purchases) return;
     let mounted = true;
-    const apply = (customerInfo: any) => {
-      if (mounted) setRcPremium(hasPremium(customerInfo));
-    };
-
-    (async () => {
-      try {
-        const customerInfo = await Purchases.getCustomerInfo();
-        apply(customerInfo);
-      } catch (e) {
-        console.warn("[premium] getCustomerInfo failed", e);
-      } finally {
-        if (mounted) setLoading(false);
+    setRcActive(false);
+    setRcState("loading");
+    const apply = (info: any) => {
+      if (mounted) {
+        setRcActive(hasDesignatedEntitlement(info));
+        setRcState("ready");
       }
-      refreshOfferings();
+    };
+    (async () => {
+      await readEntitlement();
+      if (mounted) refreshOfferings();
     })();
-
     Purchases.addCustomerInfoUpdateListener(apply);
     return () => {
       mounted = false;
       Purchases.removeCustomerInfoUpdateListener?.(apply);
     };
-  }, [refreshOfferings]);
+  }, [owner, readEntitlement, refreshOfferings]);
 
-  const purchase = useCallback(async (pkg: PremiumPackage) => {
-    if (!Purchases || !pkg?.raw) return false;
+  const purchase = useCallback(
+    async (pkg: PremiumPackage): Promise<PurchaseOutcome> => {
+      if (busyRef.current) return "unknown"; // an operation is already running
+      if (!Purchases || !pkg?.raw) return "unavailable";
+      busyRef.current = "purchase";
+      setBusy("purchase");
+      try {
+        await Purchases.purchasePackage(pkg.raw);
+        // Never trust the purchase result alone — read the entitlement back.
+        const active = await readEntitlement();
+        if (active) syncToBackend();
+        return classifyPurchase({
+          entitlementActive: active,
+          existingGrant: serverGrant(user).premium,
+          refreshFailed: !active && rcState === "error",
+        });
+      } catch (e: any) {
+        if (e?.userCancelled) return classifyPurchase({ cancelled: true });
+        return classifyPurchase({ threw: true });
+      } finally {
+        busyRef.current = null;
+        setBusy(null);
+      }
+    },
+    [readEntitlement, syncToBackend, user, rcState],
+  );
+
+  const restorePurchases = useCallback(async (): Promise<RestoreOutcome> => {
+    if (busyRef.current) return "failed";
+    if (!Purchases) return "nothing_to_restore";
+    busyRef.current = "restore";
+    setBusy("restore");
     try {
-      const { customerInfo } = await Purchases.purchasePackage(pkg.raw);
-      const ok = hasPremium(customerInfo);
-      setRcPremium(ok);
-      if (ok) syncToBackend(true); // record purchase server-side right away
-      return ok;
-    } catch (e: any) {
-      if (!e?.userCancelled) console.warn("[premium] purchase failed", e);
-      return false;
+      await Purchases.restorePurchases();
+      const active = await readEntitlement();
+      if (active) syncToBackend();
+      return classifyRestore({ entitlementActive: active, existingGrant: serverGrant(user).premium });
+    } catch {
+      return classifyRestore({ threw: true });
+    } finally {
+      busyRef.current = null;
+      setBusy(null);
     }
-  }, [syncToBackend]);
-
-  const restorePurchases = useCallback(async () => {
-    if (!Purchases) return false;
-    try {
-      const customerInfo = await Purchases.restorePurchases();
-      const ok = hasPremium(customerInfo);
-      setRcPremium(ok);
-      if (ok) syncToBackend(true);
-      return ok;
-    } catch (e) {
-      console.warn("[premium] restore failed", e);
-      return false;
-    }
-  }, [syncToBackend]);
-
-  const setPremium = useCallback((v: boolean) => setRcPremium(v), []);
+  }, [readEntitlement, syncToBackend, user]);
 
   return (
-    <Ctx.Provider value={{ isPremium, loading, packages, purchase, restorePurchases, refreshOfferings, setPremium }}>
+    <Ctx.Provider
+      value={{
+        isPremium,
+        resolution,
+        loading: resolution.state === "loading",
+        packages,
+        offeringState,
+        trialEligibility,
+        busy,
+        purchase,
+        restorePurchases,
+        refreshOfferings,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );
@@ -181,3 +277,11 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
 export function usePremium() {
   return useContext(Ctx);
 }
+
+/**
+ * The raw context, exported for the development-only state harness under app/dev,
+ * which mounts the paywall against deterministic fixtures for states that cannot
+ * be triggered on web (no store SDK). Production code always uses usePremium().
+ */
+export const PremiumContextForFixtures = Ctx;
+export type PremiumContextValue = PremiumCtx;

@@ -1,216 +1,264 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+// Phase 4 — the corrected paywall.
+//
+// It advertises ONLY the four frozen Premium areas, takes every price, period and
+// trial word from store data, preselects nothing, and never claims success before
+// the designated entitlement has been verified. All non-happy paths use the shared
+// State System.
+
+import React, { useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { usePremium, PremiumPackage } from "./PremiumContext";
-import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
-import { useTheme } from "@/src/theme/ThemeContext";
+
+import { useSemanticTokens } from "@/src/theme/semantic";
 import { ThemeToggle } from "@/src/theme/ThemeToggle";
+import {
+  ActionButton,
+  ErrorBanner,
+  InfoBanner,
+  LayoutSkeleton,
+  RetryPanel,
+  StatusAnnouncement,
+} from "@/src/ui/state";
 
-const PERKS: { icon: any; label: string; desc: string }[] = [
-  { icon: "cube", label: "3D Explore", desc: "Full interactive 3D anatomy explorer" },
-  { icon: "body", label: "Muscle Library", desc: "Muscle guide + guided anatomy lessons" },
-  { icon: "barbell", label: "Muscle Groups", desc: "3D muscle-group view in your workout" },
-  { icon: "sparkles", label: "AI Coach", desc: "Personalised coaching, anytime" },
-  { icon: "pulse", label: "Insights", desc: "Recovery heatmap & weekly analytics" },
-];
+import { PremiumPackage, usePremium } from "./PremiumContext";
+import {
+  PAYWALL_COPY,
+  PREMIUM_VALUE_ITEMS,
+  PurchaseOutcome,
+  RestoreOutcome,
+  productTerms,
+} from "./entitlement";
 
-// Preferred package order for display.
+/** Preferred display order; anything unknown sorts last, nothing is invented. */
 const ORDER = ["WEEKLY", "MONTHLY", "ANNUAL", "LIFETIME"];
 
-// Human-readable subscription length for App Store compliance (3.1.2(c)).
-const PERIOD_LABEL: Record<string, string> = {
-  WEEKLY: "1 week",
-  MONTHLY: "1 month",
-  ANNUAL: "1 year",
-  TWO_MONTH: "2 months",
-  THREE_MONTH: "3 months",
-  SIX_MONTH: "6 months",
-  LIFETIME: "one-time",
-};
-
-// Divisor to derive price-per-month from a package price. Undefined => no derived unit.
-const MONTHS_IN_PACKAGE: Record<string, number | undefined> = {
-  WEEKLY: undefined, // shown per-week directly
-  MONTHLY: 1,
-  ANNUAL: 12,
-  TWO_MONTH: 2,
-  THREE_MONTH: 3,
-  SIX_MONTH: 6,
-  LIFETIME: undefined,
-};
-
-/**
- * Format a "price per month" string using the numeric product.price + priceString.
- * Falls back to empty string if we can't safely compute it.
- */
-function pricePerUnit(pkg: PremiumPackage): string {
-  const product = pkg.raw?.product ?? {};
-  const price: number | undefined = typeof product.price === "number" ? product.price : undefined;
-  const priceStr: string = pkg.priceString || product.priceString || "";
-  const type = pkg.packageType;
-  if (type === "WEEKLY" && priceStr) return `${priceStr} / week`;
-  if (type === "LIFETIME") return "one-time purchase";
-  const months = MONTHS_IN_PACKAGE[type];
-  if (!months || !price || !priceStr) return "";
-  const per = price / months;
-  // Extract the currency prefix/suffix from priceString (e.g. "£9.99", "US$9.99", "9,99 €").
-  // Preserve the same non-numeric characters, replace the number with per-month value.
-  const numMatch = priceStr.match(/[\d.,]+/);
-  if (!numMatch) return "";
-  const perFmt = per.toFixed(2);
-  const priceStrPerMonth = priceStr.replace(numMatch[0], perFmt);
-  return months === 1 ? `${priceStrPerMonth} / month` : `${priceStrPerMonth} / month`;
-}
-
-export function Paywall({ title = "Unlock Premium", headerOffset = 0, showThemeToggle = true }: { title?: string; headerOffset?: number; showThemeToggle?: boolean }) {
+export function Paywall({
+  title = PAYWALL_COPY.title,
+  body = PAYWALL_COPY.subtitle,
+  headerOffset = 0,
+  showThemeToggle = true,
+}: {
+  title?: string;
+  body?: string;
+  headerOffset?: number;
+  showThemeToggle?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { mode } = useTheme();
-  const T = useMemo(() => legacyPalette(mode), [mode]);
-  const styles = useMemo(() => makeStyles(T), [T]);
-  const { packages, purchase, restorePurchases } = usePremium();
-  const [selected, setSelected] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"purchase" | "restore" | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const t = useSemanticTokens();
+  const styles = useMemo(() => makeStyles(t), [t]);
+  const { packages, offeringState, trialEligibility, busy, purchase, restorePurchases, refreshOfferings } = usePremium();
 
-  const sorted = useMemo(() => {
-    return [...packages].sort((a, b) => {
-      const ia = ORDER.indexOf(a.packageType);
-      const ib = ORDER.indexOf(b.packageType);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-    });
-  }, [packages]);
+  const [selected, setSelected] = useState<string | null>(null); // nothing preselected
+  const [purchaseOutcome, setPurchaseOutcome] = useState<PurchaseOutcome | null>(null);
+  const [restoreOutcome, setRestoreOutcome] = useState<RestoreOutcome | null>(null);
 
-  // Default-select the monthly package (or the first available).
-  useEffect(() => {
-    if (selected || sorted.length === 0) return;
-    const monthly = sorted.find((p) => p.packageType === "MONTHLY");
-    setSelected((monthly ?? sorted[0]).identifier);
-  }, [sorted, selected]);
+  const sorted = useMemo(
+    () =>
+      [...packages].sort((a, b) => {
+        const ia = ORDER.indexOf(a.packageType);
+        const ib = ORDER.indexOf(b.packageType);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      }),
+    [packages],
+  );
 
-  const onUpgrade = async () => {
-    const pkg = sorted.find((p) => p.identifier === selected);
-    if (!pkg) {
-      setNotice("Subscription plans load inside the app build.");
-      return;
-    }
-    setBusy("purchase");
-    setNotice(null);
-    const ok = await purchase(pkg);
-    setBusy(null);
-    if (!ok) setNotice("Purchase was not completed.");
-    // On success the premium gate re-renders and this screen unmounts.
+  const chosen: PremiumPackage | undefined = sorted.find((p) => p.identifier === selected);
+
+  const onContinue = async () => {
+    if (!chosen) return;
+    setPurchaseOutcome(null);
+    setRestoreOutcome(null);
+    const outcome = await purchase(chosen);
+    // A cancellation is a no-op: no error, no state change.
+    setPurchaseOutcome(outcome === "cancelled" ? null : outcome);
   };
 
   const onRestore = async () => {
-    setBusy("restore");
-    setNotice(null);
-    const ok = await restorePurchases();
-    setBusy(null);
-    setNotice(ok ? "Purchases restored." : "No previous purchases found.");
+    setPurchaseOutcome(null);
+    setRestoreOutcome(null);
+    setRestoreOutcome(await restorePurchases());
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 24 + headerOffset }]}>
+    <View style={[styles.root, { paddingTop: insets.top + t.space.lg + headerOffset }]}>
       {showThemeToggle && <ThemeToggle style={{ position: "absolute", top: insets.top + 8, right: 16, zIndex: 30 }} />}
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.crown}>
-          <Ionicons name="star" size={30} color={T.accent} />
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} testID="paywall">
+        <View style={styles.badge}>
+          <Ionicons name="star" size={26} color={t.color.accent} />
         </View>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>Go Premium to unlock the full Muscle Map Ai experience.</Text>
+        <Text style={[t.type.title, { color: t.color.text, textAlign: "center" }]}>{title}</Text>
+        <Text style={[t.type.body, styles.subtitle]}>{body}</Text>
 
-        <View style={styles.perks}>
-          {PERKS.map((p) => (
-            <View key={p.label} style={styles.perkRow}>
-              <View style={styles.perkIcon}>
-                <Ionicons name={p.icon} size={20} color={T.accent} />
+        {/* Only the four frozen Premium areas may appear here. */}
+        <View style={styles.values} testID="paywall-values">
+          {PREMIUM_VALUE_ITEMS.map((v) => (
+            <View key={v.label} style={styles.valueRow}>
+              <View style={styles.valueIcon}>
+                <Ionicons name={v.icon as any} size={18} color={t.color.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.perkLabel}>{p.label}</Text>
-                <Text style={styles.perkDesc}>{p.desc}</Text>
+                <Text style={[t.type.bodyStrong, { color: t.color.text }]}>{v.label}</Text>
+                <Text style={[t.type.caption, { color: t.color.textFaint }]}>{v.desc}</Text>
               </View>
-              <Ionicons name="checkmark-circle" size={20} color="#2FBF71" />
             </View>
           ))}
         </View>
 
-        {/* Live subscription options from the App Store (via RevenueCat) */}
-        {sorted.length > 0 ? (
-          <View style={styles.plans}>
+        <InfoBanner message={PAYWALL_COPY.freeReassurance} testID="paywall-free-note" />
+
+        {/* --- store options ------------------------------------------------ */}
+        {offeringState === "loading" && (
+          <>
+            <StatusAnnouncement message={PAYWALL_COPY.loadingProducts} visible={false} />
+            <LayoutSkeleton rows={2} style={{ width: "100%", marginTop: t.space.md }} />
+          </>
+        )}
+
+        {(offeringState === "error" || offeringState === "empty") && (
+          <RetryPanel
+            title={PAYWALL_COPY.noOffering.title}
+            body={PAYWALL_COPY.noOffering.body}
+            preserved={["Your Plan", "Your workouts and History", "The full exercise library"]}
+            retry={{ label: "Try again", onPress: refreshOfferings, testID: "paywall-offering-retry" }}
+            testID="paywall-no-offering"
+          />
+        )}
+
+        {offeringState === "ready" && (
+          <View style={styles.options} testID="paywall-options">
+            <Text style={[t.type.label, { color: t.color.textMuted }]}>{PAYWALL_COPY.selectPrompt}</Text>
             {sorted.map((p) => {
               const active = p.identifier === selected;
-              const perUnit = pricePerUnit(p);
-              const length = PERIOD_LABEL[p.packageType] || "";
+              const terms = productTerms(p.product, trialEligibility[p.identifier] ?? "unknown");
               return (
                 <TouchableOpacity
                   key={p.identifier}
-                  style={[styles.plan, active && styles.planActive]}
+                  style={[styles.option, active && styles.optionActive]}
                   onPress={() => setSelected(p.identifier)}
-                  testID={`plan-${p.packageType.toLowerCase()}`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={[p.label, terms.price, terms.period && `every ${terms.period}`, terms.trial]
+                    .filter(Boolean)
+                    .join(", ")}
+                  testID={`paywall-option-${p.packageType.toLowerCase()}`}
                 >
-                  <View style={[styles.radio, active && styles.radioActive]}>
-                    {active && <View style={styles.radioDot} />}
-                  </View>
+                  <Ionicons
+                    name={active ? "checkmark-circle" : "ellipse-outline"}
+                    size={22}
+                    color={active ? t.color.accent : t.color.border}
+                  />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.planLabel, active && { color: T.text }]}>{p.label}</Text>
-                    {length ? <Text style={styles.planMeta}>{length}</Text> : null}
+                    <Text style={[t.type.bodyStrong, { color: t.color.text }]}>{p.label}</Text>
+                    {terms.period ? (
+                      <Text style={[t.type.caption, { color: t.color.textFaint }]}>{`Renews every ${terms.period}`}</Text>
+                    ) : null}
+                    {terms.trial ? (
+                      <Text style={[t.type.caption, { color: t.color.accent }]} testID={`paywall-trial-${p.packageType.toLowerCase()}`}>
+                        {terms.trial}
+                      </Text>
+                    ) : null}
+                    {active ? (
+                      <Text style={[t.type.caption, { color: t.color.accent }]} testID="paywall-selected-text">
+                        Selected
+                      </Text>
+                    ) : null}
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={[styles.planPrice, active && { color: T.text }]}>{p.priceString}</Text>
-                    {perUnit ? <Text style={styles.planMeta}>{perUnit}</Text> : null}
+                    <Text style={[t.type.bodyStrong, { color: t.color.text }]}>{terms.price}</Text>
+                    {terms.perPeriod ? (
+                      <Text style={[t.type.caption, { color: t.color.textFaint }]}>{terms.perPeriod}</Text>
+                    ) : null}
                   </View>
                 </TouchableOpacity>
               );
             })}
           </View>
-        ) : (
-          <Text style={styles.plansNote}>Subscription plans appear on the installed app.</Text>
         )}
 
-        {/* Required subscription disclosure — Guideline 3.1.2 */}
-        <View style={styles.discBox}>
-          <Text style={styles.discTitle}>Subscription details</Text>
-          <Text style={styles.discBody}>
-            Muscle Map Ai Premium is an auto-renewing subscription. Payment is charged to your Apple ID
-            at confirmation of purchase. The subscription automatically renews for the same period at
-            the same price unless auto-renew is turned off at least 24 hours before the end of the
-            current period. You can manage or cancel your subscription in your Apple ID Account Settings
-            after purchase.
+        {/* --- outcomes ----------------------------------------------------- */}
+        {purchaseOutcome === "verified" && (
+          <InfoBanner message={PAYWALL_COPY.purchaseVerified} testID="paywall-purchase-verified" />
+        )}
+        {purchaseOutcome === "failed" && (
+          <ErrorBanner
+            title={PAYWALL_COPY.purchaseFailed.title}
+            message={PAYWALL_COPY.purchaseFailed.body}
+            testID="paywall-purchase-failed"
+          />
+        )}
+        {purchaseOutcome === "unknown" && (
+          <ErrorBanner
+            title={PAYWALL_COPY.purchaseUnknown.title}
+            message={PAYWALL_COPY.purchaseUnknown.body}
+            testID="paywall-purchase-unknown"
+          />
+        )}
+        {purchaseOutcome === "refresh_failed" && (
+          <ErrorBanner
+            title={PAYWALL_COPY.refreshFailed.title}
+            message={PAYWALL_COPY.refreshFailed.body}
+            testID="paywall-refresh-failed"
+          />
+        )}
+        {purchaseOutcome === "unavailable" && (
+          <InfoBanner message={PAYWALL_COPY.noOffering.body} testID="paywall-purchase-unavailable" />
+        )}
+
+        {restoreOutcome === "verified" && (
+          <InfoBanner message={PAYWALL_COPY.restoreVerified} testID="paywall-restore-verified" />
+        )}
+        {restoreOutcome === "nothing_to_restore" && (
+          <InfoBanner message={PAYWALL_COPY.restoreNothing} testID="paywall-restore-nothing" />
+        )}
+        {restoreOutcome === "failed" && (
+          <ErrorBanner
+            title={PAYWALL_COPY.restoreFailed.title}
+            message={PAYWALL_COPY.restoreFailed.body}
+            testID="paywall-restore-failed"
+          />
+        )}
+
+        <ActionButton
+          label={chosen ? PAYWALL_COPY.cta(chosen.label) : PAYWALL_COPY.ctaUnselected}
+          onPress={onContinue}
+          disabled={!chosen}
+          busy={busy === "purchase"}
+          busyLabel="Completing your purchase"
+          style={{ width: "100%", marginTop: t.space.md }}
+          testID="paywall-continue"
+        />
+
+        <ActionButton
+          label={PAYWALL_COPY.legal.restore}
+          variant="secondary"
+          onPress={onRestore}
+          busy={busy === "restore"}
+          busyLabel={PAYWALL_COPY.restoreBusy}
+          style={{ width: "100%" }}
+          testID="paywall-restore"
+        />
+
+        {/* Required subscription disclosure — no price, period or trial is hardcoded. */}
+        <View style={styles.disclosure}>
+          <Text style={[t.type.label, { color: t.color.textMuted }]}>Subscription details</Text>
+          <Text style={[t.type.caption, { color: t.color.textFaint, marginTop: 6 }]}>
+            Premium is an auto-renewing subscription. Payment is charged to your Apple ID at confirmation of
+            purchase, and it renews for the same period at the price shown above unless auto-renew is turned off
+            at least 24 hours before the end of the current period. You can manage or cancel it in your Apple ID
+            Account Settings.
           </Text>
         </View>
 
-        <TouchableOpacity style={[styles.upgradeBtn, busy && { opacity: 0.6 }]} onPress={onUpgrade} disabled={!!busy} testID="paywall-upgrade">
-          {busy === "purchase" ? (
-            <ActivityIndicator color={T.bg} />
-          ) : (
-            <>
-              <Ionicons name="star" size={16} color={T.bg} />
-              <Text style={styles.upgradeText}>Upgrade</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.restoreBtn} onPress={onRestore} disabled={!!busy} testID="paywall-restore">
-          {busy === "restore" ? (
-            <ActivityIndicator color={T.accent} />
-          ) : (
-            <Text style={styles.restoreText}>Restore Purchases</Text>
-          )}
-        </TouchableOpacity>
-
-        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-
-        {/* Legal footer — Guideline 3.1.2 requires functional Terms & Privacy links */}
         <View style={styles.legalRow}>
-          <TouchableOpacity onPress={() => router.push("/terms")} testID="paywall-terms">
-            <Text style={styles.legalLink}>Terms of Use</Text>
+          <TouchableOpacity onPress={() => router.push("/terms")} style={styles.legalBtn} testID="paywall-terms">
+            <Text style={[t.type.caption, styles.legalLink]}>{PAYWALL_COPY.legal.terms}</Text>
           </TouchableOpacity>
-          <Text style={styles.legalSep}>·</Text>
-          <TouchableOpacity onPress={() => router.push("/privacy")} testID="paywall-privacy">
-            <Text style={styles.legalLink}>Privacy Policy</Text>
+          <Text style={[t.type.caption, { color: t.color.textFaint }]}>·</Text>
+          <TouchableOpacity onPress={() => router.push("/privacy")} style={styles.legalBtn} testID="paywall-privacy">
+            <Text style={[t.type.caption, styles.legalLink]}>{PAYWALL_COPY.legal.privacy}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -218,55 +266,63 @@ export function Paywall({ title = "Unlock Premium", headerOffset = 0, showThemeT
   );
 }
 
-const makeStyles = (T: LegacyPalette) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: T.bg },
-  scroll: { paddingHorizontal: 24, paddingBottom: 40, alignItems: "center" },
-  crown: {
-    width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center",
-    backgroundColor: "rgba(52,199,255,0.12)", borderWidth: 1, borderColor: T.borderHi, marginBottom: 18,
-  },
-  title: { color: T.text, fontSize: 26, fontWeight: "800", textAlign: "center" },
-  subtitle: { color: T.textDim, fontSize: 14, textAlign: "center", marginTop: 8, lineHeight: 20, maxWidth: 300 },
-  perks: { width: "100%", marginTop: 24, gap: 10 },
-  perkRow: {
-    flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: T.surface,
-    borderWidth: 1, borderColor: T.border, borderRadius: 14, padding: 14,
-  },
-  perkIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(52,199,255,0.1)" },
-  perkLabel: { color: T.text, fontSize: 15, fontWeight: "700" },
-  perkDesc: { color: T.textFaint, fontSize: 12, marginTop: 2 },
-  plans: { width: "100%", marginTop: 22, gap: 10 },
-  plan: {
-    flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface,
-    borderWidth: 1, borderColor: T.border, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 15,
-  },
-  planActive: { borderColor: T.accent, backgroundColor: "rgba(52,199,255,0.08)" },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: T.border, alignItems: "center", justifyContent: "center" },
-  radioActive: { borderColor: T.accent },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: T.accent },
-  planLabel: { color: T.textDim, fontSize: 15, fontWeight: "700" },
-  planMeta: { color: T.textFaint, fontSize: 11, fontWeight: "500", marginTop: 2 },
-  planPrice: { color: T.textDim, fontSize: 15, fontWeight: "800" },
-  plansNote: { color: T.textFaint, fontSize: 13, marginTop: 22, textAlign: "center" },
-  discBox: {
-    width: "100%", marginTop: 18, backgroundColor: T.surface,
-    borderWidth: 1, borderColor: T.border, borderRadius: 12, padding: 14,
-  },
-  discTitle: { color: T.textDim, fontSize: 12, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
-  discBody: { color: T.textFaint, fontSize: 12, lineHeight: 18 },
-  upgradeBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: T.accent, borderRadius: 14, paddingVertical: 16, width: "100%", marginTop: 20, minHeight: 52,
-  },
-  upgradeText: { color: T.bg, fontSize: 16, fontWeight: "800" },
-  restoreBtn: { paddingVertical: 14, marginTop: 4, minHeight: 44, justifyContent: "center" },
-  restoreText: { color: T.accent, fontSize: 14, fontWeight: "700" },
-  legal: { color: T.textFaint, fontSize: 11, marginTop: 6 },
-  notice: { color: T.textDim, fontSize: 12, marginTop: 8, textAlign: "center" },
-  legalRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, marginTop: 14,
-  },
-  legalLink: { color: T.textDim, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" },
-  legalSep: { color: T.textFaint, fontSize: 12 },
-});
+const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: t.color.bg },
+    scroll: { paddingHorizontal: t.space.lg, paddingBottom: 40, alignItems: "center", gap: t.space.md },
+    badge: {
+      width: 56,
+      height: 56,
+      borderRadius: t.radius.xl,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: t.color.accentSoft + "1A",
+      borderWidth: 1,
+      borderColor: t.color.border,
+    },
+    subtitle: { color: t.color.textSecondary, textAlign: "center", maxWidth: 320 },
+    values: { width: "100%", gap: t.space.sm },
+    valueRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.space.md,
+      backgroundColor: t.color.surface,
+      borderWidth: 1,
+      borderColor: t.color.border,
+      borderRadius: t.radius.lg,
+      padding: t.space.md,
+    },
+    valueIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: t.radius.md,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: t.color.surfaceAlt,
+    },
+    options: { width: "100%", gap: t.space.sm },
+    option: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.space.md,
+      backgroundColor: t.color.surface,
+      borderWidth: 1,
+      borderColor: t.color.border,
+      borderRadius: t.radius.lg,
+      paddingHorizontal: t.space.md,
+      paddingVertical: t.space.md,
+      minHeight: t.target.comfortable,
+    },
+    optionActive: { borderColor: t.color.accent, borderWidth: 2 },
+    disclosure: {
+      width: "100%",
+      backgroundColor: t.color.surface,
+      borderWidth: 1,
+      borderColor: t.color.border,
+      borderRadius: t.radius.md,
+      padding: t.space.md,
+    },
+    legalRow: { flexDirection: "row", alignItems: "center", gap: t.space.sm },
+    legalBtn: { minHeight: t.target.min, justifyContent: "center", paddingHorizontal: 4 },
+    legalLink: { color: t.color.textSecondary, fontWeight: "700", textDecorationLine: "underline" },
+  });

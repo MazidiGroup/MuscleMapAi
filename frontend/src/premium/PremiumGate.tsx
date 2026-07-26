@@ -1,0 +1,62 @@
+// Phase 4 — the single route/feature gating contract.
+//
+// A Premium surface renders <PremiumGate surface="coach">…</PremiumGate>. No screen
+// re-implements entitlement logic, and no Free surface is ever wrapped.
+//
+// Loading never unlocks Premium and never traps the user: while the entitlement is
+// being read we show the shared skeleton, and any other non-access state routes to
+// the dismissible value path (the paywall) with the free areas named.
+
+import React from "react";
+import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useSemanticTokens } from "@/src/theme/semantic";
+import { LayoutSkeleton, StatusAnnouncement } from "@/src/ui/state";
+
+import { Paywall } from "./Paywall";
+import { usePremium } from "./PremiumContext";
+import { PAYWALL_COPY, PREMIUM_AREA_NAMES, Surface, gate, isPremiumSurface } from "./entitlement";
+
+export function PremiumGate({
+  surface,
+  children,
+  headerOffset = 0,
+  showThemeToggle = true,
+}: {
+  surface: Extract<Surface, "explore" | "coach" | "library.muscles" | "library.learn">;
+  children: React.ReactNode;
+  headerOffset?: number;
+  showThemeToggle?: boolean;
+}) {
+  const t = useSemanticTokens();
+  const insets = useSafeAreaInsets();
+  const { resolution } = usePremium();
+  const decision = gate(surface, resolution);
+
+  if (decision === "allow") return <>{children}</>;
+
+  if (decision === "loading") {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.color.bg, paddingTop: insets.top + 24, paddingHorizontal: t.space.lg }}>
+        <StatusAnnouncement message="Checking your Premium access" visible={false} />
+        <LayoutSkeleton rows={3} />
+      </View>
+    );
+  }
+
+  const area = PREMIUM_AREA_NAMES[surface];
+  return (
+    <View style={{ flex: 1, backgroundColor: t.color.bg }} testID={`locked-${surface}`}>
+      <Paywall
+        title={PAYWALL_COPY.lockedTitle(area)}
+        body={PAYWALL_COPY.lockedBody}
+        headerOffset={headerOffset}
+        showThemeToggle={showThemeToggle}
+      />
+    </View>
+  );
+}
+
+/** Exported for tests and for the tab bar's accessible lock labels. */
+export { isPremiumSurface };
