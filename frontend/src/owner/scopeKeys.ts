@@ -1,19 +1,25 @@
 // Owner model and versioned, collision-free scoped key encoding.
 //
-// Namespace version is explicit (`NAMESPACE_VERSION`). None of the generated
-// keys can collide with a legacy key: every scoped key starts with the reserved
+// Namespace version is explicit (`NAMESPACE_VERSION`). No generated key can
+// collide with a legacy key: every scoped key starts with the reserved
 // `mma.own.v1.` prefix, which no legacy key uses.
+//
+// Account identifiers are treated as OPAQUE. The repository's authentication
+// contract does not guarantee any character set or length, so validity means
+// only "a non-empty string supplied by the verified auth contract". The raw id
+// is never placed in a key directly — it is base64url encoded, which is
+// lossless, injective and cannot introduce a key separator.
+
+import { encodeBase64Url } from "./encoding";
 
 export const NAMESPACE_VERSION = 1;
 export const SCOPE_PREFIX = `mma.own.v${NAMESPACE_VERSION}`;
 
 export type OwnerKind = "account" | "guest";
 
-export type OwnerStatus = "unresolved" | "transitioning" | "resolved";
-
 export type Owner = {
   kind: OwnerKind;
-  /** Stable verified identifier — an account user_id or the local guest id. */
+  /** The exact opaque identifier from the verified identity source. */
   id: string;
 };
 
@@ -52,49 +58,73 @@ export const DOMAIN_SCHEMA_VERSION: Record<Domain, number> = {
   unitPreference: 1,
 };
 
-/** Migration contract version — bumping it re-runs migration for every owner. */
+/** Migration/adoption contract version. */
 export const MIGRATION_VERSION = 1;
 
-const SAFE_ID = /^[A-Za-z0-9_-]{4,128}$/;
-
 /**
- * An identifier is only usable as an owner scope if it is verifiably stable and
- * safe to embed in a key. Emails, display names, provider labels and raw token
- * text never reach this function.
+ * An identity can be used as an owner scope when it is a non-empty string.
+ * No character or length rule is invented here: UUIDs, provider-prefixed ids,
+ * email-like ids, punctuation and Unicode are all accepted.
  */
 export function isUsableOwnerId(id: unknown): id is string {
-  return typeof id === "string" && SAFE_ID.test(id);
+  return typeof id === "string" && id.length > 0;
 }
 
-function segment(owner: Owner): string {
-  return `${owner.kind === "account" ? "acct" : "guest"}.${owner.id}`;
+/**
+ * Safe deterministic key segment for an owner. Lossless base64url means two
+ * different raw ids can never share a segment. The encoded value is a storage
+ * detail and must never be shown to a user.
+ */
+export function encodeOwnerId(id: unknown): string | null {
+  if (!isUsableOwnerId(id)) return null;
+  return encodeBase64Url(id);
+}
+
+export function ownerSegment(owner: Owner): string {
+  const encoded = encodeOwnerId(owner.id);
+  if (!encoded) throw new Error("ownerSegment: unusable owner id");
+  return `${owner.kind === "account" ? "acct" : "guest"}.${encoded}`;
 }
 
 /** Versioned, collision-free destination key for one owner + domain. */
 export function scopedKey(owner: Owner, domain: Domain): string {
-  if (!isUsableOwnerId(owner.id)) throw new Error("scopedKey: unusable owner id");
-  return `${SCOPE_PREFIX}.${segment(owner)}.${domain}.v${DOMAIN_SCHEMA_VERSION[domain]}`;
+  return `${SCOPE_PREFIX}.${ownerSegment(owner)}.${domain}.v${DOMAIN_SCHEMA_VERSION[domain]}`;
 }
 
-/** Migration completion marker — owner + migration version + domain scoped. */
+/**
+ * Journal key holding a prepared-but-not-promoted value. Normal readers never
+ * look here, so an aborted mutation is invisible to the app.
+ */
+export function pendingKey(owner: Owner, domain: Domain): string {
+  return `${SCOPE_PREFIX}.${ownerSegment(owner)}.${domain}.v${DOMAIN_SCHEMA_VERSION[domain]}.__pending`;
+}
+
+/** Adoption completion marker — owner + migration version + domain scoped. */
 export function migrationMarkerKey(owner: Owner, domain: Domain): string {
-  if (!isUsableOwnerId(owner.id)) throw new Error("migrationMarkerKey: unusable owner id");
-  return `${SCOPE_PREFIX}.${segment(owner)}.__migration.${domain}.m${MIGRATION_VERSION}`;
+  return `${SCOPE_PREFIX}.${ownerSegment(owner)}.__migration.${domain}.m${MIGRATION_VERSION}`;
 }
 
-/** Quarantine bucket — retains conflicting/malformed evidence per owner+domain. */
+/** Quarantine bucket — retains lossless conflicting/malformed evidence. */
 export function quarantineKey(owner: Owner, domain: Domain): string {
-  if (!isUsableOwnerId(owner.id)) throw new Error("quarantineKey: unusable owner id");
-  return `${SCOPE_PREFIX}.${segment(owner)}.__quarantine.${domain}.v1`;
+  return `${SCOPE_PREFIX}.${ownerSegment(owner)}.__quarantine.${domain}.v1`;
 }
+
+/**
+ * Device-level quarantine, used when legacy data has NO verified owner. It is
+ * not owner-scoped because attributing it to an owner would be an ownership
+ * claim.
+ */
+export function unclaimedQuarantineKey(domain: string): string {
+  return `${SCOPE_PREFIX}.__unclaimed.__quarantine.${domain}.v1`;
+}
+
+/** Device-level report describing what ownerless legacy data exists. */
+export const UNCLAIMED_REPORT_KEY = `${SCOPE_PREFIX}.__unclaimed.report.v1`;
 
 /** Global (not owner-scoped) key holding the stable local guest identifier. */
 export const GUEST_ID_KEY = "mma.owner.guest.v1";
 
-/**
- * Legacy keys are immutable sources. They are listed here so the resolver can
- * assert it never returns one as a destination.
- */
+/** Legacy keys are immutable sources; nothing outside migration may write them. */
 export const LEGACY_KEYS = [
   "mma.themeMode",
   "mma.plan.v1",

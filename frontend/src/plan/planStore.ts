@@ -1,27 +1,45 @@
-// Plan store — holds the onboarding answers, the generated weekly Plan,
-// which exercises the user has ticked as done, and the deterministic seed
-// used for shuffling.
+// Plan store — onboarding answers, the generated weekly Plan, per-day exercise
+// ticks and the deterministic shuffle seed.
 //
-// Persisted via our storage shim so re-opens restore the user right back
-// where they were (onboarding step or their built plan).
+// Persistence is OWNER-SCOPED. This store never touches a legacy `mma.plan.*`
+// key: those are read-only sources owned by the migration subsystem. Reads only
+// happen once an owner is resolved (the scope is bound by `ScopeBridge`), and
+// every write captures the owner token so an account switch cannot publish into
+// the wrong namespace or delete an existing value.
 
 import { create } from "zustand";
 
-import { storage } from "@/src/utils/storage";
+import { Domain } from "@/src/owner/scopeKeys";
+import { OwnerToken, ScopedStore } from "@/src/owner/scopedStore";
 
 import { Answers, Plan } from "./exercises";
 import { buildPlan } from "./planAdapter";
 
-const KEY_PLAN = "mma.plan.v1";
-const KEY_ANSWERS = "mma.plan.answers.v1";
-const KEY_SEED = "mma.plan.seed.v1";
-const KEY_STEP = "mma.plan.onboardingStep.v1"; // 0 = welcome, 1..6 = onboarding, 7 = building
-const KEY_COMPLETIONS = "mma.plan.completions.v1"; // { "YYYY-MM-DD:exId": true }
-
 type CompletionsMap = Record<string, boolean>;
+
+const PLAN_DOMAINS: Domain[] = ["plan", "planAnswers", "planSeed", "onboardingStep", "planCompletions"];
+
+/** Bound by `ScopeBridge` whenever the resolved owner changes. */
+type Scope = { store: ScopedStore; token: OwnerToken } | null;
+let scope: Scope = null;
+
+export function setPlanScope(next: Scope) {
+  scope = next;
+}
+
+export function getPlanScope(): Scope {
+  return scope;
+}
+
+/** Identity of a bound scope, used to prove hydrated state belongs to this owner. */
+export function scopeKeyOf(token: OwnerToken | null | undefined): string | null {
+  return token ? `${token.kind}:${token.id}:${token.generation}` : null;
+}
 
 type PlanStore = {
   hydrated: boolean;
+  /** Owner the current state belongs to; null until this owner has hydrated. */
+  ownerKey: string | null;
   step: number;               // 0 welcome → 1-6 onboarding → 7 building → 100 plan ready
   answers: Partial<Answers>;
   plan: Plan | null;
@@ -29,6 +47,8 @@ type PlanStore = {
   completions: CompletionsMap;
 
   hydrate: () => Promise<void>;
+  /** Drops every hydrated value so a previous owner's data can never be shown. */
+  resetForOwner: () => void;
   setStep: (n: number) => void;
   setAnswers: (patch: Partial<Answers>) => void;
   reshuffle: () => void;
@@ -38,32 +58,39 @@ type PlanStore = {
   isCompleted: (dateISO: string, exId: string) => boolean;
 };
 
-const persist = (partial: Record<string, unknown>) => {
-  for (const [k, v] of Object.entries(partial)) {
-    storage.setItem(k, v).catch(() => {});
+const EMPTY = { step: 0, answers: {}, plan: null, seed: 0, completions: {}, ownerKey: null } as const;
+
+/** Captures the owner at mutation start and writes through the guarded journal. */
+const persist = (entries: [Domain, unknown][]) => {
+  const active = scope;
+  if (!active) return;
+  for (const [domain, value] of entries) {
+    active.store.writeGuarded(active.token, domain, value).catch(() => {});
   }
 };
 
 export const usePlanStore = create<PlanStore>((set, get) => ({
   hydrated: false,
-  step: 0,
-  answers: {},
-  plan: null,
-  seed: 0,
-  completions: {},
+  ...EMPTY,
 
   hydrate: async () => {
+    const active = scope;
+    if (!active) return; // no read before the owner is resolved
     if (get().hydrated) return;
+    const owner = { kind: active.token.kind, id: active.token.id };
     try {
       const [plan, answers, seed, step, completions] = await Promise.all([
-        storage.getItem<Plan | null>(KEY_PLAN, null),
-        storage.getItem<Partial<Answers>>(KEY_ANSWERS, {}),
-        storage.getItem<number>(KEY_SEED, 0),
-        storage.getItem<number>(KEY_STEP, 0),
-        storage.getItem<CompletionsMap>(KEY_COMPLETIONS, {}),
+        active.store.read<Plan | null>(owner, "plan", null),
+        active.store.read<Partial<Answers>>(owner, "planAnswers", {}),
+        active.store.read<number>(owner, "planSeed", 0),
+        active.store.read<number>(owner, "onboardingStep", 0),
+        active.store.read<CompletionsMap>(owner, "planCompletions", {}),
       ]);
+      // A late resolution for a previous owner must never be published.
+      if (scope !== active) return;
       set({
         hydrated: true,
+        ownerKey: scopeKeyOf(active.token),
         plan: plan || null,
         answers: answers || {},
         seed: seed || 0,
@@ -71,19 +98,21 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
         completions: completions || {},
       });
     } catch {
-      set({ hydrated: true });
+      set({ hydrated: true, ownerKey: scopeKeyOf(active.token) });
     }
   },
 
+  resetForOwner: () => set({ hydrated: false, ...EMPTY }),
+
   setStep: (n) => {
     set({ step: n });
-    persist({ [KEY_STEP]: n });
+    persist([["onboardingStep", n]]);
   },
 
   setAnswers: (patch) => {
     const next = { ...get().answers, ...patch };
     set({ answers: next });
-    persist({ [KEY_ANSWERS]: next });
+    persist([["planAnswers", next]]);
   },
 
   reshuffle: () => {
@@ -92,26 +121,31 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     const seed = Math.floor(Math.random() * 2_147_483_647);
     const plan = buildPlan(ans, seed);
     set({ plan, seed });
-    persist({ [KEY_PLAN]: plan, [KEY_SEED]: seed });
+    persist([
+      ["plan", plan],
+      ["planSeed", seed],
+    ]);
   },
 
   rebuildFromAnswers: (final) => {
     const seed = Math.floor(Math.random() * 2_147_483_647);
     const plan = buildPlan(final, seed);
     set({ plan, seed, answers: final, step: 100 });
-    persist({
-      [KEY_PLAN]: plan,
-      [KEY_SEED]: seed,
-      [KEY_ANSWERS]: final,
-      [KEY_STEP]: 100,
-    });
+    persist([
+      ["plan", plan],
+      ["planSeed", seed],
+      ["planAnswers", final],
+      ["onboardingStep", 100],
+    ]);
   },
 
   resetAll: () => {
-    set({ step: 0, answers: {}, plan: null, seed: 0, completions: {} });
-    for (const k of [KEY_PLAN, KEY_ANSWERS, KEY_SEED, KEY_STEP, KEY_COMPLETIONS]) {
-      storage.removeItem(k).catch(() => {});
-    }
+    set({ ...EMPTY });
+    const active = scope;
+    if (!active) return;
+    // Explicit deletion, targeting this verified owner only.
+    const owner = { kind: active.token.kind, id: active.token.id };
+    for (const domain of PLAN_DOMAINS) active.store.clear(owner, domain).catch(() => {});
   },
 
   toggleCompletion: (dateISO, exId, done) => {
@@ -120,7 +154,7 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     if (done) next[key] = true;
     else delete next[key];
     set({ completions: next });
-    persist({ [KEY_COMPLETIONS]: next });
+    persist([["planCompletions", next]]);
   },
 
   isCompleted: (dateISO, exId) => {

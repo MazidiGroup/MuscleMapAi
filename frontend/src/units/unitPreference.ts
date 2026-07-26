@@ -7,25 +7,40 @@
 //  - migrated legacy values are kg and are never numerically reinterpreted.
 
 import { Owner } from "./../owner/scopeKeys";
-import { ScopedStore } from "./../owner/scopedStore";
+import { OwnerToken, ScopedStore } from "./../owner/scopedStore";
 
 export type WeightUnit = "lb" | "kg";
 
 export const SUPPORTED_UNITS: WeightUnit[] = ["lb", "kg"];
 
-/** Regions that use pounds for bodyweight/training loads. */
+/** Regions that use pounds for bodyweight and training loads. */
 const POUND_REGIONS = new Set(["US", "LR", "MM"]);
 
 export function isWeightUnit(v: unknown): v is WeightUnit {
   return v === "lb" || v === "kg";
 }
 
-/** Deterministic locale → unit mapping. Locale is injected so tests are stable. */
+/**
+ * Locale → unit. Measurement units are a REGIONAL property, never a language
+ * property, so a language-only locale (`en`, `es`) resolves to kg. Only a
+ * reliable region of US, LR or MM yields lb. Locale is injected so the mapping
+ * is deterministic in tests.
+ */
 export function unitForLocale(locale: string | null | undefined): WeightUnit {
-  if (!locale) return "kg";
-  const region = locale.replace("_", "-").split("-").slice(1).find((p) => /^[A-Za-z]{2}$/.test(p));
-  if (!region) return locale.toLowerCase() === "en" ? "lb" : "kg";
-  return POUND_REGIONS.has(region.toUpperCase()) ? "lb" : "kg";
+  const region = regionOf(locale);
+  if (!region) return "kg"; // missing or ambiguous region
+  return POUND_REGIONS.has(region) ? "lb" : "kg";
+}
+
+/** Extracts an ISO 3166-1 alpha-2 region from a BCP 47 / POSIX locale tag. */
+export function regionOf(locale: string | null | undefined): string | null {
+  if (typeof locale !== "string" || !locale) return null;
+  const tag = locale.replace(/_/g, "-").split(".")[0];
+  const parts = tag.split("-").slice(1);
+  for (const p of parts) {
+    if (/^[A-Za-z]{2}$/.test(p)) return p.toUpperCase();
+  }
+  return null;
 }
 
 export function deviceLocale(): string | null {
@@ -50,9 +65,9 @@ export async function resolveUnitPreference(
   return { unit: unitForLocale(locale), source: "locale" };
 }
 
-export async function setUnitPreference(store: ScopedStore, owner: Owner | null, unit: WeightUnit) {
+export async function setUnitPreference(store: ScopedStore, owner: OwnerToken | null, unit: WeightUnit) {
   if (!isWeightUnit(unit)) throw new Error("unsupported unit");
-  return store.write(owner, "unitPreference", unit);
+  return store.writeGuarded(owner, "unitPreference", unit);
 }
 
 /**

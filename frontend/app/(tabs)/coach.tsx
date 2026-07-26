@@ -33,7 +33,7 @@ const DEFAULT_SUGGESTIONS = [
 
 // Build suggestions from the user's local workout history (nothing leaves the device
 // until the user actually taps one and sends it as a normal chat message).
-function buildSuggestions(history: Workout[], prs: PRs): string[] {
+function buildSuggestions(history: Workout[], prs: PRs, unit: string): string[] {
   if (!FLAGS.coachV2 || history.length === 0) return DEFAULT_SUGGESTIONS;
   const out: string[] = [];
   const weekly = weeklySetsByGroup(history);
@@ -41,7 +41,7 @@ function buildSuggestions(history: Workout[], prs: PRs): string[] {
   if (trained[0]) out.push(`I trained ${trained[0].label.toLowerCase()} recently. How long should I rest before training it again?`);
   if (weekly.neglected.length > 0) out.push(`I haven't trained ${weekly.neglected.slice(0, 2).join(" or ").toLowerCase()} this week. Suggest a simple session.`);
   const pr = topPRs(prs, 1)[0];
-  if (pr && pr.maxWeight > 0) out.push(`My best ${pr.name.toLowerCase()} is ${pr.maxWeight} kg. How do I keep progressing?`);
+  if (pr && pr.maxWeight > 0) out.push(`My best ${pr.name.toLowerCase()} is ${pr.maxWeight} ${unit}. How do I keep progressing?`);
   for (const s of DEFAULT_SUGGESTIONS) {
     if (out.length >= 4) break;
     out.push(s);
@@ -91,7 +91,7 @@ function CoachContent() {
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
   const params = useLocalSearchParams<{ q?: string }>();
-  const { history: workoutHistory, prs } = useWorkout();
+  const { history: workoutHistory, prs, unit } = useWorkout();
   const [messages, setMessages] = useState<CoachTurn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -100,7 +100,7 @@ function CoachContent() {
   const reqRef = useRef<CoachRequestHandle | null>(null);
   const stoppedRef = useRef(false);
 
-  const suggestions = useMemo(() => buildSuggestions(workoutHistory, prs), [workoutHistory, prs]);
+  const suggestions = useMemo(() => buildSuggestions(workoutHistory, prs, unit), [workoutHistory, prs, unit]);
 
   // Leaving the Coach screen cancels any in-flight request (saves quota + battery).
   useFocusEffect(

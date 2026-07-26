@@ -8,7 +8,7 @@
 // An in-process latch also serialises concurrent starts for the same owner.
 
 import { Owner } from "./../owner/scopeKeys";
-import { ScopedStore, WriteResult } from "./../owner/scopedStore";
+import { OwnerToken, ScopedStore, WriteResult } from "./../owner/scopedStore";
 
 /** Exercise identifiers are preserved exactly, together with their source space. */
 export type ExerciseIdSpace = "anatomy" | "plan";
@@ -55,7 +55,7 @@ export async function readActiveSession(store: ScopedStore, owner: Owner | null)
 /** Returns the existing session when one exists — it can never create a duplicate. */
 export async function startSession(
   store: ScopedStore,
-  owner: Owner,
+  owner: OwnerToken,
   now: () => number = Date.now,
 ): Promise<ActiveSession | null> {
   const key = ownerKey(owner);
@@ -74,7 +74,7 @@ export async function startSession(
       updatedAt: now(),
       exercises: [],
     };
-    const res = await store.write(owner, "activeSession", session);
+    const res = await store.writeGuarded(owner, "activeSession", session);
     return res.ok ? session : null;
   })().finally(() => latches.delete(key));
 
@@ -88,16 +88,17 @@ export async function startSession(
  */
 export async function mutateSession(
   store: ScopedStore,
-  owner: Owner,
+  owner: OwnerToken,
   fn: (s: ActiveSession) => ActiveSession,
   now: () => number = Date.now,
 ): Promise<WriteResult> {
   const current = await readActiveSession(store, owner);
   if (!current) return { ok: false, reason: "unresolved_owner" };
   const next = { ...fn(current), updatedAt: now(), ownerId: owner.id, ownerKind: owner.kind };
-  return store.write(owner, "activeSession", next);
+  return store.writeGuarded(owner, "activeSession", next);
 }
 
+/** Explicit deletion for this verified owner. */
 export async function endSession(store: ScopedStore, owner: Owner): Promise<void> {
   await store.clear(owner, "activeSession");
 }

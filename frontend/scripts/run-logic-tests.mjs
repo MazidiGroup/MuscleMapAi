@@ -45,46 +45,86 @@ const tsc = findTsc();
 const typeRoots = findTypeRoots();
 const out = fs.mkdtempSync(path.join(os.tmpdir(), "mma-phase1-tests-"));
 
-const entries = [
-  "__tests__/owner.test.ts",
-  "__tests__/migration.test.ts",
-  "__tests__/units.test.ts",
-  "__tests__/session.test.ts",
-  "__tests__/safety.test.ts",
-];
+const entries = fs
+  .readdirSync(path.join(root, "__tests__"))
+  .filter((f) => f.endsWith(".test.ts"))
+  .sort()
+  .map((f) => path.join("__tests__", f));
 
-execFileSync(
-  tsc,
-  [
-    ...entries,
-    "--outDir",
-    out,
-    "--rootDir",
-    ".",
-    "--module",
-    "commonjs",
-    "--moduleResolution",
-    "node",
-    "--target",
-    "es2021",
-    "--lib",
-    "es2021",
-    "--typeRoots",
-    typeRoots,
-    "--types",
-    "node",
-    "--strict",
-    "true",
-    "--skipLibCheck",
-    "--esModuleInterop",
-  ],
-  { cwd: root, stdio: "inherit" },
+// A temp tsconfig (outside the repo) supplies the `@/` path mapping that the CLI
+// flags cannot express. Only the test entrypoints are listed; tsc follows imports.
+const tsconfigPath = path.join(out, "tsconfig.tests.json");
+fs.writeFileSync(
+  tsconfigPath,
+  JSON.stringify(
+    {
+      compilerOptions: {
+        target: "es2021",
+        lib: ["es2021"],
+        module: "commonjs",
+        moduleResolution: "node",
+        strict: true,
+        skipLibCheck: true,
+        esModuleInterop: true,
+        resolveJsonModule: true,
+        allowJs: true,
+        checkJs: false,
+        types: ["node"],
+        typeRoots: [typeRoots],
+        baseUrl: root,
+        paths: { "@/*": ["./*"] },
+        rootDir: root,
+        outDir: out,
+      },
+      include: entries.map((e) => path.join(root, e)),
+    },
+    null,
+    2,
+  ),
 );
+
+execFileSync(tsc, ["-p", tsconfigPath], { cwd: root, stdio: "inherit" });
+
+// The app uses the `@/` path alias. tsc keeps the specifier verbatim, so rewrite
+// it to a relative require in the emitted CommonJS. The emitted tree mirrors the
+// source tree (rootDir "."), which makes this a deterministic transform.
+function rewriteAliases(dir) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) rewriteAliases(p);
+    else if (p.endsWith(".js")) {
+      const src = fs.readFileSync(p, "utf8");
+      const next = src.replace(/require\("@\/([^"]+)"\)/g, (_m, rel) => {
+        let target = path.relative(path.dirname(p), path.join(out, rel)).split(path.sep).join("/");
+        if (!target.startsWith(".")) target = `./${target}`;
+        return `require("${target}")`;
+      });
+      if (next !== src) fs.writeFileSync(p, next);
+    }
+  }
+}
+rewriteAliases(out);
+
+// `src/plan/exercises.js` is a plain JS module fronted by a hand-written .d.ts,
+// so tsc never emits it. Copy it verbatim so the Plan adapter can be exercised.
+const JS_PASSTHROUGH = ["src/plan/exercises.js"];
+for (const rel of JS_PASSTHROUGH) {
+  const dest = path.join(out, rel);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(path.join(root, rel), dest);
+}
 
 const res = spawnSync(process.execPath, ["--test", path.join(out, "__tests__")], {
   cwd: root,
   stdio: "inherit",
-  env: { ...process.env, MMA_TEST_ROOT: root },
+  env: {
+    ...process.env,
+    MMA_TEST_ROOT: root,
+    // the emitted tests live in a temp dir, so point Node at the app's modules
+    NODE_PATH: [path.join(root, "node_modules"), path.dirname(typeRoots)]
+      .filter((p) => fs.existsSync(p))
+      .join(path.delimiter),
+  },
 });
 
 fs.rmSync(out, { recursive: true, force: true });

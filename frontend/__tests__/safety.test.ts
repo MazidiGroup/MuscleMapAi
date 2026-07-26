@@ -26,6 +26,39 @@ const NEW_SOURCES = [
   "src/theme/semantic.ts",
 ];
 
+/** The complete active Plan + Workout data-access path, not just new folders. */
+const DATA_PATH_SOURCES = [
+  ...walk("src/plan"),
+  ...walk("src/anatomy"),
+  ...walk("src/owner"),
+  ...walk("src/session"),
+  ...walk("src/units"),
+  ...walk("app"),
+  "src/api.ts",
+  "src/theme/ThemeContext.tsx",
+];
+
+const LEGACY_KEYS = [
+  "mma.themeMode",
+  "mma.plan.v1",
+  "mma.plan.answers.v1",
+  "mma.plan.seed.v1",
+  "mma.plan.onboardingStep.v1",
+  "mma.plan.completions.v1",
+  "anat.workouts",
+  "anat.prs",
+  "anat.restPref",
+  "apex.session_token",
+];
+
+/** Only these modules may name a legacy key at all. */
+const LEGACY_ALLOWED = new Set([
+  "src/owner/legacySources.ts", // read-only source table
+  "src/owner/scopeKeys.ts", // preservation registry
+  "src/theme/ThemeContext.tsx", // mma.themeMode stays global by contract
+  "src/api.ts", // apex.session_token is the auth session, not app data
+]);
+
 test("cold launch never lands on a Premium tab", () => {
   const index = read("app/index.tsx").replace(/\/\/.*$/gm, "");
   assert.match(index, /href="\/\(tabs\)\/plan"/);
@@ -66,25 +99,77 @@ test("the new layer never touches RevenueCat", () => {
   }
 });
 
-test("no normal write targets a legacy key", () => {
-  const legacy = [
-    "mma.themeMode",
-    "mma.plan.v1",
-    "mma.plan.answers.v1",
-    "mma.plan.seed.v1",
-    "mma.plan.onboardingStep.v1",
-    "mma.plan.completions.v1",
-    "anat.workouts",
-    "anat.prs",
-    "anat.restPref",
-    "apex.session_token",
-  ];
-  // Only the read-only legacy source table and the preservation list may name them.
-  const allowed = new Set(["src/owner/legacySources.ts", "src/owner/scopeKeys.ts"]);
-  for (const f of NEW_SOURCES) {
-    if (allowed.has(f)) continue;
-    for (const k of legacy) assert.equal(read(f).includes(`"${k}"`), false, `${f} references ${k}`);
+test("no file in the active Plan/Workout data path references a legacy key", () => {
+  for (const f of DATA_PATH_SOURCES) {
+    if (LEGACY_ALLOWED.has(f)) continue;
+    const src = read(f);
+    for (const k of LEGACY_KEYS) {
+      assert.equal(src.includes(`"${k}"`), false, `${f} references legacy key ${k}`);
+      assert.equal(src.includes(`'${k}'`), false, `${f} references legacy key ${k}`);
+    }
   }
+});
+
+test("legacy sources are reachable only through the migration subsystem", () => {
+  const allowedImporters = new Set(["src/owner/migration.ts", "src/owner/legacySources.ts"]);
+  for (const f of DATA_PATH_SOURCES) {
+    if (allowedImporters.has(f)) continue;
+    const src = read(f);
+    assert.doesNotMatch(src, /legacySources/, `${f} must not import the legacy readers`);
+    assert.doesNotMatch(src, /snapshotLegacy|readLegacy\(/, `${f} must not read legacy data`);
+  }
+});
+
+test("the Plan and Workout stores persist only through the owner-scoped layer", () => {
+  const plan = read("src/plan/planStore.ts");
+  assert.doesNotMatch(plan, /from "@\/src\/utils\/storage"/, "no direct device storage in the Plan store");
+  assert.match(plan, /writeGuarded/);
+  assert.match(plan, /if \(!active\) return; \/\/ no read before the owner is resolved/);
+
+  const workout = read("src/anatomy/workoutStore.tsx");
+  assert.doesNotMatch(workout, /from "@\/src\/utils\/storage"/, "no direct device storage in the Workout store");
+  assert.match(workout, /hydrateWorkoutScope/);
+  assert.match(workout, /useOwner\(\)/);
+
+  const scope = read("src/anatomy/workoutScope.ts");
+  assert.match(scope, /writeGuarded/);
+  for (const k of LEGACY_KEYS) assert.equal(scope.includes(`"${k}"`), false);
+});
+
+test("adoption of ownerless legacy data is never triggered automatically", () => {
+  for (const f of DATA_PATH_SOURCES) {
+    if (f === "src/owner/migration.ts") continue;
+    assert.doesNotMatch(read(f), /adoptLegacy/, `${f} must not invoke adoption`);
+  }
+  const ctx = read("src/owner/OwnerContext.tsx");
+  assert.match(ctx, /scanLegacy/, "launch only scans");
+  assert.doesNotMatch(ctx, /adoptLegacy/);
+  const migration = read("src/owner/migration.ts");
+  assert.match(migration, /unclaimed_without_verified_owner/);
+  assert.doesNotMatch(migration, /device_guest_only/);
+  assert.doesNotMatch(migration, /not_guest_scope/);
+});
+
+test("owner ids are treated as opaque and safely encoded", () => {
+  const keys = read("src/owner/scopeKeys.ts");
+  assert.doesNotMatch(keys, /A-Za-z0-9_-\]\{4,128\}/, "no invented character/length rule");
+  assert.match(keys, /encodeBase64Url/);
+  assert.match(keys, /typeof id === "string" && id\.length > 0/);
+});
+
+test("owner-change handling is non-destructive", () => {
+  const store = read("src/owner/scopedStore.ts");
+  assert.match(store, /pendingKey/);
+  // the only removals are of pending journal data or an explicit clear()
+  const removals = [...store.matchAll(/this\.kv\.remove\(([^)]*)\)/g)].map((m) => m[1]);
+  for (const r of removals) {
+    assert.ok(
+      r.includes("pending") || r.includes("this.keyFor(owner, domain"),
+      `unexpected removal target: ${r}`,
+    );
+  }
+  // no atomicity is claimed anywhere; the disclaimer is explicit
+  assert.match(store, /There is no AsyncStorage transaction and none is claimed/);
 });
 
 test("the local-asset component carries no network wording", () => {

@@ -10,6 +10,7 @@ import { WorkoutProvider } from "@/src/anatomy/workoutStore";
 import { PremiumProvider } from "@/src/premium/PremiumContext";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
 import { OwnerProvider, useOwner } from "@/src/owner/OwnerContext";
+import { ScopeBridge } from "@/src/owner/ScopeBridge";
 import { ThemeProvider, useTheme } from "@/src/theme/ThemeContext";
 import { LoadingScreen } from "@/src/theme/LoadingScreen";
 
@@ -72,7 +73,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 function OwnerGate({ children }: { children: React.ReactNode }) {
   const { ready } = useOwner();
   if (!ready) return <LoadingScreen />;
-  return <>{children}</>;
+  return <ScopeBridge>{children}</ScopeBridge>;
 }
 
 function ThemedStack() {

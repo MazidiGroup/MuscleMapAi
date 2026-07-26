@@ -17,46 +17,69 @@ import {
 const guest: Owner = { kind: "guest", id: "g_units00001" };
 
 function make() {
-  let current: Owner | null = guest;
+  let current: any = { ...guest, generation: 1 };
   const kv = new MemoryKV();
-  return { kv, store: new ScopedStore(kv, () => current), setOwner: (o: Owner | null) => (current = o) };
+  return { kv, store: new ScopedStore(kv, () => current), setOwner: (o: any) => (current = o) };
 }
 
 test("exactly lb and kg are supported and both persist", async () => {
   assert.deepEqual(SUPPORTED_UNITS, ["lb", "kg"]);
   const { store } = make();
   for (const u of SUPPORTED_UNITS) {
-    await setUnitPreference(store, guest, u);
+    await setUnitPreference(store, { ...guest, generation: 1 }, u);
     assert.deepEqual(await resolveUnitPreference(store, guest, "en-GB"), { unit: u, source: "stored" });
   }
-  await assert.rejects(async () => setUnitPreference(store, guest, "lbs" as any));
+  await assert.rejects(async () => setUnitPreference(store, { ...guest, generation: 1 }, "lbs" as any));
 });
 
 test("Workout and History adapters resolve through one preference", async () => {
   const { store } = make();
-  await setUnitPreference(store, guest, "kg");
+  await setUnitPreference(store, { ...guest, generation: 1 }, "kg");
   const workoutUnit = (await resolveUnitPreference(store, guest, "en-US")).unit;
   const historyUnit = (await resolveUnitPreference(store, guest, "en-US")).unit;
   assert.equal(workoutUnit, historyUnit);
   assert.equal(workoutUnit, "kg", "a stored preference always beats the locale fallback");
 });
 
-test("a new owner gets a deterministic locale-aware initial unit", async () => {
+test("locale resolution is regional, never language-based", async () => {
   const { store } = make();
-  assert.equal((await resolveUnitPreference(store, guest, "en-US")).unit, "lb");
+  const cases: [string | null | undefined, "lb" | "kg"][] = [
+    ["en-US", "lb"],
+    ["en-GB", "kg"],
+    ["en", "kg"], // language only -> never lb
+    ["es-US", "lb"],
+    ["fr-CA", "kg"],
+    ["de-DE", "kg"],
+    ["en_US", "lb"],
+    ["en-US.UTF-8", "lb"],
+    ["my-MM", "lb"],
+    ["en-LR", "lb"],
+    ["es", "kg"],
+    [null, "kg"],
+    [undefined, "kg"],
+    ["", "kg"],
+  ];
+  for (const [locale, expected] of cases) {
+    assert.equal(unitForLocale(locale), expected, `unitForLocale(${String(locale)})`);
+    assert.equal((await resolveUnitPreference(store, guest, locale ?? null)).unit, expected);
+  }
   assert.equal((await resolveUnitPreference(store, guest, "en-US")).source, "locale");
-  assert.equal((await resolveUnitPreference(store, guest, "en-GB")).unit, "kg");
-  assert.equal((await resolveUnitPreference(store, guest, "de-DE")).unit, "kg");
-  assert.equal(unitForLocale("en_US"), "lb");
-  assert.equal(unitForLocale(null), "kg", "no signal never becomes a global lb default");
+});
+
+test("a persisted preference always overrides the locale", async () => {
+  const { store } = make();
+  await setUnitPreference(store, { ...guest, generation: 1 }, "kg");
+  assert.deepEqual(await resolveUnitPreference(store, guest, "en-US"), { unit: "kg", source: "stored" });
+  await setUnitPreference(store, { ...guest, generation: 1 }, "lb");
+  assert.deepEqual(await resolveUnitPreference(store, guest, "en-GB"), { unit: "lb", source: "stored" });
 });
 
 test("owner scopes hold independent unit preferences", async () => {
   const { store, setOwner } = make();
   const account: Owner = { kind: "account", id: "user_unit00001" };
-  await setUnitPreference(store, guest, "kg");
-  setOwner(account);
-  await setUnitPreference(store, account, "lb");
+  await setUnitPreference(store, { ...guest, generation: 1 }, "kg");
+  setOwner({ ...account, generation: 2 });
+  await setUnitPreference(store, { ...account, generation: 2 }, "lb");
   assert.equal((await resolveUnitPreference(store, guest, "en-GB")).unit, "kg");
   assert.equal((await resolveUnitPreference(store, account, "en-GB")).unit, "lb");
 });

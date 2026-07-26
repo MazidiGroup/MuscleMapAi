@@ -33,7 +33,7 @@ export function InsightsView() {
   const { mode } = useTheme();
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
-  const { history, prs } = useWorkout();
+  const { history, prs, unit } = useWorkout();
   const [period, setPeriod] = useState<Period>("week");
 
   const days = period === "week" ? 7 : 30;
@@ -108,7 +108,7 @@ export function InsightsView() {
                 </View>
                 <View style={styles.wStat}>
                   <Text style={styles.wValue}>{fmtVol(stats.volume)}</Text>
-                  <Text style={styles.wLabel}>Volume (kg)</Text>
+                  <Text style={styles.wLabel}>{`Volume (${unit})`}</Text>
                 </View>
                 <View style={styles.wStat}>
                   <Text style={styles.wValue}>{period === "month" ? stats.perWeek : activation.list.filter((g) => g.sets > 0).length}</Text>
@@ -180,8 +180,8 @@ export function InsightsView() {
                     {r.name}
                   </Text>
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={styles.prWeight}>{r.maxWeight > 0 ? `${r.maxWeight} kg` : "—"}</Text>
-                    <Text style={styles.prVol}>{fmtVol(r.maxVolume)} kg best session</Text>
+                    <Text style={styles.prWeight}>{r.maxWeight > 0 ? `${r.maxWeight} ${unit}` : "—"}</Text>
+                    <Text style={styles.prVol}>{`${fmtVol(r.maxVolume)} ${unit} best session`}</Text>
                   </View>
                 </View>
               ))}
@@ -201,7 +201,7 @@ export function InsightsView() {
               </View>
             ))}
           </View>
-          <Text style={styles.hint}>Total weight lifted (kg) per week over the last {series.length} weeks.</Text>
+          <Text style={styles.hint}>{`Total weight lifted (${unit}) per week over the last ${series.length} weeks.`}</Text>
 
           {/* Citations — Guideline 1.4.1: sources for recovery timing & training data */}
           <TouchableOpacity

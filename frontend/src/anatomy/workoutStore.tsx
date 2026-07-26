@@ -1,5 +1,16 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { storage } from "@/src/utils/storage";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useOwner } from "@/src/owner/OwnerContext";
+import { WeightUnit, setUnitPreference } from "@/src/units/unitPreference";
+import {
+  EMPTY_PRS,
+  buildActiveSession,
+  clearActiveSession,
+  hydrateWorkoutScope,
+  persistActiveSession,
+  persistHistory,
+  persistPRs,
+  persistRestPref,
+} from "./workoutScope";
 import { getExercise } from "./exercises";
 import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS, GYM_GROUP_ORDER } from "./groups";
@@ -17,22 +28,10 @@ export type SessionExercise = {
 export type Workout = { id: string; date: number; durationSec: number; exercises: SessionExercise[] };
 export type PRs = { byExercise: Record<string, { maxWeight: number; maxVolume: number }>; longestSec: number };
 
-const HISTORY_KEY = "anat.workouts";
-const PR_KEY = "anat.prs";
-const REST_KEY = "anat.restPref";
+// Persistence is owner-scoped and lives in ./workoutScope. The legacy `anat.*`
+// keys are read-only sources owned by the migration subsystem.
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-
-async function loadJSON<T>(key: string, fallback: T): Promise<T> {
-  const raw = await storage.getItem<string>(key, "");
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-const saveJSON = (key: string, v: any) => storage.setItem(key, JSON.stringify(v));
 
 export function workoutStats(exs: SessionExercise[]) {
   let sets = 0,
@@ -109,22 +108,82 @@ type Ctx = {
   setRestPref: (n: number) => void;
   finish: () => { workout: Workout; newPRs: string[] } | null;
   cancel: () => void;
+  /** The one stored weight unit for Workout and History. */
+  unit: WeightUnit;
+  setUnit: (u: WeightUnit) => void;
+  /** False until this owner's scope has hydrated. */
+  hydrated: boolean;
 };
 
 const WorkoutContext = createContext<Ctx | null>(null);
 
 export function WorkoutProvider({ children }: { children: React.ReactNode }) {
+  const { owner, token, ready, store } = useOwner();
+  const ownerKey = token ? `${token.kind}:${token.id}:${token.generation}` : "none";
+
   const [session, setSession] = useState<SessionExercise[] | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [restPref, setRestPrefState] = useState(60);
   const [history, setHistory] = useState<Workout[]>([]);
-  const [prs, setPRs] = useState<PRs>({ byExercise: {}, longestSec: 0 });
+  const [prs, setPRs] = useState<PRs>(EMPTY_PRS);
+  const [unit, setUnitState] = useState<WeightUnit>("kg");
+  const [hydratedFor, setHydratedFor] = useState<string | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
+  // Owner-scoped hydration. Stale values are dropped the moment the owner
+  // changes, so a previous owner's History can never render.
   useEffect(() => {
-    loadJSON<Workout[]>(HISTORY_KEY, []).then(setHistory);
-    loadJSON<PRs>(PR_KEY, { byExercise: {}, longestSec: 0 }).then(setPRs);
-    storage.getItem<number>(REST_KEY, 60).then((v) => v && setRestPrefState(Number(v)));
-  }, []);
+    let cancelled = false;
+    setHistory([]);
+    setPRs(EMPTY_PRS);
+    setRestPrefState(60);
+    setSession(null);
+    setStartedAt(null);
+    setUnitState("kg");
+    setHydratedFor(null);
+    sessionIdRef.current = null;
+    if (!ready || !owner) return;
+
+    (async () => {
+      const snap = await hydrateWorkoutScope(store, owner);
+      if (cancelled) return;
+      setHistory(snap.history);
+      setPRs(snap.prs);
+      setRestPrefState(snap.restPref);
+      setUnitState(snap.unit);
+      if (snap.active) {
+        sessionIdRef.current = snap.active.sessionId;
+        setSession(
+          snap.active.exercises.map((e) => ({
+            exerciseId: e.exerciseId,
+            sets: e.sets,
+            notes: e.notes,
+            planLink: e.planLink,
+          })),
+        );
+        setStartedAt(snap.active.startedAt);
+      }
+      setHydratedFor(ownerKey);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerKey, ready, owner, store]);
+
+  // Persist the active session so an interruption cannot lose it. One key per
+  // owner means one active session per owner.
+  useEffect(() => {
+    if (hydratedFor !== ownerKey || !token || !owner) return;
+    if (session === null) {
+      sessionIdRef.current = null;
+      clearActiveSession(store, owner).catch(() => {});
+      return;
+    }
+    if (!sessionIdRef.current) sessionIdRef.current = `s_${Date.now().toString(36)}_${uid()}`;
+    const payload = buildActiveSession(token, sessionIdRef.current, startedAt ?? Date.now(), session);
+    persistActiveSession(store, token, payload).catch(() => {});
+  }, [session, startedAt, hydratedFor, ownerKey, token, owner, store]);
 
   const startWorkout = useCallback(() => {
     setSession([]);
@@ -205,10 +264,21 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const setNotes = useCallback((exId: string, notes: string) => mutate(exId, (e) => ({ ...e, notes })), []);
 
-  const setRestPref = useCallback((n: number) => {
-    setRestPrefState(n);
-    saveJSON(REST_KEY, n);
-  }, []);
+  const setRestPref = useCallback(
+    (n: number) => {
+      setRestPrefState(n);
+      persistRestPref(store, token, n).catch(() => {});
+    },
+    [store, token],
+  );
+
+  const setUnit = useCallback(
+    (u: WeightUnit) => {
+      setUnitState(u);
+      setUnitPreference(store, token, u).catch(() => {});
+    },
+    [store, token],
+  );
 
   const finish = useCallback(() => {
     if (!session || session.length === 0) return null;
@@ -225,8 +295,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       const maxW = Math.max(0, ...done.map((s) => s.weight));
       const vol = done.reduce((a, s) => a + s.weight * s.reps, 0);
       const cur = nextPRs.byExercise[e.exerciseId] || { maxWeight: 0, maxVolume: 0 };
-      if (maxW > cur.maxWeight && maxW > 0) newPRs.push(`${ex?.name || e.exerciseId}: ${maxW} kg`);
-      if (vol > cur.maxVolume && vol > 0) newPRs.push(`${ex?.name || e.exerciseId}: ${vol} kg volume`);
+      if (maxW > cur.maxWeight && maxW > 0) newPRs.push(`${ex?.name || e.exerciseId}: ${maxW} ${unit}`);
+      if (vol > cur.maxVolume && vol > 0) newPRs.push(`${ex?.name || e.exerciseId}: ${vol} ${unit} volume`);
       nextPRs.byExercise[e.exerciseId] = { maxWeight: Math.max(cur.maxWeight, maxW), maxVolume: Math.max(cur.maxVolume, vol) };
     }
     if (durationSec > nextPRs.longestSec) {
@@ -237,12 +307,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     const nextHistory = [workout, ...history];
     setHistory(nextHistory);
     setPRs(nextPRs);
-    saveJSON(HISTORY_KEY, nextHistory);
-    saveJSON(PR_KEY, nextPRs);
+    persistHistory(store, token, nextHistory).catch(() => {});
+    persistPRs(store, token, nextPRs).catch(() => {});
     setSession(null);
     setStartedAt(null);
     return { workout, newPRs };
-  }, [session, startedAt, history, prs]);
+  }, [session, startedAt, history, prs, store, token, unit]);
 
   const cancel = useCallback(() => {
     setSession(null);
@@ -284,6 +354,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setRestPref,
         finish,
         cancel,
+        unit,
+        setUnit,
+        hydrated: hydratedFor === ownerKey,
       }}
     >
       {children}

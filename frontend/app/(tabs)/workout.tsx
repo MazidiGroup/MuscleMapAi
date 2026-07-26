@@ -154,7 +154,7 @@ export default function WorkoutScreen() {
         <View style={styles.histStats}>
           <Text style={styles.histStat}>{wk.exercises.length} exercises</Text>
           <Text style={styles.histStat}>{st.completed} sets</Text>
-          <Text style={styles.histStat}>{st.volume} kg</Text>
+          <Text style={styles.histStat}>{`${st.volume} ${w.unit}`}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -260,7 +260,7 @@ export default function WorkoutScreen() {
               <View style={styles.statsBar}>
                 <SBStat label="Exercises" value={`${w.session.length}`} styles={styles} />
                 <SBStat label="Sets" value={`${stats.completed}/${stats.sets}`} styles={styles} />
-                <SBStat label="Volume" value={`${stats.volume}kg`} styles={styles} />
+                <SBStat label="Volume" value={`${stats.volume}${w.unit}`} styles={styles} />
               </View>
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
                 {w.session.map((se) => {
