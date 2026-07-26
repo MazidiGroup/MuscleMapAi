@@ -22,12 +22,18 @@ export const MANIFEST_PATH = "release-source.manifest.json";
 
 /**
  * Documented set of release-critical files. Chosen so that any swap to a legacy or
- * unapproved source tree changes at least one entry, while ordinary evidence,
- * lockfile or dependency churn does not.
+ * unapproved source tree changes at least one entry, while ordinary evidence churn
+ * does not.
+ *
+ * `yarn.lock` is included deliberately: the dependency graph is part of what ships,
+ * so a substituted or stale lockfile must fail the gate in the build job, before any
+ * dependency is installed. An intentional lockfile change therefore requires this
+ * manifest to be regenerated and committed with it.
  */
 export const RELEASE_CRITICAL_FILES = [
   "app.json",
   "eas.json",
+  "yarn.lock",
   "app/_layout.tsx",
   "app/(tabs)/_layout.tsx",
   "app/(tabs)/library.tsx",

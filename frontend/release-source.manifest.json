@@ -1,11 +1,12 @@
 {
   "note": "Release-source fingerprint. Regenerate with `yarn release:manifest` after an approved source change. Contains no secret or environment value.",
   "algorithm": "sha256",
-  "fileCount": 21,
-  "fingerprint": "1e7dddbc6adea3450d945c3770e3073542b6aaebcfb81c933b26b953a272c08d",
+  "fileCount": 22,
+  "fingerprint": "d596b2065d127d4df8a5b4453e0e2e41f0d5ad72baf8b103825e92f24787e619",
   "files": {
     "app.json": "ab11c2a3a224d60f6f0e137126c718db0cae2dcac1536bc715e95c0aa05230fc",
     "eas.json": "4a12a265ff7842bd25656f70f48f7067e7e13e2616400fac86ca8a3d39eb277c",
+    "yarn.lock": "08fa989a12627f3a8a11d1210565e0926f734b5a7bbf0f8d8c0f903779047c6b",
     "app/_layout.tsx": "8d6b242112b4df82d583e3fc880943491d9609365271d9c8098b54087aaf53f8",
     "app/(tabs)/_layout.tsx": "4e5cae502513bcd2d9a16849c9868aa4dfd0c3274006f0082d51fbbaf55f683d",
     "app/(tabs)/library.tsx": "51b1631f03284abd20b8b5ac214a3a72d9eba7263a3fc86b939019773fea2f12",
