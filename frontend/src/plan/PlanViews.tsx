@@ -13,21 +13,34 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { useTheme } from "@/src/theme/ThemeContext";
+import { useSemanticTokens } from "@/src/theme/semantic";
 import { R } from "@/src/theme/tokens";
+import { ActionButton, InfoBanner, InterruptedSessionCard } from "@/src/ui/state";
 import { usePlanStore, todayISO } from "./planStore";
+import { AdjustPlanSheet } from "./AdjustPlanSheet";
+import { daysSummary } from "./onboarding";
 import { entryFor, alternativesFor, MUSCLE_LABEL, GOAL_LABEL, REGION_LABEL } from "./planAdapter";
 import type { PlanDay, PlanExerciseEntry } from "./exercises";
 import { posterUrl } from "@/src/anatomy/media";
 import { useWorkout } from "@/src/anatomy/workoutStore";
 
-const DOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-export function WeeklyPlan({ onOpenDay, onEdit }: { onOpenDay: (i: number) => void; onEdit: () => void }) {
+export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number) => void; onEditAnswers: () => void }) {
   const { T, mode, toggleTheme } = useTheme();
+  const t = useSemanticTokens();
+  const router = useRouter();
   const plan = usePlanStore(s => s.plan);
-  const reshuffle = usePlanStore(s => s.reshuffle);
+  const w = useWorkout();
+  const [adjusting, setAdjusting] = useState(false);
   if (!plan) return null;
   const { answers, splitLabel, days } = plan;
+
+  const hasActiveWorkout = w.session !== null;
+  const activeSets = (w.session || []).reduce((a, e) => a + e.sets.length, 0);
+  const activeDone = (w.session || []).reduce((a, e) => a + e.sets.filter(s => s.done).length, 0);
+  const todayIdx = (new Date().getDay() + 6) % 7;
+  const todayDay = days[todayIdx];
+
+  const openSession = () => router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={styles.wpScroll}>
@@ -42,24 +55,54 @@ export function WeeklyPlan({ onOpenDay, onEdit }: { onOpenDay: (i: number) => vo
             <Ionicons name={mode === "night" ? "sunny" : "moon"} size={16} color={T.text2} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.shuffleBtn, { backgroundColor: T.accent }]}
-            onPress={reshuffle}
-            testID="wp-shuffle"
+            style={[styles.adjustBtn, { backgroundColor: T.accent }]}
+            onPress={() => setAdjusting(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Adjust plan"
+            testID="wp-adjust"
           >
-            <Ionicons name="refresh" size={14} color={T.ctaText} />
-            <Text style={[styles.shuffleText, { color: T.ctaText }]}>Shuffle</Text>
+            <Ionicons name="options-outline" size={14} color={T.ctaText} />
+            <Text style={[styles.adjustText, { color: T.ctaText }]}>Adjust plan</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.chipsRow}>
         <Chip label={GOAL_LABEL[answers.goal]} />
-        <Chip label={`${answers.days.length} days / week`} />
+        <Chip label={daysSummary(answers.days)} />
         <Chip label={splitLabel} />
         {answers.focus.map(f => (
           <Chip key={f} label={`Focus: ${REGION_LABEL[f]}`} tone="focus" />
         ))}
         {answers.posture && <Chip label="Posture work" tone="posture" />}
+      </View>
+
+      {/* Resuming an active session and starting a new workout are separate actions. */}
+      <View style={{ marginTop: 20 }}>
+        {hasActiveWorkout ? (
+          <InterruptedSessionCard
+            title="Workout in progress"
+            body="Pick up exactly where you left off — every set you logged is saved on this device."
+            facts={[
+              ["Exercises", String((w.session || []).length)],
+              ["Sets logged", `${activeDone} of ${activeSets}`],
+            ]}
+            resume={{ label: "Resume workout", onPress: openSession, testID: "wp-resume-session" }}
+            testID="wp-active-session"
+          />
+        ) : todayDay && !todayDay.rest ? (
+          <ActionButton
+            label={`Start today's workout · ${todayDay.typeName}`}
+            onPress={() => onOpenDay(todayIdx)}
+            testID="wp-start-today"
+          />
+        ) : (
+          <InfoBanner
+            title="Today is a rest day"
+            message="Tap any training day below to start that workout instead."
+            testID="wp-rest-today"
+          />
+        )}
       </View>
 
       <View style={{ gap: 10, marginTop: 20 }}>
@@ -70,14 +113,16 @@ export function WeeklyPlan({ onOpenDay, onEdit }: { onOpenDay: (i: number) => vo
 
       <View style={styles.wpFooter}>
         <TouchableOpacity
-          style={[styles.footBtn, { borderColor: T.border, backgroundColor: T.card }]}
-          onPress={onEdit}
+          style={[styles.footBtn, { borderColor: T.border, backgroundColor: T.card, minHeight: t.target.min }]}
+          onPress={onEditAnswers}
           testID="wp-edit"
         >
           <Ionicons name="create-outline" size={14} color={T.text2} />
-          <Text style={[styles.footBtnText, { color: T.text2 }]}>Edit my answers</Text>
+          <Text style={[styles.footBtnText, { color: T.text2 }]}>Change my answers</Text>
         </TouchableOpacity>
       </View>
+
+      <AdjustPlanSheet visible={adjusting} hasActiveWorkout={hasActiveWorkout} onDismiss={() => setAdjusting(false)} />
     </ScrollView>
   );
 }
@@ -178,11 +223,15 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
   const dateKey = todayISO();
 
   const items = (day.exercises || []).map(e => replaced[e.id] || e);
+  const hasActiveWorkout = w.session !== null;
 
-  const addAllToSession = () => {
+  // Starting a new workout and resuming the active one are distinct actions:
+  // resuming never rewrites the session the user is already logging.
+  const startWorkout = () => {
     for (const it of items) w.addExerciseFromPlan(it.id, dateKey);
     router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
   };
+  const resumeWorkout = () => router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
@@ -203,10 +252,14 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
         </View>
         <TouchableOpacity
           style={[styles.startAllBtn, { backgroundColor: T.accent }]}
-          onPress={addAllToSession}
-          testID="add-all-to-session"
+          onPress={hasActiveWorkout ? resumeWorkout : startWorkout}
+          accessibilityRole="button"
+          accessibilityLabel={hasActiveWorkout ? "Resume active workout" : "Start this workout"}
+          testID={hasActiveWorkout ? "resume-session" : "start-session"}
         >
-          <Text style={{ color: T.ctaText, fontWeight: "800", fontSize: 12 }}>Start</Text>
+          <Text style={{ color: T.ctaText, fontWeight: "800", fontSize: 12 }}>
+            {hasActiveWorkout ? "Resume" : "Start"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -354,14 +407,14 @@ const styles = StyleSheet.create({
     paddingTop: 56, paddingHorizontal: 20, paddingBottom: 8,
   },
   headerBtn: {
-    width: 36, height: 36, borderRadius: 18, borderWidth: 1,
+    width: 44, height: 44, borderRadius: 22, borderWidth: 1,
     alignItems: "center", justifyContent: "center",
   },
-  shuffleBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: R.pill,
+  adjustBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44,
+    paddingHorizontal: 14, borderRadius: R.pill,
   },
-  shuffleText: { fontSize: 12, fontWeight: "800" },
+  adjustText: { fontSize: 12.5, fontWeight: "800" },
 
   chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: R.pill, borderWidth: 1 },
@@ -405,9 +458,9 @@ const styles = StyleSheet.create({
   exName: { fontSize: 14.5, fontWeight: "600", marginTop: 4 },
   exMeta: { fontSize: 12, marginTop: 4 },
   tickBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  addBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  swapBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  startAllBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: R.pill },
+  addBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  swapBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  startAllBtn: { paddingHorizontal: 18, minHeight: 44, justifyContent: "center", borderRadius: R.pill },
 
   sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
   sheet: {

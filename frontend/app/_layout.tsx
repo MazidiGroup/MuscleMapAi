@@ -34,8 +34,12 @@ if (Platform.OS === "ios") {
   }
 }
 
-// Gates every route behind auth: unauthenticated users only see /login (and /privacy).
-// Deep links stay intact — they resolve normally once the user is signed in.
+/**
+ * Direction B is local-first: the free journey (Welcome → plan → workout) runs for
+ * whoever is on this device, with no account and no server round-trip. So this gate
+ * no longer forces anyone to /login — it only sends a signed-in account away from
+ * the sign-in screen. Deep links resolve normally either way.
+ */
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const segments = useSegments();
@@ -51,11 +55,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (loading) return;
     SplashScreen.hideAsync();
     const seg = segments[0] as string | undefined;
-    const isPublic = seg === "login" || seg === "privacy" || seg === "terms" || seg === "references";
-    if (!user && !isPublic) {
-      router.replace("/login");
-    } else if (user && !user.is_guest && seg === "login") {
-      // Guests may visit /login to upgrade to a real account
+    if (user && !user.is_guest && seg === "login") {
       router.replace("/(tabs)/plan");
     }
   }, [user, loading, segments, router]);

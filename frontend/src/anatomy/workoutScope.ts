@@ -7,12 +7,14 @@
 
 import { Owner } from "@/src/owner/scopeKeys";
 import { OwnerToken, ScopedStore, WriteResult } from "@/src/owner/scopedStore";
-import { ActiveSession, endSession, readActiveSession } from "@/src/session/activeSession";
+import { ActiveSession, ExerciseIdSpace, endSession, readActiveSession } from "@/src/session/activeSession";
 import { WeightUnit, resolveUnitPreference } from "@/src/units/unitPreference";
 
 export type LoggedSet = { id: string; weight: number; reps: number; done: boolean };
 export type SessionExercise = {
   exerciseId: string;
+  /** Source catalogue of the id. Defaults to the anatomy library when absent. */
+  idSpace?: ExerciseIdSpace;
   sets: LoggedSet[];
   notes: string;
   planLink?: { planDate: string };
@@ -80,7 +82,7 @@ export function buildActiveSession(
     updatedAt: now(),
     exercises: exercises.map((e) => ({
       exerciseId: e.exerciseId,
-      idSpace: "anatomy",
+      idSpace: e.idSpace ?? "anatomy",
       sets: e.sets,
       notes: e.notes,
       planLink: e.planLink,

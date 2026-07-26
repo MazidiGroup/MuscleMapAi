@@ -1,11 +1,27 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { legacyPalette, LegacyPalette } from "./ui";
 import { useTheme } from "@/src/theme/ThemeContext";
+import {
+  RestClock,
+  formatRemaining,
+  pauseClock,
+  progress,
+  remainingSec,
+  resumeClock,
+  setClockTotal,
+  startClock,
+} from "./restClock";
 
 const PRESETS = [30, 60, 90, 120];
 
+/**
+ * Rest timer driven by an absolute end timestamp rather than by counting ticks.
+ * Backgrounding the app can therefore neither freeze the countdown nor let two
+ * timers run: returning to the foreground recalculates the remaining time from
+ * elapsed wall-clock time, and only one interval ever exists.
+ */
 export function RestTimer({
   visible,
   initial,
@@ -20,70 +36,95 @@ export function RestTimer({
   const { mode } = useTheme();
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
-  const [total, setTotal] = useState(initial);
-  const [left, setLeft] = useState(initial);
-  const [paused, setPaused] = useState(false);
-  const timer = useRef<any>(null);
 
+  const [clock, setClock] = useState<RestClock>(() => startClock(initial, Date.now()));
+  const [left, setLeft] = useState(initial);
+  const tick = useRef<ReturnType<typeof setInterval> | null>(null);
+  const paused = clock.pausedRemaining !== null;
+
+  const resync = useCallback((c: RestClock) => setLeft(remainingSec(c, Date.now())), []);
+
+  // Opening the sheet always starts a fresh rest period.
   useEffect(() => {
     if (!visible) return;
-    setTotal(initial);
-    setLeft(initial);
-    setPaused(false);
-  }, [visible, initial]);
+    const next = startClock(initial, Date.now());
+    setClock(next);
+    resync(next);
+  }, [visible, initial, resync]);
 
+  // Exactly one interval, and it only re-reads the wall clock.
   useEffect(() => {
+    if (tick.current) {
+      clearInterval(tick.current);
+      tick.current = null;
+    }
     if (!visible || paused) return;
-    timer.current = setInterval(() => {
-      setLeft((l) => {
-        if (l <= 1) {
-          clearInterval(timer.current);
-          return 0;
-        }
-        return l - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer.current);
-  }, [visible, paused]);
+    tick.current = setInterval(() => setLeft(remainingSec(clock, Date.now())), 500);
+    return () => {
+      if (tick.current) clearInterval(tick.current);
+      tick.current = null;
+    };
+  }, [visible, paused, clock]);
+
+  // Foregrounding recalculates from elapsed time instead of resuming a stale count.
+  useEffect(() => {
+    if (!visible) return;
+    const onChange = (state: AppStateStatus) => {
+      if (state === "active") resync(clock);
+    };
+    const sub = AppState.addEventListener("change", onChange);
+    return () => sub.remove();
+  }, [visible, clock, resync]);
 
   useEffect(() => {
-    if (visible && left === 0) {
+    if (visible && left <= 0) {
       const t = setTimeout(onClose, 600);
       return () => clearTimeout(t);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [left, visible]);
 
   const setPreset = (n: number) => {
-    setTotal(n);
+    const next = setClockTotal(clock, n, Date.now());
+    setClock({ ...next, pausedRemaining: null });
     setLeft(n);
-    setPaused(false);
     onPrefChange(n);
   };
 
-  const mm = String(Math.floor(left / 60)).padStart(1, "0");
-  const ss = String(left % 60).padStart(2, "0");
-  const pct = total > 0 ? left / total : 0;
+  const togglePause = () => {
+    const now = Date.now();
+    const next = paused ? resumeClock(clock, now) : pauseClock(clock, now);
+    setClock(next);
+    resync(next);
+  };
+
+  const pct = progress({ ...clock, pausedRemaining: paused ? left : null }, Date.now());
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card} testID="rest-timer">
           <Text style={styles.label}>REST</Text>
-          <Text style={styles.time}>
-            {mm}:{ss}
+          <Text style={styles.time} testID="rest-remaining">
+            {formatRemaining(left)}
           </Text>
           <View style={styles.barTrack}>
             <View style={[styles.barFill, { width: `${pct * 100}%` }]} />
           </View>
           <View style={styles.presets}>
             {PRESETS.map((n) => (
-              <TouchableOpacity key={n} style={[styles.preset, total === n && styles.presetActive]} onPress={() => setPreset(n)} testID={`rest-${n}`}>
-                <Text style={[styles.presetText, total === n && { color: T.bg }]}>{n}s</Text>
+              <TouchableOpacity
+                key={n}
+                style={[styles.preset, clock.total === n && styles.presetActive]}
+                onPress={() => setPreset(n)}
+                testID={`rest-${n}`}
+              >
+                <Text style={[styles.presetText, clock.total === n && { color: T.bg }]}>{n}s</Text>
               </TouchableOpacity>
             ))}
           </View>
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => setPaused((p) => !p)} testID="rest-pause">
+            <TouchableOpacity style={styles.actionBtn} onPress={togglePause} testID="rest-pause">
               <Ionicons name={paused ? "play" : "pause"} size={20} color={T.text} />
               <Text style={styles.actionText}>{paused ? "Resume" : "Pause"}</Text>
             </TouchableOpacity>
@@ -106,11 +147,11 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   barTrack: { width: "100%", height: 8, borderRadius: 4, backgroundColor: T.surfaceHi, overflow: "hidden", marginBottom: 20 },
   barFill: { height: 8, borderRadius: 4, backgroundColor: T.accent },
   presets: { flexDirection: "row", gap: 8, marginBottom: 20 },
-  preset: { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, alignItems: "center" },
+  preset: { flex: 1, minHeight: 44, justifyContent: "center", borderRadius: 10, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, alignItems: "center" },
   presetActive: { backgroundColor: T.accent, borderColor: T.accent },
   presetText: { color: T.text, fontSize: 14, fontWeight: "700" },
   actions: { flexDirection: "row", gap: 12, width: "100%" },
-  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, paddingVertical: 14, borderRadius: 14 },
+  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, minHeight: 48, borderRadius: 14 },
   skip: { backgroundColor: T.accent, borderColor: T.accent },
   actionText: { color: T.text, fontSize: 15, fontWeight: "700" },
 });

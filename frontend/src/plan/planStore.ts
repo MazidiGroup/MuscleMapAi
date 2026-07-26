@@ -12,8 +12,12 @@ import { create } from "zustand";
 import { Domain } from "@/src/owner/scopeKeys";
 import { OwnerToken, ScopedStore } from "@/src/owner/scopedStore";
 
+import { AdjustOutcome, previewAdjustedPlan } from "./adjustPlan";
 import { Answers, Plan } from "./exercises";
+import { normalizeAnswers } from "./onboarding";
 import { buildPlan } from "./planAdapter";
+
+const newSeed = () => Math.floor(Math.random() * 2_147_483_647);
 
 type CompletionsMap = Record<string, boolean>;
 
@@ -51,7 +55,10 @@ type PlanStore = {
   resetForOwner: () => void;
   setStep: (n: number) => void;
   setAnswers: (patch: Partial<Answers>) => void;
-  reshuffle: () => void;
+  /** Computes a verified replacement week. Publishes nothing. */
+  previewAdjust: (hasActiveWorkout: boolean) => AdjustOutcome;
+  /** Publishes an already-verified replacement. The old plan survives a failure. */
+  publishAdjusted: (plan: Plan) => Promise<boolean>;
   rebuildFromAnswers: (final: Answers) => void;
   resetAll: () => void;
   toggleCompletion: (dateISO: string, exId: string, done: boolean) => void;
@@ -115,26 +122,41 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     persist([["planAnswers", next]]);
   },
 
-  reshuffle: () => {
-    const ans = get().answers as Answers;
-    if (!ans.goal) return;
-    const seed = Math.floor(Math.random() * 2_147_483_647);
-    const plan = buildPlan(ans, seed);
-    set({ plan, seed });
-    persist([
-      ["plan", plan],
-      ["planSeed", seed],
+  previewAdjust: (hasActiveWorkout) => {
+    const { plan, answers, completions } = get();
+    return previewAdjustedPlan({
+      current: plan,
+      answers: normalizeAnswers(answers),
+      seed: newSeed(),
+      completions,
+      hasActiveWorkout,
+    });
+  },
+
+  publishAdjusted: async (plan) => {
+    const active = scope;
+    if (!active) return false;
+    const seed = plan.seed;
+    // The current plan stays in state until both writes are confirmed.
+    const [planWrite, seedWrite] = await Promise.all([
+      active.store.writeGuarded(active.token, "plan", plan),
+      active.store.writeGuarded(active.token, "planSeed", seed),
     ]);
+    if (!planWrite.ok || !seedWrite.ok) return false;
+    if (scope !== active) return false;
+    set({ plan, seed });
+    return true;
   },
 
   rebuildFromAnswers: (final) => {
-    const seed = Math.floor(Math.random() * 2_147_483_647);
-    const plan = buildPlan(final, seed);
-    set({ plan, seed, answers: final, step: 100 });
+    const answers = normalizeAnswers(final);
+    const seed = newSeed();
+    const plan = buildPlan(answers, seed);
+    set({ plan, seed, answers, step: 100 });
     persist([
       ["plan", plan],
       ["planSeed", seed],
-      ["planAnswers", final],
+      ["planAnswers", answers],
       ["onboardingStep", 100],
     ]);
   },

@@ -11,6 +11,8 @@ import {
   persistPRs,
   persistRestPref,
 } from "./workoutScope";
+import type { ExerciseIdSpace } from "@/src/session/activeSession";
+import { computePRUpdate, commitFinishedWorkout } from "./finishWorkout";
 import { getExercise } from "./exercises";
 import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS, GYM_GROUP_ORDER } from "./groups";
@@ -18,7 +20,10 @@ import { usePlanStore } from "@/src/plan/planStore";
 
 export type LoggedSet = { id: string; weight: number; reps: number; done: boolean };
 export type SessionExercise = {
+  /** The exact source id — never renamed, never inferred from a display name. */
   exerciseId: string;
+  /** Which catalogue the id came from. Preserved for the lifetime of the set. */
+  idSpace?: ExerciseIdSpace;
   sets: LoggedSet[];
   notes: string;
   /** When the exercise was added via the Plan tab, this remembers the plan-day
@@ -106,7 +111,7 @@ type Ctx = {
   removeExercise: (exId: string) => void;
   setNotes: (exId: string, notes: string) => void;
   setRestPref: (n: number) => void;
-  finish: () => { workout: Workout; newPRs: string[] } | null;
+  finish: () => Promise<FinishResult>;
   cancel: () => void;
   /** The one stored weight unit for Workout and History. */
   unit: WeightUnit;
@@ -114,6 +119,10 @@ type Ctx = {
   /** False until this owner's scope has hydrated. */
   hydrated: boolean;
 };
+
+export type FinishResult =
+  | { ok: true; workout: Workout; newPRs: string[] }
+  | { ok: false; reason: "empty_session" | "unresolved_owner" | "history_write_failed" | "prs_write_failed" };
 
 const WorkoutContext = createContext<Ctx | null>(null);
 
@@ -156,6 +165,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setSession(
           snap.active.exercises.map((e) => ({
             exerciseId: e.exerciseId,
+            idSpace: e.idSpace,
             sets: e.sets,
             notes: e.notes,
             planLink: e.planLink,
@@ -194,7 +204,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setSession((prev) => {
       const base = prev || [];
       if (base.some((e) => e.exerciseId === id)) return base;
-      return [...base, { exerciseId: id, sets: [{ id: uid(), weight: 0, reps: 0, done: false }], notes: "" }];
+      return [
+        ...base,
+        { exerciseId: id, idSpace: "anatomy" as ExerciseIdSpace, sets: [{ id: uid(), weight: 0, reps: 0, done: false }], notes: "" },
+      ];
     });
     setStartedAt((s) => s ?? Date.now());
   }, []);
@@ -214,6 +227,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         ...base,
         {
           exerciseId: id,
+          idSpace: "plan" as ExerciseIdSpace,
           sets: [{ id: uid(), weight: 0, reps: 0, done: false }],
           notes: "",
           planLink: { planDate },
@@ -280,39 +294,34 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     [store, token],
   );
 
-  const finish = useCallback(() => {
-    if (!session || session.length === 0) return null;
+  const finish = useCallback(async (): Promise<FinishResult> => {
+    if (!session || session.length === 0) return { ok: false, reason: "empty_session" };
+    if (!token || !owner) return { ok: false, reason: "unresolved_owner" };
+
     const durationSec = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
     const workout: Workout = { id: uid(), date: Date.now(), durationSec, exercises: session };
+    const { prs: nextPRs, newPRs } = computePRUpdate(prs, session, {
+      unit,
+      durationSec,
+      nameOf: (id) => getExercise(id)?.name,
+    });
 
-    // compute PRs
-    const newPRs: string[] = [];
-    const nextPRs: PRs = { byExercise: { ...prs.byExercise }, longestSec: prs.longestSec };
-    for (const e of session) {
-      const ex = getExercise(e.exerciseId);
-      const done = e.sets.filter((s) => s.done);
-      if (done.length === 0) continue;
-      const maxW = Math.max(0, ...done.map((s) => s.weight));
-      const vol = done.reduce((a, s) => a + s.weight * s.reps, 0);
-      const cur = nextPRs.byExercise[e.exerciseId] || { maxWeight: 0, maxVolume: 0 };
-      if (maxW > cur.maxWeight && maxW > 0) newPRs.push(`${ex?.name || e.exerciseId}: ${maxW} ${unit}`);
-      if (vol > cur.maxVolume && vol > 0) newPRs.push(`${ex?.name || e.exerciseId}: ${vol} ${unit} volume`);
-      nextPRs.byExercise[e.exerciseId] = { maxWeight: Math.max(cur.maxWeight, maxW), maxVolume: Math.max(cur.maxVolume, vol) };
-    }
-    if (durationSec > nextPRs.longestSec) {
-      nextPRs.longestSec = durationSec;
-      if (prs.longestSec > 0) newPRs.push("Longest workout!");
-    }
+    // Verified local transaction: History and PRs are both confirmed written
+    // before the active session is released.
+    const res = await commitFinishedWorkout(store, token, owner, {
+      workout,
+      previousHistory: history,
+      nextPRs,
+    });
+    if (!res.ok) return { ok: false, reason: res.reason };
 
-    const nextHistory = [workout, ...history];
-    setHistory(nextHistory);
-    setPRs(nextPRs);
-    persistHistory(store, token, nextHistory).catch(() => {});
-    persistPRs(store, token, nextPRs).catch(() => {});
+    setHistory(res.history);
+    setPRs(res.prs);
+    sessionIdRef.current = null;
     setSession(null);
     setStartedAt(null);
-    return { workout, newPRs };
-  }, [session, startedAt, history, prs, store, token, unit]);
+    return { ok: true, workout, newPRs };
+  }, [session, startedAt, history, prs, store, token, owner, unit]);
 
   const cancel = useCallback(() => {
     setSession(null);

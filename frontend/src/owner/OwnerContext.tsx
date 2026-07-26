@@ -21,6 +21,7 @@ import { getDeviceKV, KV } from "./kv";
 import { ScanReport, scanLegacy } from "./migration";
 import { Owner, OwnerState, isUsableOwnerId } from "./scopeKeys";
 import { OwnerToken, ScopedStore } from "./scopedStore";
+import { purgeOwnerNamespace, setOwnerTeardownHook } from "./teardown";
 
 type OwnerCtx = {
   state: OwnerState;
@@ -46,6 +47,17 @@ export function OwnerProvider({ children, kv }: { children: React.ReactNode; kv?
 
   const currentOwner = useCallback((): OwnerToken | null => tokenRef.current, []);
   const store = useMemo(() => new ScopedStore(kvRef.current, currentOwner), [currentOwner]);
+
+  // Account deletion clears this device's namespace for the deleted account only.
+  // Registered here because `AuthProvider` sits above the owner resolver.
+  useEffect(() => {
+    setOwnerTeardownHook(async (expect) => {
+      const active = tokenRef.current;
+      if (!active || active.kind !== expect) return null;
+      return purgeOwnerNamespace(kvRef.current, { kind: active.kind, id: active.id });
+    });
+    return () => setOwnerTeardownHook(null);
+  }, []);
 
   const [state, setState] = useState<OwnerState>({ status: "unresolved", reason: "loading", owner: null });
   const [token, setToken] = useState<OwnerToken | null>(null);

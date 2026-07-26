@@ -17,13 +17,14 @@ import { useRouter } from "expo-router";
 
 import { useAuth } from "@/src/auth/AuthContext";
 import { T } from "@/src/anatomy/ui";
+import { InfoBanner } from "@/src/ui/state";
 
 type Step = "buttons" | "email" | "code";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode, continueAsGuest } = useAuth();
+  const { loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode } = useAuth();
 
   const [step, setStep] = useState<Step>("buttons");
   const [email, setEmail] = useState("");
@@ -66,18 +67,6 @@ export default function LoginScreen() {
   };
 
   const verify = () => run("verify", () => verifyMagicCode(email.trim(), code.trim()));
-
-  const guest = async () => {
-    setError(null);
-    setBusy("guest");
-    try {
-      const res = await continueAsGuest();
-      if (res.ok) router.replace("/(tabs)/plan");
-      else if (res.error) setError(res.error);
-    } finally {
-      setBusy(null);
-    }
-  };
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -151,23 +140,19 @@ export default function LoginScreen() {
               <Text style={styles.btnEmailText}>Continue with email</Text>
             </TouchableOpacity>
 
-            {user?.is_guest ? (
-              <TouchableOpacity
-                style={styles.guestLink}
-                onPress={() => router.replace("/(tabs)/plan")}
-                testID="login-guest-back"
-              >
-                <Text style={styles.guestLinkText}>Not now — keep browsing as guest</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.guestLink} onPress={guest} disabled={!!busy} testID="login-guest">
-                {busy === "guest" ? (
-                  <ActivityIndicator color={T.textDim} size="small" />
-                ) : (
-                  <Text style={styles.guestLinkText}>Continue without an account</Text>
-                )}
-              </TouchableOpacity>
-            )}
+            {/* Informational only — signing in never moves this device's data. */}
+            <InfoBanner
+              message="Guest data stays on this device and is not automatically transferred to your account."
+              testID="guest-data-note"
+            />
+
+            <TouchableOpacity
+              style={styles.guestLink}
+              onPress={() => router.replace("/(tabs)/plan")}
+              testID="login-dismiss"
+            >
+              <Text style={styles.guestLinkText}>Not now — back to my plan</Text>
+            </TouchableOpacity>
           </View>
         )}
 

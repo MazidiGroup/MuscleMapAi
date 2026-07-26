@@ -4,6 +4,7 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 
 import { apiGet, apiPost, apiDelete, setToken, getToken, clearToken } from "@/src/api";
+import { runOwnerTeardown } from "@/src/owner/teardown";
 
 /**
  * App-wide authentication.
@@ -337,6 +338,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("[auth] delete account failed", e);
       return { ok: false, error: "Couldn't delete your account. Please check your connection and try again." };
     }
+    // The server confirmed the deletion, so tear down this device's local
+    // namespace for that account. The guest namespace is deliberately untouched.
+    await runOwnerTeardown("account");
+
     // Fully sign the user out — clear session token + RevenueCat identity — and
     // reset state so the app returns to the login screen.
     await clearToken();

@@ -13,8 +13,10 @@ import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { useWorkout, workoutStats, Workout } from "@/src/anatomy/workoutStore";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
+import { formatSetLoad, isBodyweightEquipment, loadColumnLabel, loadPlaceholder } from "@/src/anatomy/bodyweight";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { ThemeToggle } from "@/src/theme/ThemeToggle";
+import { EmptyState, ErrorBanner } from "@/src/ui/state";
 
 type Seg = "session" | "exercises" | "insights";
 const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower", "Mobility"];
@@ -50,6 +52,8 @@ export default function WorkoutScreen() {
   const [cat, setCat] = useState("All");
   const [restVisible, setRestVisible] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
 
   useEffect(() => {
     if (["exercises", "session", "history", "insights"].includes(String(params.seg))) setSeg(params.seg as Seg);
@@ -94,11 +98,20 @@ export default function WorkoutScreen() {
     if (willBeDone) setRestVisible(true);
   };
 
-  const finish = () => {
-    const res = w.finish();
-    if (res) {
+  // Finishing is a verified local transaction: History and PRs must both be
+  // written before the session is released. A failure keeps every logged set.
+  const finish = async () => {
+    if (finishing) return;
+    setFinishError(null);
+    setFinishing(true);
+    const res = await w.finish();
+    setFinishing(false);
+    if (res.ok) {
       router.push({ pathname: "/summary", params: { id: res.workout.id, prs: encodeURIComponent(JSON.stringify(res.newPRs)) } });
+      return;
     }
+    if (res.reason === "empty_session") return;
+    setFinishError("We couldn't save this workout to your device. Every set you logged is still here — try again.");
   };
 
   // ---- History: This Week + monthly calendar (derived from existing w.history) ----
@@ -177,6 +190,15 @@ export default function WorkoutScreen() {
               </TouchableOpacity>
             ))}
           </View>
+          <TouchableOpacity
+            style={styles.unitBtn}
+            onPress={() => w.setUnit(w.unit === "kg" ? "lb" : "kg")}
+            accessibilityRole="button"
+            accessibilityLabel={`Weight unit, ${w.unit}. Tap to switch.`}
+            testID="unit-toggle"
+          >
+            <Text style={styles.unitText}>{w.unit.toUpperCase()}</Text>
+          </TouchableOpacity>
           <ThemeToggle />
         </View>
       </View>
@@ -244,31 +266,38 @@ export default function WorkoutScreen() {
         <View style={[styles.full, { paddingTop: insets.top + 56 }]}>
           {!w.session || w.session.length === 0 ? (
             <View style={styles.empty}>
-              <Ionicons name="barbell-outline" size={40} color={T.textFaint} />
-              <Text style={styles.emptyText}>No active workout</Text>
-              <TouchableOpacity style={styles.primaryBtn} onPress={() => setSeg("exercises")} testID="browse-ex">
-                <Text style={styles.primaryBtnText}>Browse Exercises</Text>
-              </TouchableOpacity>
-              {!w.session && (
-                <TouchableOpacity style={styles.ghostBtn} onPress={() => w.startWorkout()} testID="start-empty">
-                  <Text style={styles.ghostText}>Start empty workout</Text>
-                </TouchableOpacity>
-              )}
+              <EmptyState
+                icon="barbell-outline"
+                title="No workout in progress"
+                body="Start an empty workout, or open a day in your plan to load its exercises."
+                note="Everything you log is saved on this device as you go."
+                primary={{ label: "Start empty workout", onPress: () => w.startWorkout(), testID: "start-empty" }}
+                secondary={{ label: "Browse exercises", onPress: () => setSeg("exercises"), testID: "browse-ex" }}
+                testID="session-empty"
+              />
             </View>
           ) : (
             <>
               <View style={styles.statsBar}>
                 <SBStat label="Exercises" value={`${w.session.length}`} styles={styles} />
                 <SBStat label="Sets" value={`${stats.completed}/${stats.sets}`} styles={styles} />
-                <SBStat label="Volume" value={`${stats.volume}${w.unit}`} styles={styles} />
+                <SBStat label="Volume" value={`${stats.volume} ${w.unit}`} styles={styles} />
               </View>
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
                 {w.session.map((se) => {
                   const ex = getExercise(se.exerciseId);
+                  const bodyweight = isBodyweightEquipment(ex?.equipment);
                   return (
                     <View key={se.exerciseId} style={styles.exCard}>
                       <View style={styles.exCardHead}>
-                        <Text style={styles.exCardName}>{ex?.name}</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                          <Text style={styles.exCardName}>{ex?.name}</Text>
+                          {bodyweight && (
+                            <View style={styles.bwBadge}>
+                              <Text style={styles.bwBadgeText}>BW</Text>
+                            </View>
+                          )}
+                        </View>
                         <TouchableOpacity onPress={() => w.removeExercise(se.exerciseId)} testID={`rm-${se.exerciseId}`}>
                           <Ionicons name="trash-outline" size={18} color={T.textFaint} />
                         </TouchableOpacity>
@@ -277,7 +306,7 @@ export default function WorkoutScreen() {
                       <ExerciseAnimation exerciseId={se.exerciseId} variant="workout" />
                       <View style={styles.setHeadRow}>
                         <Text style={[styles.setHead, { width: 30 }]}>SET</Text>
-                        <Text style={[styles.setHead, { flex: 1 }]}>KG</Text>
+                        <Text style={[styles.setHead, { flex: 1 }]}>{loadColumnLabel(w.unit, bodyweight)}</Text>
                         <Text style={[styles.setHead, { flex: 1 }]}>REPS</Text>
                         <Text style={[styles.setHead, { width: 80, textAlign: "center" }]}>DONE</Text>
                       </View>
@@ -288,9 +317,10 @@ export default function WorkoutScreen() {
                             style={styles.setInput}
                             keyboardType="numeric"
                             value={s.weight ? String(s.weight) : ""}
-                            placeholder="0"
+                            placeholder={loadPlaceholder(bodyweight)}
                             placeholderTextColor={T.textFaint}
                             onChangeText={(t) => w.updateSet(se.exerciseId, s.id, { weight: Number(t) || 0 })}
+                            accessibilityLabel={`Set ${idx + 1} load, ${formatSetLoad(s.weight, w.unit, bodyweight)}`}
                             testID={`w-${se.exerciseId}-${idx}`}
                           />
                           <TextInput
@@ -334,13 +364,18 @@ export default function WorkoutScreen() {
                   <Text style={styles.addExText}>Add Exercise</Text>
                 </TouchableOpacity>
               </ScrollView>
+              {finishError && (
+                <View style={[styles.finishErrorWrap, { bottom: insets.bottom + 76 }]}>
+                  <ErrorBanner title="Workout not saved" message={finishError} testID="finish-error" />
+                </View>
+              )}
               <View style={[styles.finishBar, { paddingBottom: insets.bottom + 8 }]}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => w.cancel()} testID="cancel-workout">
                   <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.finishBtn} onPress={finish} testID="finish-workout">
+                <TouchableOpacity style={styles.finishBtn} onPress={finish} disabled={finishing} testID="finish-workout">
                   <Ionicons name="flag" size={16} color={T.bg} />
-                  <Text style={styles.finishText}>Finish Workout</Text>
+                  <Text style={styles.finishText}>{finishing ? "Saving…" : "Finish Workout"}</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -384,7 +419,15 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   exItemName: { color: T.text, fontSize: 15, fontWeight: "700" },
   exItemMeta: { color: T.textFaint, fontSize: 12, marginTop: 2 },
 
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 24 },
+  empty: { flex: 1, justifyContent: "center", padding: 16 },
+  unitBtn: {
+    minWidth: 44, height: 44, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1,
+    borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center",
+  },
+  unitText: { color: T.text, fontSize: 13, fontWeight: "800" },
+  bwBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: T.accent + "22" },
+  bwBadgeText: { color: T.accent, fontSize: 10.5, fontWeight: "800" },
+  finishErrorWrap: { position: "absolute", left: 16, right: 16 },
   emptyText: { color: T.text, fontSize: 17, fontWeight: "700" },
   emptySub: { color: T.textDim, fontSize: 14, textAlign: "center" },
   primaryBtn: { backgroundColor: T.accent, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 12, marginTop: 8 },
