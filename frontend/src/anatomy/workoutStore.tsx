@@ -10,6 +10,7 @@ import {
   persistHistory,
   persistPRs,
   persistRestPref,
+  plannedSetCount,
 } from "./workoutScope";
 import type { ExerciseIdSpace } from "@/src/session/activeSession";
 import { computePRUpdate, commitFinishedWorkout } from "./finishWorkout";
@@ -37,6 +38,10 @@ export type PRs = { byExercise: Record<string, { maxWeight: number; maxVolume: n
 // keys are read-only sources owned by the migration subsystem.
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+/** Empty set rows for a planned exercise (count decided by plannedSetCount). */
+const plannedSetRows = (planned: unknown) =>
+  Array.from({ length: plannedSetCount(planned) }, () => ({ id: uid(), weight: 0, reps: 0, done: false }));
 
 export function workoutStats(exs: SessionExercise[]) {
   let sets = 0,
@@ -100,8 +105,11 @@ type Ctx = {
   prs: PRs;
   startWorkout: () => void;
   addExercise: (id: string) => void;
-  /** Add an exercise from a Plan day. Auto-ticks the Plan when all sets complete. */
-  addExerciseFromPlan: (id: string, planDate: string) => void;
+  /**
+   * Add an exercise from a Plan day, carrying the planned set count into the
+   * session. Auto-ticks the Plan when all sets complete.
+   */
+  addExerciseFromPlan: (id: string, planDate: string, plannedSets?: number) => void;
   hasExercise: (id: string) => boolean;
   addSet: (exId: string) => void;
   updateSet: (exId: string, setId: string, patch: Partial<LoggedSet>) => void;
@@ -231,11 +239,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setStartedAt((s) => s ?? Date.now());
   }, []);
 
-  const addExerciseFromPlan = useCallback((id: string, planDate: string) => {
+  const addExerciseFromPlan = useCallback((id: string, planDate: string, plannedSets = 1) => {
     setSession((prev) => {
       const base = prev || [];
       if (base.some((e) => e.exerciseId === id)) {
         // If already there, ensure the planLink is stamped so completion ticks.
+        // An existing entry is never rewritten: the user may already be logging it.
         return base.map((e) =>
           e.exerciseId === id
             ? { ...e, planLink: e.planLink || { planDate } }
@@ -247,7 +256,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         {
           exerciseId: id,
           idSpace: "plan" as ExerciseIdSpace,
-          sets: [{ id: uid(), weight: 0, reps: 0, done: false }],
+          // The Plan day promises N sets, so the session starts with N empty sets.
+          sets: plannedSetRows(plannedSets),
           notes: "",
           planLink: { planDate },
         },

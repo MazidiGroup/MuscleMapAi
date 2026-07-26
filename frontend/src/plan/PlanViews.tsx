@@ -1,6 +1,6 @@
 // Weekly plan + Workout day + Swap sheet.
 //
-// - Weekly view: header (logo + Shuffle + theme toggle), summary chips,
+// - Weekly view: header (logo + "Adjust plan" + theme toggle), summary chips,
 //   7 day cards Mon-Sun with poster stack + target muscles line.
 // - Day view: exercise cards with poster, muscle caps, badges, and tap-to-tick.
 // - Swap sheet: bottom-sheet listing up to 6 alternatives; "Use" replaces.
@@ -228,7 +228,8 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
   // Starting a new workout and resuming the active one are distinct actions:
   // resuming never rewrites the session the user is already logging.
   const startWorkout = () => {
-    for (const it of items) w.addExerciseFromPlan(it.id, dateKey);
+    // The planned set count travels with the exercise into the session.
+    for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets);
     router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
   };
   const resumeWorkout = () => router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
@@ -313,7 +314,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
                     { borderColor: inSession ? T.accent : T.border, backgroundColor: inSession ? T.accent + "22" : "transparent" },
                   ]}
                   onPress={() => {
-                    if (!inSession) w.addExerciseFromPlan(ex.id, dateKey);
+                    if (!inSession) w.addExerciseFromPlan(ex.id, dateKey, ex.sets);
                   }}
                   testID={`add-${ex.id}`}
                 >

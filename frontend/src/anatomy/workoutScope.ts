@@ -11,6 +11,17 @@ import { ActiveSession, ExerciseIdSpace, endSession, readActiveSession } from "@
 import { WeightUnit, resolveUnitPreference } from "@/src/units/unitPreference";
 
 export type LoggedSet = { id: string; weight: number; reps: number; done: boolean };
+
+/**
+ * How many empty set rows a planned exercise starts with in the session.
+ * A Plan day that promises 3 sets must arrive as 3 loggable sets; an unusable
+ * value falls back to one set, and the count is capped so a damaged plan record
+ * can never generate an unbounded session.
+ */
+export function plannedSetCount(planned: unknown): number {
+  const n = typeof planned === "number" && Number.isFinite(planned) ? Math.floor(planned) : 1;
+  return Math.min(Math.max(n, 1), 10);
+}
 export type SessionExercise = {
   exerciseId: string;
   /** Source catalogue of the id. Defaults to the anatomy library when absent. */
