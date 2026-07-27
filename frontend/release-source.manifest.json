@@ -1,8 +1,8 @@
 {
   "note": "Release-source fingerprint. Regenerate with `yarn release:manifest` after an approved source change. Contains no secret or environment value.",
   "algorithm": "sha256",
-  "fileCount": 22,
-  "fingerprint": "d596b2065d127d4df8a5b4453e0e2e41f0d5ad72baf8b103825e92f24787e619",
+  "fileCount": 23,
+  "fingerprint": "2d550d1cd7cf76964a250c8b3203a4a8034a3aca013964e76891b2aa284b1ec6",
   "files": {
     "app.json": "ab11c2a3a224d60f6f0e137126c718db0cae2dcac1536bc715e95c0aa05230fc",
     "eas.json": "4a12a265ff7842bd25656f70f48f7067e7e13e2616400fac86ca8a3d39eb277c",
@@ -12,6 +12,7 @@
     "app/(tabs)/library.tsx": "51b1631f03284abd20b8b5ac214a3a72d9eba7263a3fc86b939019773fea2f12",
     "app/(tabs)/workout.tsx": "310ac830010fe25777f98b2526627002fbdf7eaf683e9bbd4e73710f5c9456ae",
     "app/(tabs)/plan.tsx": "494db5973d7611d3d37e8eb71774a315e50f0a4406ffc49d860ae918132afb25",
+    "app/dev/paywall-states.tsx": "2e9371a74fc28e59764b8843b2281143636ebd2adfe091c9d9467418e657d67d",
     "src/plan/onboarding.ts": "f23f6cc5bf92c75fe0356b451747feb6250903a3fb000635b2e1dac3d02d752a",
     "src/plan/OnboardingFlow.tsx": "9e64c6ff7db1f786a66ef31b7637b9c40cd9c5a04dae492cfd140e9c446b9a5a",
     "src/plan/PlanViews.tsx": "c4dd0f2c54321ccd1a6006b0e02c2960842465980e4c6e3b5bb4658a9d34d877",

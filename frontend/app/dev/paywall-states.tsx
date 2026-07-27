@@ -4,8 +4,13 @@
 // product selection, purchase and restore states.
 //
 // The fixture prices below are FIXTURES, not app copy: production display data
-// always comes from RevenueCat/App Store-localised product data.
+// always comes from RevenueCat/App Store-localised product data. Because a
+// fixture price must never be reachable in a shipped build, the route component
+// below is a guard only: in a production build it redirects and the fixture
+// component is never mounted, so no fixture package, price, trial or entitlement
+// state is ever created.
 
+import { Redirect } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +23,19 @@ import {
 } from "@/src/premium/PremiumContext";
 import { PurchaseOutcome, RestoreOutcome } from "@/src/premium/entitlement";
 import { useSemanticTokens } from "@/src/theme/semantic";
+
+/**
+ * Route entry point. `__DEV__` is a build-time constant, so in a production build
+ * this returns before any fixture state or fixture JSX exists. "/" is the app's
+ * index route, which redirects to the free Plan tab — no account, no Premium and
+ * no onboarding is required, and it can never redirect back here.
+ */
+export default function PaywallStatesRoute() {
+  if (!__DEV__) {
+    return <Redirect href="/" />;
+  }
+  return <PaywallStatesHarness />;
+}
 
 const FIXTURE_PACKAGES = [
   {
@@ -44,7 +62,7 @@ const FIXTURE_PACKAGES = [
 
 type Scenario = "ready" | "loading" | "no-offering" | "purchase-busy" | "verified" | "restore-nothing";
 
-export default function PaywallStatesHarness() {
+function PaywallStatesHarness() {
   const t = useSemanticTokens();
   const insets = useSafeAreaInsets();
   const [scenario, setScenario] = useState<Scenario>("ready");

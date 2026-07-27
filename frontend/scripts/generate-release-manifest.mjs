@@ -29,6 +29,10 @@ export const MANIFEST_PATH = "release-source.manifest.json";
  * so a substituted or stale lockfile must fail the gate in the build job, before any
  * dependency is installed. An intentional lockfile change therefore requires this
  * manifest to be regenerated and committed with it.
+ *
+ * `app/dev/paywall-states.tsx` is included for the same reason: it is a development
+ * fixture harness that must stay guarded out of production builds, so removing the
+ * guard cannot pass the gate without an approved manifest regeneration.
  */
 export const RELEASE_CRITICAL_FILES = [
   "app.json",
@@ -39,6 +43,7 @@ export const RELEASE_CRITICAL_FILES = [
   "app/(tabs)/library.tsx",
   "app/(tabs)/workout.tsx",
   "app/(tabs)/plan.tsx",
+  "app/dev/paywall-states.tsx",
   "src/plan/onboarding.ts",
   "src/plan/OnboardingFlow.tsx",
   "src/plan/PlanViews.tsx",
