@@ -13,10 +13,15 @@
  *   EAS cloud pre-install mode (`--eas-pre-install`, wired to the
  *   `eas-build-pre-install` package script)
  *     Runs before dependencies are installed, so it uses Node built-ins only and
- *     never touches node_modules. It assumes nothing about the absolute path,
- *     branch names or .git metadata; instead it verifies the committed source
- *     fingerprint, the Direction B source markers, application identity and the
- *     presence of the required public build variables.
+ *     never touches node_modules. It executes NO Git command and requires no `.git`
+ *     directory, Git root, branch, HEAD, status or worktree path: the uploaded EAS
+ *     workspace is frequently not a usable Git repository (`git rev-parse` exits
+ *     128 there), so Git metadata can never be part of the cloud contract. Instead
+ *     it verifies the committed source fingerprint, the Direction B source markers,
+ *     application identity and the presence of the required public build variables.
+ *     Cloud mode is entered by the `--eas-pre-install` flag OR by any `EAS_BUILD*`
+ *     environment name, so losing the flag can never silently fall back to the
+ *     Git-dependent local mode inside a build job.
  *
  * It exits non-zero on failure, states that the build must not proceed, explains
  * which check failed WITHOUT revealing any environment value, never repairs source,
@@ -31,7 +36,7 @@ import path from "node:path";
 
 import { MANIFEST_PATH, RELEASE_CRITICAL_FILES, computeFingerprint } from "./generate-release-manifest.mjs";
 
-const EAS_MODE = process.argv.includes("--eas-pre-install") || process.env.EAS_BUILD === "true";
+const EAS_MODE = process.argv.includes("--eas-pre-install") || isEasBuildEnvironment();
 const ROOT = process.cwd();
 // The approved commit is supplied by the release operator, never hardcoded: a
 // hardcoded sha inside a release-critical file can only ever be stale (and would
@@ -42,6 +47,48 @@ const FORBIDDEN_SOURCE_ROOTS = ["/app/frontend"];
 
 /** Required public build variables. Names only — values are never read out or printed. */
 export const REQUIRED_PUBLIC_VARS = ["EXPO_PUBLIC_BACKEND_URL", "EXPO_PUBLIC_REVENUECAT_IOS_KEY"];
+
+/**
+ * EAS-provided names that may be reported when present. None is required, none is a
+ * secret, and the gate never depends on any of them: the 23-file content fingerprint
+ * remains the authoritative source proof.
+ */
+export const EAS_PROVENANCE_VARS = [
+  "EAS_BUILD_ID",
+  "EAS_BUILD_PROFILE",
+  "EAS_BUILD_PROJECT_ID",
+  "EAS_BUILD_GIT_COMMIT_HASH",
+  "EAS_BUILD_WORKINGDIR",
+];
+
+/**
+ * True inside an EAS Build job. Any `EAS_BUILD*` name counts, so the cloud can never
+ * be misclassified as a local release checkout if the CLI flag is dropped by a shell
+ * wrapper or a changed hook invocation (the exact failure mode that made a cloud job
+ * run Git commands against a workspace with no `.git`).
+ */
+export function isEasBuildEnvironment(env = process.env) {
+  return Object.keys(env).some((name) => name.startsWith("EAS_BUILD"));
+}
+
+/** Cloud-mode provenance notes. Reported only; never required, never a failure. */
+function noteCloudProvenance() {
+  notes.push("Git metadata is not consulted in cloud mode — the 23-file fingerprint is the source proof");
+  // One snapshot, read by name: no dynamic `process.env[...]` access.
+  const snapshot = { ...process.env };
+  const present = EAS_PROVENANCE_VARS.filter((name) => typeof snapshot[name] === "string" && snapshot[name].trim() !== "");
+  if (!present.length) {
+    notes.push("no EAS_BUILD* provenance name was supplied (not required)");
+    return;
+  }
+  for (const name of present) {
+    // A build/profile/project id and a commit hash are not secrets; a workingdir is a
+    // path. Anything unexpected is reported as present only.
+    const value = snapshot[name].trim();
+    const safe = /^[A-Za-z0-9._/-]{1,120}$/.test(value) ? value : "present";
+    notes.push(`${name} ${safe}`);
+  }
+}
 
 const EXPECTED_IDENTITY = {
   "ios.bundleIdentifier": "com.mazidigroup.apexai",
@@ -326,7 +373,11 @@ export function runChecks() {
   checkIdentityAndConfig();
   checkFingerprint();
   checkPublicVars();
-  if (!EAS_MODE) checkLocalWorkspace();
+  // Git is touched in local mode only. `checkLocalWorkspace` is the sole caller of
+  // `execFileSync`, so cloud mode cannot execute a Git command even when the uploaded
+  // workspace happens to contain a `.git` directory.
+  if (EAS_MODE) noteCloudProvenance();
+  else checkLocalWorkspace();
   return { failures, notes };
 }
 
