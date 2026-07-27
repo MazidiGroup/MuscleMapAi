@@ -103,9 +103,16 @@ const EXPECTED_IDENTITY = {
 };
 
 /** Managed-pipeline-visible identity. `app.json` is rewritten by the wrapper before the
- * cloud upload (resolved config + injected `extra.eas.projectId`), so it is validated
- * semantically instead of byte-pinned. */
+ * cloud upload (resolved config, injected `extra.eas.projectId`, and the EAS project
+ * slug), so it is validated semantically instead of byte-pinned. */
 const EXPECTED_SLUG = "apex-ai";
+/**
+ * The managed wrapper renames the slug to the EAS project's own slug. It is accepted in
+ * cloud mode ONLY when every other identity signal simultaneously proves this is the
+ * approved project and profile — see `resolveSlugPolicy()`.
+ */
+const MANAGED_CLOUD_SLUG = "ai-coach-trainer-2";
+const EXPECTED_VERSION = "1.1.8";
 const EXPECTED_PROJECT_ID = "7f544570-f0e2-45ce-bc88-97a50226e5cb";
 const LEGACY_IDENTITY_MARKERS = ["frontend", "muscle-map-ai", "musclemapai", "expo-template", "my-app"];
 
@@ -342,7 +349,12 @@ function checkIdentityAndConfig() {
       for (const [key, want] of Object.entries(EXPECTED_IDENTITY)) {
         if (actual[key] !== want) fail(`${key} is "${actual[key]}", expected "${want}"`);
       }
-      if (app.slug !== EXPECTED_SLUG) fail(`app.json slug is "${app.slug}", expected "${EXPECTED_SLUG}"`);
+      if (app.version !== EXPECTED_VERSION) {
+        fail(`app.json version is "${app.version}", expected "${EXPECTED_VERSION}"`);
+      }
+      const slugPolicy = resolveSlugPolicy(app, actual);
+      if (!slugPolicy.ok) fail(slugPolicy.reason);
+      else if (slugPolicy.note) notes.push(slugPolicy.note);
       // The managed wrapper injects extra.eas.projectId; it must be this project's.
       const projectId = app.extra?.eas?.projectId;
       if (projectId !== undefined && projectId !== EXPECTED_PROJECT_ID) {
@@ -421,6 +433,55 @@ function checkNoConflictingIdentity(node, where) {
     const value = node[key];
     if (value !== undefined && value !== want) fail(`${where} declares ${key} "${value}", expected "${want}"`);
   }
+}
+
+/**
+ * Slug policy.
+ *
+ * The committed slug is always `apex-ai`. The Emergent managed wrapper rewrites it to
+ * the EAS project's own slug (`ai-coach-trainer-2`) before uploading, which was the sole
+ * failure of the RC5 cloud build. That renamed slug is accepted ONLY in cloud mode and
+ * ONLY when every one of the following is simultaneously true, so a foreign or
+ * mis-targeted project can never borrow the exception:
+ *   - EAS_BUILD is present in the environment;
+ *   - EAS_BUILD_PROFILE is exactly "production";
+ *   - EAS_BUILD_PROJECT_ID is exactly the approved project id;
+ *   - app.json extra.eas.projectId, when present, equals that same id;
+ *   - iOS bundle identifier, Android package and scheme are unchanged;
+ *   - no active updates block and (checked separately) no update channel.
+ */
+function resolveSlugPolicy(app, actualIdentity) {
+  const slug = app.slug;
+  if (slug === EXPECTED_SLUG) return { ok: true };
+  if (slug !== MANAGED_CLOUD_SLUG) {
+    return { ok: false, reason: `app.json slug is "${slug}", expected "${EXPECTED_SLUG}"` };
+  }
+  if (!EAS_MODE) {
+    return { ok: false, reason: `app.json slug is "${slug}", expected "${EXPECTED_SLUG}" (local release mode)` };
+  }
+  const env = { ...process.env };
+  const conditions = [
+    [isEasBuildEnvironment(env), "no EAS_BUILD* environment name is present"],
+    [(env.EAS_BUILD_PROFILE || "").trim() === "production", "EAS_BUILD_PROFILE is not exactly \"production\""],
+    [(env.EAS_BUILD_PROJECT_ID || "").trim() === EXPECTED_PROJECT_ID, "EAS_BUILD_PROJECT_ID is not the approved project id"],
+    [
+      app.extra?.eas?.projectId === undefined || app.extra.eas.projectId === EXPECTED_PROJECT_ID,
+      "app.json extra.eas.projectId is not the approved project id",
+    ],
+    [
+      Object.entries(EXPECTED_IDENTITY).every(([key, want]) => actualIdentity[key] === want),
+      "the bundle identifier, package or scheme is not the approved identity",
+    ],
+    [!app.updates || app.updates.enabled === false, "an active updates configuration is present"],
+  ];
+  const unmet = conditions.filter(([met]) => !met).map(([, why]) => why);
+  if (unmet.length) {
+    return {
+      ok: false,
+      reason: `managed wrapper slug "${slug}" is not permitted here: ${unmet.join("; ")}`,
+    };
+  }
+  return { ok: true, note: `app.json: managed wrapper slug "${slug}" accepted for the approved production project` };
 }
 
 function checkFingerprint() {

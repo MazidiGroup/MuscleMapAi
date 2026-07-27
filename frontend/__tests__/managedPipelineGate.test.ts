@@ -371,3 +371,219 @@ test("14 — the committed eas-build-pre-install chain succeeds in a pipeline-sh
   assert.deepEqual(shim.invocations(), [], "neither the gate nor cmd-guard invoked Git");
   clean(dir, shim.dir);
 });
+
+// --------------------------------------------------------------------------- //
+// RC6 — version 1.1.8 and the managed wrapper slug rename
+//
+// The RC5 cloud build failed on exactly one check: the wrapper renames the slug to the
+// EAS project slug `ai-coach-trainer-2`. That rename is accepted in cloud mode only when
+// every other identity signal simultaneously proves the approved production project.
+// --------------------------------------------------------------------------- //
+
+const MANAGED_SLUG = "ai-coach-trainer-2";
+const COMMITTED_SLUG = "apex-ai";
+const EXPECTED_VERSION = "1.1.8";
+
+/** Cloud environment as the managed wrapper supplies it for a production build. */
+function managedCloudEnv(extra: Record<string, string> = {}, shimDir?: string) {
+  return cloudEnv(
+    { EAS_BUILD: "true", EAS_BUILD_PROFILE: "production", EAS_BUILD_PROJECT_ID: EXPECTED_PROJECT_ID, ...extra },
+    shimDir,
+  );
+}
+
+/** Pipeline archive after the wrapper's slug rename. */
+function makeCloudRenamedArchive(mutate: (expo: Record<string, any>) => void = () => {}): string {
+  const dir = makeArchive();
+  normaliseAppJson(dir, (expo) => {
+    expo.slug = MANAGED_SLUG;
+    mutate(expo);
+  });
+  writeGeneratedEasJson(dir);
+  writeEnv(dir, managedEnvFile());
+  return dir;
+}
+
+test("RC6.1 — local mode accepts version 1.1.8 with the committed slug", () => {
+  const app = JSON.parse(fs.readFileSync(path.join(ROOT, "app.json"), "utf8")).expo;
+  assert.equal(app.version, EXPECTED_VERSION, "the committed marketing version is 1.1.8");
+  assert.equal(app.slug, COMMITTED_SLUG, "the committed slug is unchanged");
+  // Identity, build numbers and OTA configuration are untouched by the version bump.
+  assert.equal(app.ios.bundleIdentifier, "com.mazidigroup.apexai");
+  assert.equal(app.android.package, "com.mazidigroup.apexai");
+  assert.equal(app.scheme, "apexai");
+  assert.equal(app.name, "Muscle Map Ai");
+  assert.equal(app.ios.buildNumber, "2");
+  assert.equal(app.android.versionCode, 2);
+  assert.equal(app.updates, undefined, "no Expo Updates configuration");
+
+  const dir = makeArchive();
+  writeEnv(dir, managedEnvFile());
+  const res = runGate(dir, cloudEnv());
+  assert.equal(res.status, 0, res.all);
+  assert.match(res.stdout, /app\.json: version 1\.1\.8, slug apex-ai/);
+  clean(dir);
+});
+
+test("RC6.2 — local mode refuses the managed wrapper slug", () => {
+  const dir = makeCloudRenamedArchive();
+  // No flag and no EAS_BUILD* name: local release mode.
+  const res = runGate(dir, cloudEnv(), []);
+  assert.equal(res.status, 1);
+  assert.match(res.stderr, /app\.json slug is "ai-coach-trainer-2", expected "apex-ai" \(local release mode\)/);
+  clean(dir);
+});
+
+test("RC6.3 — cloud mode accepts the managed slug for the approved production project", () => {
+  const dir = makeCloudRenamedArchive();
+  const shim = makeGitShim();
+  const res = runGate(dir, managedCloudEnv({}, shim.dir));
+  assert.equal(res.status, 0, res.all);
+  assert.match(res.stdout, /app\.json: version 1\.1\.8, slug ai-coach-trainer-2/);
+  assert.match(res.stdout, /managed wrapper slug "ai-coach-trainer-2" accepted for the approved production project/);
+  assert.match(res.stdout, /source fingerprint matches \(21 files\)/);
+  assert.deepEqual(shim.invocations(), [], "no Git process was invoked");
+  clean(dir, shim.dir);
+});
+
+test("RC6.4 — the managed slug is refused whenever any guard condition is unmet", () => {
+  const cases: [string, () => { dir: string; env: NodeJS.ProcessEnv }, RegExp][] = [
+    [
+      "missing project id",
+      () => ({ dir: makeCloudRenamedArchive(), env: managedCloudEnv({ EAS_BUILD_PROJECT_ID: "" }) }),
+      /EAS_BUILD_PROJECT_ID is not the approved project id/,
+    ],
+    [
+      "wrong project id",
+      () => ({
+        dir: makeCloudRenamedArchive(),
+        env: managedCloudEnv({ EAS_BUILD_PROJECT_ID: "00000000-0000-0000-0000-000000000000" }),
+      }),
+      /EAS_BUILD_PROJECT_ID is not the approved project id/,
+    ],
+    [
+      "wrong app.json project id",
+      () => {
+        const dir = makeCloudRenamedArchive();
+        const file = path.join(dir, "app.json");
+        const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+        parsed.expo.extra.eas.projectId = "11111111-1111-4111-8111-111111111111";
+        fs.writeFileSync(file, JSON.stringify(parsed, null, 2));
+        return { dir, env: managedCloudEnv() };
+      },
+      /extra\.eas\.projectId is/,
+    ],
+    [
+      "missing profile",
+      () => ({ dir: makeCloudRenamedArchive(), env: managedCloudEnv({ EAS_BUILD_PROFILE: "" }) }),
+      /EAS_BUILD_PROFILE is not exactly "production"/,
+    ],
+    [
+      "wrong profile",
+      () => ({ dir: makeCloudRenamedArchive(), env: managedCloudEnv({ EAS_BUILD_PROFILE: "preview" }) }),
+      /EAS_BUILD_PROFILE is "preview", expected "production"/,
+    ],
+    [
+      "wrong bundle identifier",
+      () => ({
+        dir: makeCloudRenamedArchive((expo) => (expo.ios.bundleIdentifier = "com.someoneelse.apexai")),
+        env: managedCloudEnv(),
+      }),
+      /ios\.bundleIdentifier is/,
+    ],
+    [
+      "wrong android package",
+      () => ({
+        dir: makeCloudRenamedArchive((expo) => (expo.android.package = "com.someoneelse.apexai")),
+        env: managedCloudEnv(),
+      }),
+      /android\.package is/,
+    ],
+    [
+      "wrong scheme",
+      () => ({ dir: makeCloudRenamedArchive((expo) => (expo.scheme = "someoneelse")), env: managedCloudEnv() }),
+      /scheme is/,
+    ],
+    [
+      "active updates configuration",
+      () => ({
+        dir: makeCloudRenamedArchive((expo) => (expo.updates = { enabled: true, url: "https://u.expo.dev/x" })),
+        env: managedCloudEnv(),
+      }),
+      /active updates block|active updates configuration is present/,
+    ],
+  ];
+  for (const [label, build, expected] of cases) {
+    const { dir, env } = build();
+    const res = runGate(dir, env);
+    assert.equal(res.status, 1, `${label} must fail`);
+    assert.match(res.stderr, expected, label);
+    clean(dir);
+  }
+});
+
+test("RC6.5 — every version other than 1.1.8 fails in both modes", () => {
+  for (const version of ["1.1.1", "1.1.6", "1.1.7", "1.1.9", "1.18", "v1.1.8", "", "1.1.8-beta"]) {
+    const cloud = makeCloudRenamedArchive((expo) => (expo.version = version));
+    const a = runGate(cloud, managedCloudEnv());
+    assert.equal(a.status, 1, `cloud must reject version "${version}"`);
+    assert.match(a.stderr, /app\.json version is/);
+
+    const local = makeArchive();
+    normaliseAppJson(local, (expo) => (expo.version = version));
+    writeEnv(local, managedEnvFile());
+    const b = runGate(local, cloudEnv());
+    assert.equal(b.status, 1, `local-slug archive must reject version "${version}"`);
+    assert.match(b.stderr, /app\.json version is/);
+    clean(cloud, local);
+  }
+});
+
+test("RC6.6 — no slug other than the committed and managed slugs is accepted", () => {
+  for (const slug of ["apex-ai-2", "ai-coach-trainer", "ai-coach-trainer-3", "some-other-project", ""]) {
+    const dir = makeCloudRenamedArchive((expo) => (expo.slug = slug));
+    const res = runGate(dir, managedCloudEnv());
+    assert.equal(res.status, 1, `slug "${slug}" must fail`);
+    assert.match(res.stderr, /app\.json slug is/);
+    clean(dir);
+  }
+});
+
+test("RC6.7 — the committed pre-install chain passes on the cloud-renamed archive", () => {
+  const dir = makeCloudRenamedArchive();
+  const shim = makeGitShim();
+  const command = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")).scripts[
+    "eas-build-pre-install"
+  ] as string;
+  const res = spawnSync("sh", ["-c", command], { cwd: dir, env: managedCloudEnv({}, shim.dir), encoding: "utf8" });
+  assert.equal(res.status, 0, `${res.stdout}${res.stderr}`);
+  assert.match(res.stdout, /✓ release source verified/);
+  assert.match(res.stdout, /version 1\.1\.8, slug ai-coach-trainer-2/);
+  assert.deepEqual(shim.invocations(), [], "neither the gate nor cmd-guard invoked Git");
+  clean(dir, shim.dir);
+});
+
+test("RC6.8 — fingerprint and tamper protection still apply to the cloud-renamed archive", () => {
+  const lock = makeCloudRenamedArchive();
+  fs.appendFileSync(path.join(lock, "yarn.lock"), "\n");
+  const a = runGate(lock, managedCloudEnv());
+  assert.equal(a.status, 1);
+  assert.match(a.stderr, /source fingerprint mismatch[\s\S]*yarn\.lock/);
+
+  const route = makeCloudRenamedArchive();
+  const rel = "app/dev/paywall-states.tsx";
+  fs.writeFileSync(
+    path.join(route, rel),
+    fs.readFileSync(path.join(route, rel), "utf8").replace("if (!__DEV__)", "if (false)"),
+  );
+  const b = runGate(route, managedCloudEnv());
+  assert.equal(b.status, 1);
+  assert.match(b.stderr, /source fingerprint mismatch[\s\S]*app\/dev\/paywall-states\.tsx/);
+
+  const removed = makeCloudRenamedArchive();
+  fs.rmSync(path.join(removed, "src/premium/entitlement.ts"));
+  const c = runGate(removed, managedCloudEnv());
+  assert.equal(c.status, 1);
+  assert.match(c.stderr, /release-critical files missing from this source tree/);
+  clean(lock, route, removed);
+});

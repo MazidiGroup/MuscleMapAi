@@ -2,7 +2,7 @@
   "note": "Release-source fingerprint. Regenerate with `yarn release:manifest` after an approved source change. Contains no secret or environment value.",
   "algorithm": "sha256",
   "fileCount": 21,
-  "fingerprint": "cb322cb4e0cb96f6f5a11abb2e03452b5d2ebab4371a119e1a11abcb2cde96b7",
+  "fingerprint": "5ab878bbbb93672e685a0258267b59070e086563ff2843e0124d34feba8e2497",
   "files": {
     "yarn.lock": "08fa989a12627f3a8a11d1210565e0926f734b5a7bbf0f8d8c0f903779047c6b",
     "app/_layout.tsx": "8d6b242112b4df82d583e3fc880943491d9609365271d9c8098b54087aaf53f8",
@@ -24,6 +24,6 @@
     "src/anatomy/workoutStore.tsx": "95e00363d6865ebd0a435a690b1a3260bc5b91c70c6973c0f2b1d75b132c68ae",
     "src/auth/AuthContext.tsx": "ecaf742012b080e84d74f27836bae8cd8baee2a4a8c790868821a14c6d7e1890",
     "src/ui/RootErrorBoundary.tsx": "0992f7e6fd6d43520e1567441f3de53a5030ac3ad119b2a19bab195898594d7b",
-    "scripts/verify-release-source.mjs": "abd4b18315e18512f12b614f249e35edeb20597117f2c0af83ed7cc19669d0b1"
+    "scripts/verify-release-source.mjs": "100e8d7061ffc51aaa446f2756ecc24302eb34cc1c8bb20a5f7a14e6488c28fe"
   }
 }

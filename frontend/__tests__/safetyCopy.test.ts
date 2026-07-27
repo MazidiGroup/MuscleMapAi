@@ -198,7 +198,7 @@ test("no Premium lock is attached to an individual exercise row", () => {
 test("no RevenueCat, EAS, version or identifier change was introduced by Phase 3", () => {
   // Pinned to the inherited values: Phase 3 must not bump or rename anything.
   const app = JSON.parse(fs.readFileSync(path.join(ROOT, "app.json"), "utf8"));
-  assert.equal(app.expo.version, "1.1.1");
+  assert.equal(app.expo.version, "1.1.8");
   assert.equal(app.expo.ios.bundleIdentifier, "com.mazidigroup.apexai");
   assert.equal(app.expo.android.package, "com.mazidigroup.apexai");
   // The pre-existing RevenueCat initialisation in app/_layout.tsx is untouched;
