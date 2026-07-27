@@ -23,6 +23,12 @@
  *     environment name, so losing the flag can never silently fall back to the
  *     Git-dependent local mode inside a build job.
  *
+ *     The Emergent managed wrapper rewrites `app.json`, `eas.json` and `.env` before it
+ *     uploads the source, so those three are validated semantically (identity, slug,
+ *     project id, OTA disabled, no update channel, no conflicting identity, required
+ *     public variables) instead of being byte-pinned. The remaining 21 files, including
+ *     `yarn.lock` and the guarded development route, stay hash-pinned.
+ *
  * It exits non-zero on failure, states that the build must not proceed, explains
  * which check failed WITHOUT revealing any environment value, never repairs source,
  * makes no network request and performs no deployment action.
@@ -50,7 +56,7 @@ export const REQUIRED_PUBLIC_VARS = ["EXPO_PUBLIC_BACKEND_URL", "EXPO_PUBLIC_REV
 
 /**
  * EAS-provided names that may be reported when present. None is required, none is a
- * secret, and the gate never depends on any of them: the 23-file content fingerprint
+ * secret, and the gate never depends on any of them: the content fingerprint
  * remains the authoritative source proof.
  */
 export const EAS_PROVENANCE_VARS = [
@@ -73,7 +79,7 @@ export function isEasBuildEnvironment(env = process.env) {
 
 /** Cloud-mode provenance notes. Reported only; never required, never a failure. */
 function noteCloudProvenance() {
-  notes.push("Git metadata is not consulted in cloud mode — the 23-file fingerprint is the source proof");
+  notes.push(`Git metadata is not consulted in cloud mode — the ${RELEASE_CRITICAL_FILES.length}-file fingerprint is the source proof`);
   // One snapshot, read by name: no dynamic `process.env[...]` access.
   const snapshot = { ...process.env };
   const present = EAS_PROVENANCE_VARS.filter((name) => typeof snapshot[name] === "string" && snapshot[name].trim() !== "");
@@ -95,6 +101,13 @@ const EXPECTED_IDENTITY = {
   "android.package": "com.mazidigroup.apexai",
   scheme: "apexai",
 };
+
+/** Managed-pipeline-visible identity. `app.json` is rewritten by the wrapper before the
+ * cloud upload (resolved config + injected `extra.eas.projectId`), so it is validated
+ * semantically instead of byte-pinned. */
+const EXPECTED_SLUG = "apex-ai";
+const EXPECTED_PROJECT_ID = "7f544570-f0e2-45ce-bc88-97a50226e5cb";
+const LEGACY_IDENTITY_MARKERS = ["frontend", "muscle-map-ai", "musclemapai", "expo-template", "my-app"];
 
 const REQUIRED_MARKERS = [
   ["Build my free plan", "src/plan/OnboardingFlow.tsx"],
@@ -155,6 +168,9 @@ export function validateBackendUrl(rawValue) {
   if (/(^|[.-])(staging|stage|dev|test|preview|sandbox)([.-]|$)/.test(host) || host.includes("ngrok")) {
     return { ok: false, reason: "non-production host" };
   }
+  // The managed wrapper replaces the pod's preview host before upload; if the old
+  // `inspect-*` workspace host survived, the build would ship pointing at the sandbox.
+  if (/^inspect-/.test(host)) return { ok: false, reason: "sandbox workspace host" };
   // Redacted host is safe to surface; the full URL and any path never is.
   const redacted = host.replace(/^([^.]{1,3})[^.]*/, "$1***");
   return { ok: true, redactedHost: redacted };
@@ -163,27 +179,88 @@ export function validateBackendUrl(rawValue) {
 export function validatePublicSdkKey(rawValue) {
   const value = typeof rawValue === "string" ? rawValue.trim() : "";
   if (!value) return { ok: false, reason: "missing or blank" };
-  // Public SDK key: shape only, and it is NOT treated as a server secret.
+  // Public SDK key: shape only, and it is NOT treated as a server secret. A passing
+  // shape is NOT proof that the key belongs to the correct RevenueCat app — that stays
+  // a manual production check.
   if (value.length < 20 || /\s/.test(value)) return { ok: false, reason: "implausible shape" };
   return { ok: true };
 }
 
+/**
+ * Parses ONLY the two approved public names out of a `.env` file.
+ *
+ * The Emergent managed wrapper delivers the production values by rewriting the uploaded
+ * `frontend/.env` rather than by setting EAS environment variables, so the gate must be
+ * able to read them from there. Deliberately minimal: Node built-ins only, no
+ * dependency, no interpolation, no command expansion, no variable substitution, and no
+ * other key is ever read. Ambiguity fails closed instead of guessing.
+ */
+export function parseApprovedEnvFile(text) {
+  const values = {};
+  const errors = [];
+  const seen = {};
+  const lines = String(text).split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/\r$/, "");
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    const name = REQUIRED_PUBLIC_VARS.find((candidate) => trimmed.startsWith(candidate));
+    if (!name) continue; // any other key is none of this gate's business
+    const match = trimmed.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (!match || match[1] !== name) {
+      errors.push(`${name} is malformed on .env line ${i + 1} (value never printed)`);
+      continue;
+    }
+    seen[name] = (seen[name] ?? 0) + 1;
+    if (seen[name] > 1) {
+      errors.push(`${name} is declared more than once in .env — ambiguous, refusing to guess`);
+      continue;
+    }
+    let raw = match[2].trim();
+    const quoted = /^(".*"|'.*')$/s.test(raw);
+    if (quoted) raw = raw.slice(1, -1);
+    if (raw.includes("${") || raw.includes("$(")) {
+      errors.push(`${name} contains an unexpanded reference in .env — no interpolation is performed`);
+      continue;
+    }
+    if (raw.trim() === "") {
+      errors.push(`${name} is blank in .env (value never printed)`);
+      continue;
+    }
+    values[name] = raw;
+  }
+  return { values, errors };
+}
+
+/** Reads `.env` next to the project root. Missing file is not an error. */
+function readApprovedEnvFile() {
+  const text = readSafe(".env");
+  if (text === null) return { values: {}, errors: [], present: false };
+  const parsed = parseApprovedEnvFile(text);
+  return { ...parsed, present: true };
+}
+
 function checkPublicVars() {
+  const fromFile = readApprovedEnvFile();
+  for (const message of fromFile.errors) fail(`build variable ${message}`);
+  const shell = { ...process.env };
   for (const name of REQUIRED_PUBLIC_VARS) {
-    const present = Object.prototype.hasOwnProperty.call(process.env, name);
-    if (!present) {
+    // `process.env` always wins; `.env` is the managed-pipeline fallback.
+    const shellValue = Object.prototype.hasOwnProperty.call(shell, name) ? shell[name] : undefined;
+    const value = shellValue !== undefined ? shellValue : fromFile.values[name];
+    const source = shellValue !== undefined ? "environment" : ".env";
+    if (value === undefined) {
       fail(`required build variable ${name} is not available to this environment (value never printed)`);
       continue;
     }
-    const result =
-      name === "EXPO_PUBLIC_BACKEND_URL" ? validateBackendUrl(process.env[name]) : validatePublicSdkKey(process.env[name]);
+    const result = name === "EXPO_PUBLIC_BACKEND_URL" ? validateBackendUrl(value) : validatePublicSdkKey(value);
     if (!result.ok) {
       fail(`build variable ${name} failed validation: ${result.reason} (value never printed)`);
     } else {
       notes.push(
         name === "EXPO_PUBLIC_BACKEND_URL"
-          ? `${name} present, absolute HTTPS, host ${result.redactedHost}`
-          : `${name} present, shape accepted`,
+          ? `${name} present (${source}), absolute HTTPS, host ${result.redactedHost}`
+          : `${name} present (${source}), shape accepted`,
       );
     }
   }
@@ -265,8 +342,22 @@ function checkIdentityAndConfig() {
       for (const [key, want] of Object.entries(EXPECTED_IDENTITY)) {
         if (actual[key] !== want) fail(`${key} is "${actual[key]}", expected "${want}"`);
       }
-      if (app.updates) fail("app.json contains an updates block (OTA must stay disabled)");
+      if (app.slug !== EXPECTED_SLUG) fail(`app.json slug is "${app.slug}", expected "${EXPECTED_SLUG}"`);
+      // The managed wrapper injects extra.eas.projectId; it must be this project's.
+      const projectId = app.extra?.eas?.projectId;
+      if (projectId !== undefined && projectId !== EXPECTED_PROJECT_ID) {
+        fail(`app.json extra.eas.projectId is "${projectId}", expected "${EXPECTED_PROJECT_ID}"`);
+      }
+      if (app.updates && app.updates.enabled !== false) {
+        fail("app.json contains an active updates block (OTA must stay disabled)");
+      }
+      for (const marker of LEGACY_IDENTITY_MARKERS) {
+        if (app.name === marker || app.slug === marker || app.owner === marker) {
+          fail(`app.json carries the legacy application identity "${marker}"`);
+        }
+      }
       notes.push(`app.json: version ${app.version}, slug ${app.slug}`);
+      if (projectId !== undefined) notes.push(`app.json: EAS project id matches (${projectId})`);
     } catch (e) {
       fail(`app.json could not be parsed: ${e.message}`);
     }
@@ -278,16 +369,57 @@ function checkIdentityAndConfig() {
   } else {
     try {
       const eas = JSON.parse(easRaw);
-      if (eas.cli?.requireCommit !== true) fail("eas.json cli.requireCommit must be true");
-      if (eas.build?.production?.environment !== "production") {
-        fail('eas.json production profile must select "environment": "production"');
+      // Local release mode verifies the committed eas.json, which is the authoritative
+      // configuration for direct EAS use. In a managed cloud job the wrapper replaces
+      // eas.json with its own minimal file before upload, so these two operator-facing
+      // fields are verified locally and must not fail the build there.
+      if (!EAS_MODE) {
+        if (eas.cli?.requireCommit !== true) fail("eas.json cli.requireCommit must be true");
+        if (eas.build?.production?.environment !== "production") {
+          fail('eas.json production profile must select "environment": "production"');
+        }
+      } else if (eas.build?.production && "environment" in eas.build.production) {
+        // Production semantics are still enforced wherever the field is present.
+        if (eas.build.production.environment !== "production") {
+          fail('eas.json production profile selects a non-production environment');
+        }
       }
       for (const [name, profile] of Object.entries(eas.build ?? {})) {
         if (profile?.channel) fail(`build profile ${name} declares an update channel`);
+        if (profile?.updates) fail(`build profile ${name} declares an updates configuration (OTA must stay disabled)`);
+        checkNoConflictingIdentity(profile, `build profile ${name}`);
       }
+      for (const [name, profile] of Object.entries(eas.submit ?? {})) {
+        checkNoConflictingIdentity(profile?.ios, `submit profile ${name} (ios)`);
+        checkNoConflictingIdentity(profile?.android, `submit profile ${name} (android)`);
+      }
+      if (EAS_MODE) notes.push("eas.json: valid JSON, no update channel, no conflicting identity");
     } catch (e) {
       fail(`eas.json could not be parsed: ${e.message}`);
     }
+  }
+
+  // Cloud jobs may or may not forward the profile name. When they do, it must be the
+  // production profile; when they do not, nothing is required.
+  if (EAS_MODE) {
+    const profile = (process.env.EAS_BUILD_PROFILE || "").trim();
+    if (profile && profile !== "production") {
+      fail(`EAS_BUILD_PROFILE is "${profile}", expected "production"`);
+    }
+  }
+}
+
+/** eas.json must never re-declare a different application identity. */
+function checkNoConflictingIdentity(node, where) {
+  if (!node || typeof node !== "object") return;
+  const pairs = [
+    ["bundleIdentifier", EXPECTED_IDENTITY["ios.bundleIdentifier"]],
+    ["applicationId", EXPECTED_IDENTITY["android.package"]],
+    ["package", EXPECTED_IDENTITY["android.package"]],
+  ];
+  for (const [key, want] of pairs) {
+    const value = node[key];
+    if (value !== undefined && value !== want) fail(`${where} declares ${key} "${value}", expected "${want}"`);
   }
 }
 

@@ -33,10 +33,16 @@ export const MANIFEST_PATH = "release-source.manifest.json";
  * `app/dev/paywall-states.tsx` is included for the same reason: it is a development
  * fixture harness that must stay guarded out of production builds, so removing the
  * guard cannot pass the gate without an approved manifest regeneration.
+ *
+ * `app.json`, `eas.json` and `.env` are deliberately NOT byte-pinned: the Emergent
+ * managed publish wrapper rewrites all three before it uploads the source (resolved
+ * Expo config plus an injected `extra.eas.projectId`, its own generated `eas.json`, and
+ * the production backend host written into `.env`). Byte-pinning them would fail every
+ * managed build, so `verify-release-source.mjs` validates them semantically instead —
+ * identity, slug, project id, OTA disabled, no update channel, no conflicting identity,
+ * and the two required public build variables.
  */
 export const RELEASE_CRITICAL_FILES = [
-  "app.json",
-  "eas.json",
   "yarn.lock",
   "app/_layout.tsx",
   "app/(tabs)/_layout.tsx",

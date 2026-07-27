@@ -84,7 +84,7 @@ test("the guarded route is bound to the release gate with its exact hash", async
 
   const manifest = JSON.parse(read("release-source.manifest.json"));
   assert.equal(manifest.fileCount, RELEASE_CRITICAL_FILES.length, "the manifest covers every listed file");
-  assert.equal(manifest.fileCount, 23, "23 release-critical files");
+  assert.equal(manifest.fileCount, 21, "21 release-critical files");
   const expected = createHash("sha256").update(fs.readFileSync(path.join(ROOT, ROUTE_REL))).digest("hex");
   assert.equal(manifest.files[ROUTE_REL], expected, "the recorded hash is the guarded file's hash");
   // The dependency graph stays pinned by the same manifest.

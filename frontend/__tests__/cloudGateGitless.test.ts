@@ -86,7 +86,7 @@ test("A — cloud mode in a Gitless workspace fails only on the two required bui
 
   assert.equal(res.status, 1, "the gate fails closed");
   assert.match(res.stdout, /EAS cloud pre-install mode/);
-  assert.match(res.stdout, /source fingerprint matches \(23 files\)/);
+  assert.match(res.stdout, /source fingerprint matches \(21 files\)/);
   assert.match(res.stdout, /Git metadata is not consulted in cloud mode/);
   assert.match(res.stdout, /no EAS_BUILD\* provenance name was supplied \(not required\)/);
   for (const symptom of GIT_SYMPTOMS) {
@@ -107,7 +107,7 @@ test("B — cloud mode passes with validator-only variables and never invokes Gi
   const res = runGate(dir, ["--eas-pre-install"], cloudEnv(VALIDATOR_ONLY_ENV, shim.dir));
 
   assert.equal(res.status, 0, res.all);
-  assert.match(res.stdout, /source fingerprint matches \(23 files\)/);
+  assert.match(res.stdout, /source fingerprint matches \(21 files\)/);
   assert.match(res.stdout, /✓ release source verified/);
   assert.ok(!res.stdout.includes(VALIDATOR_ONLY_ENV.EXPO_PUBLIC_BACKEND_URL), "the URL is never echoed in full");
   assert.ok(!res.all.includes(VALIDATOR_ONLY_ENV.EXPO_PUBLIC_REVENUECAT_IOS_KEY), "the SDK key is never echoed");
