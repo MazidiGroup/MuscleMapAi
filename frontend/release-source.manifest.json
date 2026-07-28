@@ -2,7 +2,7 @@
   "note": "Release-source fingerprint. Regenerate with `yarn release:manifest` after an approved source change. Contains no secret or environment value.",
   "algorithm": "sha256",
   "fileCount": 21,
-  "fingerprint": "b8825e6424500cdee14c02297461aeafce05c1ed927b6fcb67f9af3f05ba4931",
+  "fingerprint": "2819aa4595faf17ce6be20c0be1b5ab71611505ae7b81223c1c099fe7e6f2d04",
   "files": {
     "yarn.lock": "08fa989a12627f3a8a11d1210565e0926f734b5a7bbf0f8d8c0f903779047c6b",
     "app/_layout.tsx": "57594e78209b134b06ed44e9f517930a19ddea5c7071fad3de12e8d74ea2089d",
@@ -16,7 +16,7 @@
     "src/plan/PlanViews.tsx": "0758fa216dea5b2db328f44cb64caef5dfaa59aaa48d45a670dfd7b061c2d90e",
     "src/owner/scopeKeys.ts": "b21d6c18ebd7e71d1cd4d8e06e190e4a9595abf7279ec06fa9343ce8f560f08b",
     "src/history/metrics.ts": "b9e27f87eea35217764f93257c1cd7d4274c1545e757181ce55ce490d85a3211",
-    "src/history/HistoryView.tsx": "3ddb3faba132e41c007e4ee19048cb9404ecee6aef11c36f60c0a2aad1d36a56",
+    "src/history/HistoryView.tsx": "0c7ff44663cb7505a256a0fc7716f29d854d197a8063574f96d280d6a20381a6",
     "src/premium/entitlement.ts": "62e00c7e01448fdc42e73f47dc3def980dca9066bfe148172cd47cbde9001f1e",
     "src/premium/PremiumGate.tsx": "8ac3be7af092cc07a91ef34abc093ce17db5c123b440c9d3744bc87149da4c3d",
     "src/premium/Paywall.tsx": "56d58b70abc5cccc225809562e15ca1841e77c04c99622668fc160d6b0513076",

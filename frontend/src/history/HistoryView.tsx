@@ -171,7 +171,7 @@ export function HistoryView({ scrollPadding = 24 }: { scrollPadding?: number }) 
               <Pressable
                 onPress={() => shiftMonth(1)}
                 accessibilityRole="button"
-                accessibilityLabel="Next month"
+                accessibilityLabel={`Next month, ${monthLabel(nextMonth.getFullYear(), nextMonth.getMonth())}`}
                 testID="cal-next"
                 style={[styles.iconBtn, { borderColor: t.color.border }]}
               >
