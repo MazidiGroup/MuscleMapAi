@@ -27,7 +27,6 @@ import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette, GROUP_COLORS } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { PremiumGate } from "@/src/premium/PremiumGate";
 import { gate } from "@/src/premium/entitlement";
@@ -203,7 +202,6 @@ export default function LibraryScreen() {
       <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 18 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <Text style={styles.h1}>Library</Text>
-          <ThemeToggle />
         </View>
         <Text style={styles.sub}>Exercises · muscle guide · learn · account</Text>
         {FLAGS.libraryExercises && (
@@ -254,7 +252,7 @@ export default function LibraryScreen() {
       </View>
 
       {((seg === "muscles" && musclesDecision !== "allow") || (seg === "learn" && learnDecision !== "allow")) ? (
-        <PremiumGate surface={seg === "learn" ? "library.learn" : "library.muscles"} showThemeToggle={false}>
+        <PremiumGate surface={seg === "learn" ? "library.learn" : "library.muscles"}>
           <View />
         </PremiumGate>
       ) : (

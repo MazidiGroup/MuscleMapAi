@@ -16,7 +16,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
-import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { ActionButton, LayoutSkeleton, RetryPanel, StatusAnnouncement } from "@/src/ui/state";
 
 import { usePlanStore } from "./planStore";
@@ -64,7 +63,6 @@ export function Welcome({ onStart, onSignIn }: { onStart: () => void; onSignIn: 
   return (
     <View style={[styles.root, { backgroundColor: t.color.bg, paddingTop: insets.top }]} testID="welcome">
       <View style={styles.welcomeTop}>
-        <ThemeToggle />
       </View>
 
       <View style={styles.center}>
@@ -139,7 +137,6 @@ function Shell({
         <Text style={[t.type.caption, { color: t.color.textMuted }]} testID="onb-step-label">
           {stepLabel(step)}
         </Text>
-        <ThemeToggle />
       </View>
 
       <ScrollView
@@ -387,6 +384,13 @@ export function Building() {
           <Image source={require("../../assets/images/adaptive-icon.png")} style={styles.brandMark} resizeMode="contain" />
         </Animated.View>
         <Text style={[t.type.heading, { color: t.color.text, marginTop: t.space.xl }]}>Building your plan…</Text>
+        {/* The one promise the user needs while they wait: nothing is lost, and this is not instant. */}
+        <Text
+          style={[t.type.body, { color: t.color.text, marginTop: t.space.sm, textAlign: "center" }]}
+          testID="plan-building-reassurance"
+        >
+          Your answers are saved. This may take a few seconds.
+        </Text>
         <StatusAnnouncement message={BUILD_LINES[i]} />
         <Text style={[t.type.body, { color: t.color.textSecondary, marginTop: t.space.sm }]}>{BUILD_LINES[i]}</Text>
       </View>

@@ -1,66 +1,27 @@
-// Theme context + persistence. Wraps the app so any screen can call
-// `useTheme()` to read the current palette and `toggleTheme()` to flip modes.
+// Theme context.
 //
-// Persistence uses AsyncStorage-via-`storage` (our web/native shim) so the
-// user's choice survives across launches. Night is the launch default.
+// The app ships ONE theme: night. Light mode is not part of the approved design,
+// has no reviewed token set, and no longer exists in the code — so there is no
+// mode state, no persisted preference and no toggle. `useTheme()` stays because
+// every screen reads its palette through it.
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-
-import { storage } from "@/src/utils/storage";
+import React, { createContext, useContext } from "react";
 
 import { DEFAULT_MODE, PALETTES, Palette, ThemeMode } from "./tokens";
-
-const KEY = "mma.themeMode";
 
 type ThemeCtx = {
   mode: ThemeMode;
   T: Palette;
-  setMode: (m: ThemeMode) => void;
-  toggleTheme: () => void;
 };
 
-const Ctx = createContext<ThemeCtx | null>(null);
+const VALUE: ThemeCtx = { mode: DEFAULT_MODE, T: PALETTES[DEFAULT_MODE] };
+
+const Ctx = createContext<ThemeCtx>(VALUE);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>(DEFAULT_MODE);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const saved = await storage.getItem<ThemeMode | null>(KEY, null);
-        if (saved === "day" || saved === "night") setModeState(saved);
-      } catch {
-        /* ignore */
-      }
-    })();
-  }, []);
-
-  const setMode = (m: ThemeMode) => {
-    setModeState(m);
-    storage.setItem(KEY, m).catch(() => {});
-  };
-
-  const value: ThemeCtx = {
-    mode,
-    T: PALETTES[mode],
-    setMode,
-    toggleTheme: () => setMode(mode === "night" ? "day" : "night"),
-  };
-
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={VALUE}>{children}</Ctx.Provider>;
 }
 
 export function useTheme(): ThemeCtx {
-  const ctx = useContext(Ctx);
-  if (!ctx) {
-    // Sensible fallback for components rendered before the provider mounts
-    // (e.g. during error boundaries). Returns the night palette.
-    return {
-      mode: DEFAULT_MODE,
-      T: PALETTES[DEFAULT_MODE],
-      setMode: () => {},
-      toggleTheme: () => {},
-    };
-  }
-  return ctx;
+  return useContext(Ctx);
 }

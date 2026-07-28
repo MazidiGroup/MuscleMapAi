@@ -43,6 +43,12 @@ export default function PlanTab() {
       try {
         const { answers, rebuildFromAnswers } = usePlanStore.getState();
         rebuildFromAnswers(normalizeAnswers(answers));
+        // A build that produces no plan is a failed build, not a silent return to
+        // Welcome: check the post-condition instead of trusting the call.
+        if (!usePlanStore.getState().plan) {
+          setPhase("failed");
+          return;
+        }
         setPhase("idle");
       } catch (e) {
         console.error("[Plan] buildPlan failed:", e);

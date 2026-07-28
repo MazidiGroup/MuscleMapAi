@@ -18,7 +18,6 @@ import {
 } from "@/src/history/metrics";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { ThemeToggle } from "@/src/theme/ThemeToggle";
 
 function fmt(sec: number) {
   const m = Math.floor(sec / 60);
@@ -57,7 +56,6 @@ export default function SummaryScreen() {
 
   return (
     <View style={styles.root}>
-      <ThemeToggle style={{ position: "absolute", top: insets.top + 8, right: 16, zIndex: 30 }} />
       <View style={{ height: "38%" }}>
         <AnatomyViewer mode="workout" primary={act.primary} secondary={act.secondary} />
       </View>

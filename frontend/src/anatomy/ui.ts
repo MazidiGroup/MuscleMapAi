@@ -1,9 +1,10 @@
 // Anatomy-trainer theme tokens.
 //
-// Historically this file exported a single dark palette `T`. To support the
-// app-wide Day/Night mode we now expose BOTH a night and a day variant with
-// the SAME keys, plus `legacyPalette(mode)` which the screens call (via
-// useMemo) so their existing `T.*` references simply flip colours.
+// This file exports the dark palette `T` plus `legacyPalette()`, which the
+// screens call (via useMemo) so their existing `T.*` references keep working.
+// There is no day variant: light mode is not part of the approved design.
+
+import type { ThemeMode } from "@/src/theme/tokens";
 
 export type LegacyPalette = {
   bg: string;
@@ -41,27 +42,14 @@ const NIGHT_T: LegacyPalette = {
   secondary: "#FFB020",
 };
 
-const DAY_T: LegacyPalette = {
-  bg: "#eef2f9",
-  bg2: "#ffffff",
-  surface: "#ffffff",
-  surfaceHi: "#eaf0fa",
-  border: "rgba(40,80,140,0.16)",
-  borderHi: "rgba(40,80,140,0.28)",
-  text: "#0c1424",
-  textDim: "#42506c",
-  textFaint: "#8090af",
-  accent: "#1E9BFF",
-  accentDim: "#1877d6",
-  bone: "#C8A96A",
-  muscle: "#C0584F",
-  primary: "#E23B30",
-  secondary: "#E09415",
-};
 
-/** Returns the legacy-shaped palette for the given theme mode. */
-export function legacyPalette(mode: "night" | "day"): LegacyPalette {
-  return mode === "day" ? DAY_T : NIGHT_T;
+/**
+ * The legacy-shaped palette. The app ships one theme (night); the parameter is
+ * kept so the existing `legacyPalette(mode)` call sites stay untouched, and
+ * there is no light variant to return.
+ */
+export function legacyPalette(_mode?: ThemeMode): LegacyPalette {
+  return NIGHT_T;
 }
 
 // Backward-compatible default (night) for screens not yet theme-aware.

@@ -16,7 +16,6 @@ import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { formatSetLoad, isBodyweightEquipment, loadColumnLabel, loadPlaceholder } from "@/src/anatomy/bodyweight";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { EmptyState, ErrorBanner } from "@/src/ui/state";
 import { A11yControl } from "@/src/ui/A11yControl";
 
@@ -130,7 +129,6 @@ export default function WorkoutScreen() {
           >
             <Text style={styles.unitText}>{w.unit.toUpperCase()}</Text>
           </TouchableOpacity>
-          <ThemeToggle />
         </View>
       </View>
 

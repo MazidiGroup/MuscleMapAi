@@ -19,7 +19,6 @@ import { useWorkout, weeklySetsByGroup, topPRs, Workout, PRs } from "@/src/anato
 import { ThinkingDots } from "@/src/components/ThinkingDots";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { PremiumGate } from "@/src/premium/PremiumGate";
 import { FLAGS } from "@/src/config/featureFlags";
 
@@ -181,7 +180,6 @@ function CoachContent() {
             <Text style={styles.sub}>AI anatomy & training assistant</Text>
           </View>
           <View style={{ flex: 1 }} />
-          <ThemeToggle />
         </View>
         <View style={styles.disclaimer}>
           <Ionicons name="information-circle-outline" size={14} color={T.textFaint} />

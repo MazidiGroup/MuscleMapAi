@@ -8,7 +8,7 @@
 // the dismissible value path (the paywall) with the free areas named.
 
 import React from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
@@ -22,12 +22,10 @@ export function PremiumGate({
   surface,
   children,
   headerOffset = 0,
-  showThemeToggle = true,
 }: {
   surface: Extract<Surface, "explore" | "coach" | "library.muscles" | "library.learn">;
   children: React.ReactNode;
   headerOffset?: number;
-  showThemeToggle?: boolean;
 }) {
   const t = useSemanticTokens();
   const insets = useSafeAreaInsets();
@@ -38,7 +36,12 @@ export function PremiumGate({
 
   if (decision === "loading") {
     return (
-      <View style={{ flex: 1, backgroundColor: t.color.bg, paddingTop: insets.top + 24, paddingHorizontal: t.space.lg }}>
+      <View
+        style={{ flex: 1, backgroundColor: t.color.bg, paddingTop: insets.top + 24, paddingHorizontal: t.space.lg, gap: t.space.md }}
+        testID={`checking-${surface}`}
+      >
+        {/* A skeleton on its own reads as an empty screen. Say what is happening. */}
+        <Text style={[t.type.body, { color: t.color.textMuted }]}>Checking your Premium access…</Text>
         <StatusAnnouncement message="Checking your Premium access" visible={false} />
         <LayoutSkeleton rows={3} />
       </View>
@@ -52,7 +55,6 @@ export function PremiumGate({
         title={PAYWALL_COPY.lockedTitle(area)}
         body={PAYWALL_COPY.lockedBody}
         headerOffset={headerOffset}
-        showThemeToggle={showThemeToggle}
       />
     </View>
   );

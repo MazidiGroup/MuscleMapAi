@@ -88,10 +88,11 @@ function OwnerGate({ children }: { children: React.ReactNode }) {
 }
 
 function ThemedStack() {
-  const { T, mode } = useTheme();
+  const { T } = useTheme();
   return (
     <>
-      <StatusBar barStyle={mode === "night" ? "light-content" : "dark-content"} />
+      {/* One theme (night): the status bar is always light-on-dark. */}
+      <StatusBar barStyle="light-content" />
       <AuthGate>
         <OwnerGate>
         <Stack

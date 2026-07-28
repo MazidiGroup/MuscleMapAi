@@ -12,7 +12,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
-import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import {
   ActionButton,
   ErrorBanner,
@@ -38,12 +37,10 @@ export function Paywall({
   title = PAYWALL_COPY.title,
   body = PAYWALL_COPY.subtitle,
   headerOffset = 0,
-  showThemeToggle = true,
 }: {
   title?: string;
   body?: string;
   headerOffset?: number;
-  showThemeToggle?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -84,7 +81,6 @@ export function Paywall({
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + t.space.lg + headerOffset }]}>
-      {showThemeToggle && <ThemeToggle style={{ position: "absolute", top: insets.top + 8, right: 16, zIndex: 30 }} />}
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} testID="paywall">
         <View style={styles.badge}>
           <Ionicons name="star" size={26} color={t.color.accent} />

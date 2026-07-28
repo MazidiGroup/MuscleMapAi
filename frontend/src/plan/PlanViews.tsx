@@ -15,7 +15,7 @@ import { useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { useSemanticTokens } from "@/src/theme/semantic";
 import { R } from "@/src/theme/tokens";
-import { ActionButton, InfoBanner, InterruptedSessionCard } from "@/src/ui/state";
+import { ActionButton, InfoBanner, InterruptedSessionCard, RetryPanel } from "@/src/ui/state";
 import { A11yControl } from "@/src/ui/A11yControl";
 import { usePlanStore, todayISO } from "./planStore";
 import { AdjustPlanSheet } from "./AdjustPlanSheet";
@@ -26,7 +26,7 @@ import { posterUrl } from "@/src/anatomy/media";
 import { useWorkout } from "@/src/anatomy/workoutStore";
 
 export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number) => void; onEditAnswers: () => void }) {
-  const { T, mode, toggleTheme } = useTheme();
+  const { T } = useTheme();
   const t = useSemanticTokens();
   const router = useRouter();
   const plan = usePlanStore(s => s.plan);
@@ -48,13 +48,6 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
       <View style={styles.wpHeader}>
         <Text style={[styles.wpTitle, { color: T.text }]}>Your weekly plan</Text>
         <View style={{ flexDirection: "row", gap: 8 }}>
-          <TouchableOpacity
-            style={[styles.headerBtn, { backgroundColor: T.card, borderColor: T.border }]}
-            onPress={toggleTheme}
-            testID="theme-toggle"
-          >
-            <Ionicons name={mode === "night" ? "sunny" : "moon"} size={16} color={T.text2} />
-          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.adjustBtn, { backgroundColor: T.accent }]}
             onPress={() => setAdjusting(true)}
@@ -166,10 +159,17 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
     return live || !!completions[`${dateKey}:${ex.id}`];
   }).length;
   const allDone = exs.length > 0 && doneCount === exs.length;
+  // The muscle summary is derived from THIS day's exercises and lists every group
+  // they represent, so days with different exercises read differently.
+  const muscles = Array.from(new Set(exs.map((ex) => ex.muscle).filter(Boolean))).map(
+    (m) => MUSCLE_LABEL[m as keyof typeof MUSCLE_LABEL] || String(m),
+  );
   // The card is the control that starts this day's workout, so it is a real
-  // button and its name carries the day, the session and its length.
+  // button and its name carries the day, the session, its length and its muscles
+  // (the name replaces the card's text for a screen reader).
   const label =
     `${day.dow}, ${day.typeName}, about ${day.minutes} minutes` +
+    (muscles.length ? `, ${muscles.join(", ")}` : "") +
     (doneCount > 0 ? `, ${doneCount} of ${exs.length} done` : "");
   return (
     <A11yControl
@@ -208,8 +208,8 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
           </View>
         ))}
       </View>
-      <Text style={[styles.dayMuscles, { color: T.text2 }]} numberOfLines={1}>
-        {(day.focusMuscles || []).map(m => MUSCLE_LABEL[m]).slice(0, 4).join(" · ")}
+      <Text style={[styles.dayMuscles, { color: T.text2 }]} numberOfLines={2}>
+        {muscles.join(" · ")}
       </Text>
     </A11yControl>
   );
@@ -224,6 +224,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
   const completions = usePlanStore(s => s.completions);
   const [swapId, setSwapId] = useState<string | null>(null);
   const [replaced, setReplaced] = useState<Record<string, PlanExerciseEntry>>({});
+  const [startFailed, setStartFailed] = useState(false);
   if (!plan) return null;
   const day = plan.days[dayIndex];
   if (day.rest) return null;
@@ -235,8 +236,16 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
   // Starting a new workout and resuming the active one are distinct actions:
   // resuming never rewrites the session the user is already logging.
   const startWorkout = () => {
-    // The planned set count travels with the exercise into the session.
-    for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets, day.typeName);
+    setStartFailed(false);
+    try {
+      // The planned set count travels with the exercise into the session.
+      for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets, day.typeName);
+    } catch {
+      // Nothing is half-started, and we never retry behind the user's back: the
+      // retry below only runs when they ask for it.
+      setStartFailed(true);
+      return;
+    }
     router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
   };
   const resumeWorkout = () => router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
@@ -275,6 +284,18 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+        {startFailed && (
+          <View style={{ marginBottom: 16 }}>
+            <RetryPanel
+              title="We couldn't start this workout"
+              body="Nothing was logged and your plan has not changed."
+              preserved={["Your plan", "Completed workouts", "Your History"]}
+              retry={{ label: "Try again", onPress: startWorkout, testID: "start-retry" }}
+              secondary={{ label: "Back to my weekly plan", onPress: onBack, testID: "start-back" }}
+              testID="start-failed"
+            />
+          </View>
+        )}
         {items.map((ex) => {
           const sessionEx = w.session?.find((s) => s.exerciseId === ex.id);
           const sessionDone = !!sessionEx && sessionEx.sets.length > 0 && sessionEx.sets.every((s) => s.done);
