@@ -81,10 +81,18 @@ test("set progress is formatted {completed} of {total}", () => {
 });
 
 test("titles use the stored Plan relationship, otherwise an absolute date", () => {
-  const planned = w("p1", NOW, [ex("squat", [set("a", 100, 5)], { planLink: { planDate: "2026-06-17" } })]);
+  const named = w("p1", NOW, [
+    ex("squat", [set("a", 100, 5)], { planLink: { planDate: "2026-06-17", planName: "Full Body A" } }),
+  ]);
+  const unnamed = w("p2", NOW, [ex("squat", [set("a", 100, 5)], { planLink: { planDate: "2026-06-17" } })]);
   const adhoc = w("a1", NOW, [ex("squat", [set("a", 100, 5)])]);
-  assert.equal(workoutTitle(planned), `Planned workout · ${absoluteDate(NOW)}`);
+  // The stored plan day name, never a generic label.
+  assert.equal(workoutTitle(named), `Full Body A · ${absoluteDate(NOW)}`);
+  assert.equal(workoutTitle(unnamed), `Workout · ${absoluteDate(NOW)}`, "no name stored means the date fallback");
   assert.equal(workoutTitle(adhoc), `Workout · ${absoluteDate(NOW)}`);
+  for (const title of [workoutTitle(named), workoutTitle(unnamed), workoutTitle(adhoc)]) {
+    assert.ok(!/planned workout/i.test(title), "the generic string never appears");
+  }
   assert.ok(!/upper|lower|push|pull|full body/i.test(workoutTitle(adhoc)), "a split is never inferred");
 });
 

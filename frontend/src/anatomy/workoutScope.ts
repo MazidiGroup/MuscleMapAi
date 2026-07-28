@@ -28,7 +28,7 @@ export type SessionExercise = {
   idSpace?: ExerciseIdSpace;
   sets: LoggedSet[];
   notes: string;
-  planLink?: { planDate: string };
+  planLink?: { planDate: string; planName?: string };
 };
 export type Workout = { id: string; date: number; durationSec: number; exercises: SessionExercise[] };
 export type PRs = { byExercise: Record<string, { maxWeight: number; maxVolume: number }>; longestSec: number };

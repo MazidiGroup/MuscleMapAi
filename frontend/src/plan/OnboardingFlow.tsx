@@ -11,12 +11,11 @@
 // Answers persist per step through the owner-scoped plan store.
 
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
-import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { ActionButton, LayoutSkeleton, RetryPanel, StatusAnnouncement } from "@/src/ui/state";
 
 import { usePlanStore } from "./planStore";
@@ -64,7 +63,6 @@ export function Welcome({ onStart, onSignIn }: { onStart: () => void; onSignIn: 
   return (
     <View style={[styles.root, { backgroundColor: t.color.bg, paddingTop: insets.top }]} testID="welcome">
       <View style={styles.welcomeTop}>
-        <ThemeToggle />
       </View>
 
       <View style={styles.center}>
@@ -82,6 +80,7 @@ export function Welcome({ onStart, onSignIn }: { onStart: () => void; onSignIn: 
         <Pressable
           onPress={onSignIn}
           accessibilityRole="button"
+          accessibilityLabel="Already have an account?"
           style={[styles.secondaryLink, { minHeight: t.target.min }]}
           testID="cta-sign-in"
         >
@@ -138,7 +137,6 @@ function Shell({
         <Text style={[t.type.caption, { color: t.color.textMuted }]} testID="onb-step-label">
           {stepLabel(step)}
         </Text>
-        <ThemeToggle />
       </View>
 
       <ScrollView
@@ -172,12 +170,19 @@ function OptionCard({
   testID?: string;
 }) {
   const t = useSemanticTokens();
+  // react-native-web no longer derives aria-checked from accessibilityState, and a
+  // radio must state itself. Native keeps reading accessibilityState.
+  const aria = Platform.OS === "web" ? ({ "aria-checked": selected } as any) : null;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, checked: selected }}
+      // The name carries the option and the line that qualifies it, so the
+      // choice is understandable without the visual pairing.
+      accessibilityLabel={sub ? `${label}, ${sub.charAt(0).toLowerCase()}${sub.slice(1)}` : label}
       testID={testID}
+      {...aria}
       style={[
         styles.optCard,
         {
@@ -202,12 +207,15 @@ function OptionCard({
 
 function Pill({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
   const t = useSemanticTokens();
+  const aria = Platform.OS === "web" ? ({ "aria-checked": on } as any) : null;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: on }}
+      accessibilityLabel={label}
       testID={testID}
+      {...aria}
       style={{
         paddingHorizontal: t.space.lg,
         minHeight: t.target.min,
@@ -376,6 +384,13 @@ export function Building() {
           <Image source={require("../../assets/images/adaptive-icon.png")} style={styles.brandMark} resizeMode="contain" />
         </Animated.View>
         <Text style={[t.type.heading, { color: t.color.text, marginTop: t.space.xl }]}>Building your plan…</Text>
+        {/* The one promise the user needs while they wait: nothing is lost, and this is not instant. */}
+        <Text
+          style={[t.type.body, { color: t.color.text, marginTop: t.space.sm, textAlign: "center" }]}
+          testID="plan-building-reassurance"
+        >
+          Your answers are saved. This may take a few seconds.
+        </Text>
         <StatusAnnouncement message={BUILD_LINES[i]} />
         <Text style={[t.type.body, { color: t.color.textSecondary, marginTop: t.space.sm }]}>{BUILD_LINES[i]}</Text>
       </View>

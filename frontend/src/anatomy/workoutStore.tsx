@@ -29,7 +29,7 @@ export type SessionExercise = {
   notes: string;
   /** When the exercise was added via the Plan tab, this remembers the plan-day
    *  it belongs to so we can auto-tick it once every set is done. */
-  planLink?: { planDate: string };
+  planLink?: { planDate: string; planName?: string };
 };
 export type Workout = { id: string; date: number; durationSec: number; exercises: SessionExercise[] };
 export type PRs = { byExercise: Record<string, { maxWeight: number; maxVolume: number }>; longestSec: number };
@@ -109,7 +109,7 @@ type Ctx = {
    * Add an exercise from a Plan day, carrying the planned set count into the
    * session. Auto-ticks the Plan when all sets complete.
    */
-  addExerciseFromPlan: (id: string, planDate: string, plannedSets?: number) => void;
+  addExerciseFromPlan: (id: string, planDate: string, plannedSets?: number, planName?: string) => void;
   hasExercise: (id: string) => boolean;
   addSet: (exId: string) => void;
   updateSet: (exId: string, setId: string, patch: Partial<LoggedSet>) => void;
@@ -239,7 +239,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setStartedAt((s) => s ?? Date.now());
   }, []);
 
-  const addExerciseFromPlan = useCallback((id: string, planDate: string, plannedSets = 1) => {
+  const addExerciseFromPlan = useCallback((id: string, planDate: string, plannedSets = 1, planName?: string) => {
     setSession((prev) => {
       const base = prev || [];
       if (base.some((e) => e.exerciseId === id)) {
@@ -247,7 +247,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         // An existing entry is never rewritten: the user may already be logging it.
         return base.map((e) =>
           e.exerciseId === id
-            ? { ...e, planLink: e.planLink || { planDate } }
+            ? { ...e, planLink: e.planLink || { planDate, planName } }
             : e,
         );
       }
@@ -259,7 +259,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           // The Plan day promises N sets, so the session starts with N empty sets.
           sets: plannedSetRows(plannedSets),
           notes: "",
-          planLink: { planDate },
+          planLink: { planDate, planName },
         },
       ];
     });

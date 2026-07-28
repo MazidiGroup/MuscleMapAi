@@ -16,8 +16,8 @@ import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { formatSetLoad, isBodyweightEquipment, loadColumnLabel, loadPlaceholder } from "@/src/anatomy/bodyweight";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { EmptyState, ErrorBanner } from "@/src/ui/state";
+import { A11yControl } from "@/src/ui/A11yControl";
 
 type Seg = "session" | "history" | "insights" | "exercises";
 const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower", "Mobility"];
@@ -42,6 +42,12 @@ export default function WorkoutScreen() {
   useEffect(() => {
     if (["exercises", "session", "history", "insights"].includes(String(params.seg))) setSeg(params.seg as Seg);
   }, [params.seg]);
+  // Tapping a segment keeps the URL honest, so the segment a user is looking at is
+  // the segment a reload or a shared link reopens.
+  const selectSeg = (next: Seg) => {
+    setSeg(next);
+    router.setParams({ seg: next });
+  };
   useEffect(() => {
     if (params.ex) w.addExercise(String(params.ex));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,7 +112,7 @@ export default function WorkoutScreen() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <View style={[styles.seg, { flex: 1 }]}>
             {(["session", "history", "insights", "exercises"] as Seg[]).map((s) => (
-              <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => setSeg(s)} testID={`seg-${s}`}>
+              <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => selectSeg(s)} testID={`seg-${s}`}>
                 <Text style={[styles.segText, seg === s && styles.segTextActive]}>
                   {s === "session" ? "Session" : s === "history" ? "History" : s === "insights" ? "Insights" : "Muscle Groups"}
                 </Text>
@@ -123,7 +129,6 @@ export default function WorkoutScreen() {
           >
             <Text style={styles.unitText}>{w.unit.toUpperCase()}</Text>
           </TouchableOpacity>
-          <ThemeToggle />
         </View>
       </View>
 
@@ -196,7 +201,7 @@ export default function WorkoutScreen() {
                 body="Start an empty workout, or open a day in your plan to load its exercises."
                 note="Everything you log is saved on this device as you go."
                 primary={{ label: "Start empty workout", onPress: () => w.startWorkout(), testID: "start-empty" }}
-                secondary={{ label: "Browse exercises", onPress: () => setSeg("exercises"), testID: "browse-ex" }}
+                secondary={{ label: "Browse exercises", onPress: () => selectSeg("exercises"), testID: "browse-ex" }}
                 testID="session-empty"
               />
             </View>
@@ -222,7 +227,12 @@ export default function WorkoutScreen() {
                             </View>
                           )}
                         </View>
-                        <TouchableOpacity onPress={() => w.removeExercise(se.exerciseId)} testID={`rm-${se.exerciseId}`}>
+                        <TouchableOpacity
+                          onPress={() => w.removeExercise(se.exerciseId)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${ex?.name} from this workout`}
+                          testID={`rm-${se.exerciseId}`}
+                        >
                           <Ionicons name="trash-outline" size={18} color={T.textFaint} />
                         </TouchableOpacity>
                       </View>
@@ -254,22 +264,46 @@ export default function WorkoutScreen() {
                             placeholder="0"
                             placeholderTextColor={T.textFaint}
                             onChangeText={(t) => w.updateSet(se.exerciseId, s.id, { reps: Number(t) || 0 })}
+                            accessibilityLabel={`Set ${idx + 1} reps, ${s.reps || 0}`}
                             testID={`r-${se.exerciseId}-${idx}`}
                           />
                           <View style={styles.setActions}>
-                            <TouchableOpacity onPress={() => w.duplicateSet(se.exerciseId, s.id)} testID={`dup-${se.exerciseId}-${idx}`}>
+                            <A11yControl
+                              label={`Duplicate set ${idx + 1}`}
+                              onPress={() => w.duplicateSet(se.exerciseId, s.id)}
+                              style={styles.setActionBtn}
+                              testID={`dup-${se.exerciseId}-${idx}`}
+                            >
                               <Ionicons name="copy-outline" size={18} color={T.textDim} />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => w.deleteSet(se.exerciseId, s.id)}>
+                            </A11yControl>
+                            <A11yControl
+                              label={`Delete set ${idx + 1}`}
+                              onPress={() => w.deleteSet(se.exerciseId, s.id)}
+                              style={styles.setActionBtn}
+                              testID={`del-${se.exerciseId}-${idx}`}
+                            >
                               <Ionicons name="remove-circle-outline" size={18} color={T.textDim} />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => onToggleDone(se.exerciseId, s.id, !s.done)} testID={`done-${se.exerciseId}-${idx}`}>
+                            </A11yControl>
+                            <A11yControl
+                              role="checkbox"
+                              checked={s.done}
+                              label={`Set ${idx + 1} complete`}
+                              onPress={() => onToggleDone(se.exerciseId, s.id, !s.done)}
+                              style={styles.setActionBtn}
+                              testID={`done-${se.exerciseId}-${idx}`}
+                            >
                               <Ionicons name={s.done ? "checkmark-circle" : "ellipse-outline"} size={24} color={s.done ? "#3DDC97" : T.textFaint} />
-                            </TouchableOpacity>
+                            </A11yControl>
                           </View>
                         </View>
                       ))}
-                      <TouchableOpacity style={styles.addSet} onPress={() => w.addSet(se.exerciseId)} testID={`addset-${se.exerciseId}`}>
+                      <TouchableOpacity
+                        style={styles.addSet}
+                        onPress={() => w.addSet(se.exerciseId)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Add a set to ${ex?.name}`}
+                        testID={`addset-${se.exerciseId}`}
+                      >
                         <Ionicons name="add" size={16} color={T.accent} />
                         <Text style={styles.addSetText}>Add Set</Text>
                       </TouchableOpacity>
@@ -279,14 +313,21 @@ export default function WorkoutScreen() {
                         placeholderTextColor={T.textFaint}
                         value={se.notes}
                         onChangeText={(t) => w.setNotes(se.exerciseId, t)}
+                        accessibilityLabel={`Notes for ${ex?.name}`}
+                        testID={`notes-${se.exerciseId}`}
                       />
                     </View>
                   );
                 })}
-                <TouchableOpacity style={styles.addExBtn} onPress={() => setSeg("exercises")} testID="add-exercise">
+                <A11yControl
+                  label="Add exercise"
+                  onPress={() => selectSeg("exercises")}
+                  style={styles.addExBtn}
+                  testID="add-exercise"
+                >
                   <Ionicons name="add-circle-outline" size={18} color={T.accent} />
                   <Text style={styles.addExText}>Add Exercise</Text>
-                </TouchableOpacity>
+                </A11yControl>
               </ScrollView>
               {finishError && (
                 <View style={[styles.finishErrorWrap, { bottom: insets.bottom + 76 }]}>
@@ -294,13 +335,25 @@ export default function WorkoutScreen() {
                 </View>
               )}
               <View style={[styles.finishBar, { paddingBottom: insets.bottom + 8 }]}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => w.cancel()} testID="cancel-workout">
+                <A11yControl
+                  label="Cancel workout"
+                  onPress={() => w.cancel()}
+                  style={styles.cancelBtn}
+                  testID="cancel-workout"
+                >
                   <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.finishBtn} onPress={finish} disabled={finishing} testID="finish-workout">
+                </A11yControl>
+                <A11yControl
+                  label={finishing ? "Finish workout, saving" : "Finish workout"}
+                  onPress={finish}
+                  disabled={finishing}
+                  busy={finishing}
+                  style={styles.finishBtn}
+                  testID="finish-workout"
+                >
                   <Ionicons name="flag" size={16} color={T.bg} />
                   <Text style={styles.finishText}>{finishing ? "Saving…" : "Finish Workout"}</Text>
-                </TouchableOpacity>
+                </A11yControl>
               </View>
             </>
           )}
@@ -374,8 +427,10 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   setRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 5 },
   setRowDone: { opacity: 0.85 },
   setIdx: { color: T.text, fontSize: 14, fontWeight: "700" },
-  setInput: { flex: 1, backgroundColor: T.surfaceHi, borderRadius: 8, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600" },
-  setActions: { width: 80, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  setInput: { flex: 1, minWidth: 0, backgroundColor: T.surfaceHi, borderRadius: 8, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600" },
+  // Each control keeps its 18-24px glyph but owns a full 44x44 target.
+  setActions: { width: 132, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  setActionBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 10, backgroundColor: T.surfaceHi },
   addSetText: { color: T.accent, fontSize: 13, fontWeight: "700" },
   notes: { backgroundColor: T.bg2, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: T.text, fontSize: 14, marginTop: 8, borderWidth: 1, borderColor: T.border },

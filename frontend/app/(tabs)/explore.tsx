@@ -10,7 +10,6 @@ import { DraggableSheet, DraggableSheetHandle } from "@/src/anatomy/DraggableShe
 import { EXPLORER } from "@/src/anatomy/groups";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { ThemeToggle } from "@/src/theme/ThemeToggle";
 import { PremiumGate } from "@/src/premium/PremiumGate";
 
 export default function ExploreScreen() {
@@ -74,7 +73,6 @@ function ExploreContent() {
           <Text style={[styles.h1, { color: "#EAF1FB" }]}>Explore Anatomy</Text>
           <Text style={[styles.sub, { color: "#9AA7BD" }]}>Tap a muscle to learn about it · drag to rotate</Text>
         </View>
-        <ThemeToggle />
       </View>
 
       <DraggableSheet ref={sheet} peekHeight={peek} maxHeight={maxHeight} initial="collapsed">

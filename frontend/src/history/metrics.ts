@@ -145,8 +145,9 @@ export const incompleteCopy = (n: number) =>
  * exercises a workout happens to contain.
  */
 export function workoutTitle(w: Workout): string {
-  const planned = (w.exercises || []).some((e) => !!e.planLink);
-  return `${planned ? "Planned workout" : "Workout"} · ${absoluteDate(w.date)}`;
+  // The plan day's own name when the record stored one; never a generic label.
+  const planName = (w.exercises || []).map((e) => e.planLink?.planName).find((n) => !!n && n.trim() !== "");
+  return `${planName ? planName.trim() : "Workout"} · ${absoluteDate(w.date)}`;
 }
 
 // --- grouping --------------------------------------------------------------

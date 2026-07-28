@@ -1,0 +1,6 @@
+# Hosted web export is a single-page app (expo.web.output = "single"), so every
+# route must be SERVED index.html at its own URL. A host that redirects instead
+# of rewriting sends /workout to / , and the app then resolves / to /plan — which
+# is why direct links appeared to bounce to the Plan tab.
+# Netlify / Cloudflare Pages / Render read this file from the export root.
+/*    /index.html    200

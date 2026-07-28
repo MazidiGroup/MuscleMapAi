@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { AnatomyViewer } from "@/src/anatomy/AnatomyViewer";
+import { formatSetLoad, isBodyweightEquipment } from "@/src/anatomy/bodyweight";
 import { getExercise } from "@/src/anatomy/exercises";
 import { useWorkout, getWorkoutById, muscleActivation } from "@/src/anatomy/workoutStore";
 import {
@@ -17,7 +18,6 @@ import {
 } from "@/src/history/metrics";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { ThemeToggle } from "@/src/theme/ThemeToggle";
 
 function fmt(sec: number) {
   const m = Math.floor(sec / 60);
@@ -56,7 +56,6 @@ export default function SummaryScreen() {
 
   return (
     <View style={styles.root}>
-      <ThemeToggle style={{ position: "absolute", top: insets.top + 8, right: 16, zIndex: 30 }} />
       <View style={{ height: "38%" }}>
         <AnatomyViewer mode="workout" primary={act.primary} secondary={act.secondary} />
       </View>
@@ -98,24 +97,10 @@ export default function SummaryScreen() {
             </View>
           )}
 
-          <Text style={styles.section}>Muscle Activation</Text>
-          {act.list.map((m) => (
-            <View key={m.name} style={styles.actRow}>
-              <View style={styles.actTop}>
-                <Text style={styles.actName} numberOfLines={1}>
-                  {m.label}
-                </Text>
-                <Text style={[styles.actPct, { color: m.role === "primary" ? T.primary : T.secondary }]}>{m.pct}%</Text>
-              </View>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${m.pct}%`, backgroundColor: m.role === "primary" ? T.primary : T.secondary }]} />
-              </View>
-            </View>
-          ))}
-
           <Text style={styles.section}>Exercises</Text>
           {workout.exercises.map((e) => {
             const ex = getExercise(e.exerciseId);
+            const bodyweight = isBodyweightEquipment(ex?.equipment);
             const status = exerciseStatus(e);
             const done = e.sets.filter((s) => s.done).length;
             const icon = status === "Completed" ? "checkmark-done" : status === "Incomplete" ? "remove-circle-outline" : "ellipse-outline";
@@ -139,7 +124,11 @@ export default function SummaryScreen() {
                   <View style={{ gap: 2, marginTop: 6 }}>
                     {e.sets.map((set, i) => (
                       <Text key={set.id} style={[styles.setLine, !set.done && { color: T.textDim }]}>
-                        {`Set ${i + 1}: ${set.weight > 0 ? `${set.weight} ${unit}` : "BW"} × ${set.reps}`}
+                        {`Set ${i + 1}: ${
+                          // "BW" belongs to bodyweight exercises only. A loaded exercise with
+                          // no weight entered has no weight — it is not bodyweight.
+                          bodyweight ? formatSetLoad(set.weight, unit, true) : set.weight > 0 ? `${set.weight} ${unit}` : "—"
+                        } × ${set.reps}`}
                         {set.done ? "" : " · not completed"}
                       </Text>
                     ))}
@@ -183,12 +172,6 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   prTitle: { color: T.secondary, fontSize: 15, fontWeight: "800" },
   prItem: { color: T.text, fontSize: 14, marginTop: 2 },
   section: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },
-  actRow: { marginBottom: 10, gap: 5 },
-  actTop: { flexDirection: "row", justifyContent: "space-between" },
-  actName: { color: T.text, fontSize: 14, fontWeight: "600", flex: 1, marginRight: 8 },
-  actPct: { fontSize: 13, fontWeight: "800" },
-  track: { height: 8, borderRadius: 999, backgroundColor: T.surfaceHi, overflow: "hidden" },
-  fill: { height: 8, borderRadius: 999 },
   exRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
   exName: { color: T.text, fontSize: 15, fontWeight: "600", flex: 1 },
   exSets: { color: T.textDim, fontSize: 13 },

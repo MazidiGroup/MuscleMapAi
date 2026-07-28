@@ -5,8 +5,8 @@
 // the night theme are taken from the frozen State System authority palette
 // (`MuscleMapAI State System.dc.html`): ok #3DDC97, warn #FFB020, err #EF4444.
 //
-// Screens must read these through `useSemanticTokens()` so day/night stays in
-// sync. Nothing here changes the production font — typography roles only carry
+// Screens must read these through `useSemanticTokens()`. Nothing here changes
+// the production font — typography roles only carry
 // size/weight/line-height, never a family.
 
 import { useMemo } from "react";
@@ -82,15 +82,9 @@ const NIGHT_STATUS: Record<StatusRole, StatusColors> = {
   error: { fg: "#EF4444", text: "#fca5a5", bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.42)" },
 };
 
-const DAY_STATUS: Record<StatusRole, StatusColors> = {
-  info: { fg: "#1d6fd6", text: "#2c3c58", bg: "rgba(47,141,255,0.10)", border: "rgba(47,141,255,0.34)" },
-  success: { fg: "#12805a", text: "#2c3c58", bg: "rgba(61,220,151,0.16)", border: "rgba(18,128,90,0.34)" },
-  warning: { fg: "#9a6100", text: "#4a3a17", bg: "rgba(255,176,32,0.18)", border: "rgba(154,97,0,0.38)" },
-  error: { fg: "#c02626", text: "#6a1f1f", bg: "rgba(239,68,68,0.10)", border: "rgba(192,38,38,0.38)" },
-};
 
 export function semanticTokens(palette: Palette): SemanticTokens {
-  const night = palette.mode === "night";
+  // One theme (night): there is no light status set or light scrim to choose.
   return {
     mode: palette.mode,
     palette,
@@ -108,11 +102,11 @@ export function semanticTokens(palette: Palette): SemanticTokens {
       accentSoft: palette.accentText,
       onAccent: palette.ctaText,
       focusRing: palette.accent,
-      scrim: night ? "rgba(2,5,11,0.62)" : "rgba(12,20,36,0.42)",
-      skeletonBase: night ? "#0f1930" : "#e2e9f5",
-      skeletonHighlight: night ? "#16233c" : "#f2f6fd",
+      scrim: "rgba(2,5,11,0.62)",
+      skeletonBase: "#0f1930",
+      skeletonHighlight: "#16233c",
     },
-    status: night ? NIGHT_STATUS : DAY_STATUS,
+    status: NIGHT_STATUS,
     space: S,
     radius: { sm: R.sm, md: R.md, lg: R.lg, xl: 20, xxl: 24, pill: R.pill },
     type: {

@@ -40,6 +40,21 @@ export function resumeClock(clock: RestClock, now: number): RestClock {
   return { total: clock.total, endsAt: now + clock.pausedRemaining * 1000, pausedRemaining: null };
 }
 
+/**
+ * Extends an ALREADY RUNNING (or paused) rest by `seconds` without restarting it:
+ * the time already served is kept and only the remainder grows. The total grows
+ * with it when needed so the remainder is never clamped back down.
+ */
+export function extendClock(clock: RestClock, seconds: number, now: number): RestClock {
+  const remaining = Math.max(0, remainingSec(clock, now) + seconds);
+  const total = Math.max(clock.total, remaining);
+  return {
+    total,
+    endsAt: now + remaining * 1000,
+    pausedRemaining: clock.pausedRemaining === null ? null : remaining,
+  };
+}
+
 /** Choosing a preset restarts the rest period from the new total. */
 export function setClockTotal(clock: RestClock, total: number, now: number): RestClock {
   return { total, endsAt: now + total * 1000, pausedRemaining: clock.pausedRemaining === null ? null : total };

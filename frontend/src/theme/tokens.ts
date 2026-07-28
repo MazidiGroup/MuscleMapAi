@@ -1,11 +1,12 @@
 // Design tokens for the Muscle Map AI redesign (July 2026 workout-builder pack).
 //
-// Two themes: `night` (default, dark radial) and `day` (light). Colours,
-// borders, and shadow values are the authoritative palette from the design
-// hand-off. Screens should NEVER hard-code colours — always read via
-// `useTheme()` so day/night flips work app-wide.
+// ONE theme: `night` (dark radial). Light mode is not part of the approved
+// design and has no reviewed token set, so no light palette exists here.
+// Colours, borders and shadow values are the authoritative palette from the
+// design hand-off. Screens should NEVER hard-code colours — always read via
+// `useTheme()`.
 
-export type ThemeMode = "night" | "day";
+export type ThemeMode = "night";
 
 export type Palette = {
   mode: ThemeMode;
@@ -67,34 +68,8 @@ const NIGHT: Palette = {
   bodyNeutral: "#2c3f65",
 };
 
-const DAY: Palette = {
-  mode: "day",
-  bg: "#e9eff9",
-  bgRadialFrom: "#f7faff",
-  bgRadialTo: "#e9eff9",
-  card: "#ffffff",
-  cardAlt: "#f2f6fd",
-  border: "#d3dff0",
-  borderDashed: "#d3dff0",
-  text: "#0c1424",
-  text2: "#2c3c58",
-  textMuted: "#5a6b8c",
-  textFaint: "#8090af",
-  textCaps: "#2f6fc4",
-  accent: "#2f8dff",
-  accentText: "#1d6fd6",
-  gradFrom: "#8fd0ff",
-  gradTo: "#2f8dff",
-  ctaText: "#06101f",
-  focusRed: "#d84848",
-  focusRedBg: "rgba(216,72,72,0.10)",
-  posterBg: "#ffffff",
-  bodyIdle: "#c3d2ea",
-  bodyStroke: "#a9bedd",
-  bodyNeutral: "#cfdaec",
-};
 
-export const PALETTES: Record<ThemeMode, Palette> = { night: NIGHT, day: DAY };
+export const PALETTES: Record<ThemeMode, Palette> = { night: NIGHT };
 export const DEFAULT_MODE: ThemeMode = "night";
 
 /** Common spacing scale (8 pt grid). */

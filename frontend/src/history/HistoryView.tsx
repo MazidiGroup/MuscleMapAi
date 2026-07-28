@@ -60,6 +60,10 @@ export function HistoryView({ scrollPadding = 24 }: { scrollPadding?: number }) 
     setMonth({ year: d.getFullYear(), month: d.getMonth() });
   };
 
+  // The month arrows name where they go, not just which way they point.
+  const prevMonth = new Date(month.year, month.month - 1, 1);
+  const nextMonth = new Date(month.year, month.month + 1, 1);
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: t.color.bg }}
@@ -151,7 +155,7 @@ export function HistoryView({ scrollPadding = 24 }: { scrollPadding?: number }) 
               <Pressable
                 onPress={() => shiftMonth(-1)}
                 accessibilityRole="button"
-                accessibilityLabel="Previous month"
+                accessibilityLabel={`Previous month, ${monthLabel(prevMonth.getFullYear(), prevMonth.getMonth())}`}
                 testID="cal-prev"
                 style={[styles.iconBtn, { borderColor: t.color.border }]}
               >
@@ -167,7 +171,7 @@ export function HistoryView({ scrollPadding = 24 }: { scrollPadding?: number }) 
               <Pressable
                 onPress={() => shiftMonth(1)}
                 accessibilityRole="button"
-                accessibilityLabel="Next month"
+                accessibilityLabel={`Next month, ${monthLabel(nextMonth.getFullYear(), nextMonth.getMonth())}`}
                 testID="cal-next"
                 style={[styles.iconBtn, { borderColor: t.color.border }]}
               >

@@ -111,6 +111,15 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
 
   const owner = user?.user_id ?? null;
 
+  // The entitlement read must never leave a Premium surface stuck on a skeleton:
+  // if the store SDK does not answer, stop waiting and treat it as a failed read
+  // (which locks — a failed read can never fabricate access).
+  useEffect(() => {
+    if (rcState !== "loading") return;
+    const t = setTimeout(() => setRcState((s) => (s === "loading" ? "error" : s)), 8000);
+    return () => clearTimeout(t);
+  }, [rcState]);
+
   const resolution = resolvePremium({
     user,
     designatedEntitlementActive: rcActive,

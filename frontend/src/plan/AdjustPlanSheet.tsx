@@ -46,7 +46,13 @@ export function AdjustPlanSheet({
 
   const preview = useCallback(() => {
     setFailed(false);
-    setOutcome(previewAdjust(hasActiveWorkout));
+    try {
+      setOutcome(previewAdjust(hasActiveWorkout));
+    } catch {
+      // A failed preview is a failed adjust: say so and wait to be asked again.
+      setOutcome(null);
+      setFailed(true);
+    }
   }, [previewAdjust, hasActiveWorkout]);
 
   useEffect(() => {

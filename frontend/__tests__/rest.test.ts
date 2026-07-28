@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  extendClock,
   formatRemaining,
   isFinished,
   pauseClock,
@@ -74,4 +75,29 @@ test("the display format is stable", () => {
   assert.equal(formatRemaining(90), "1:30");
   assert.equal(formatRemaining(5), "0:05");
   assert.equal(formatRemaining(-4), "0:00");
+});
+
+test("+15s extends a running rest without restarting it", () => {
+  const running = startClock(60, T0);
+  const extended = extendClock(running, 15, T0 + 20_000);
+  // 40 left plus 15 is 55, and the 20s already served are NOT given back.
+  assert.equal(remainingSec(extended, T0 + 20_000), 55);
+  assert.equal(remainingSec(extended, T0 + 30_000), 45);
+  // The total grows so the extra time cannot be clamped away.
+  assert.equal(extended.total, 60);
+  assert.equal(extendClock(running, 15, T0).total, 75);
+});
+
+test("+15s on a paused rest keeps it paused", () => {
+  const paused = pauseClock(startClock(60, T0), T0 + 10_000);
+  const extended = extendClock(paused, 15, T0 + 90_000);
+  assert.equal(remainingSec(extended, T0 + 90_000), 65);
+  assert.equal(remainingSec(extended, T0 + 200_000), 65);
+});
+
+test("+15s can revive a rest that just reached zero", () => {
+  const done = startClock(30, T0);
+  assert.equal(isFinished(done, T0 + 31_000), true);
+  const extended = extendClock(done, 15, T0 + 31_000);
+  assert.equal(remainingSec(extended, T0 + 31_000), 15);
 });

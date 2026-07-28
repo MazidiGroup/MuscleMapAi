@@ -167,7 +167,22 @@ test("selection and lock states are never communicated by colour alone", () => {
   assert.ok(paywall.includes("accessibilityState={{ selected: active }}"));
   assert.ok(paywall.includes("paywall-selected-text"), "a visible 'Selected' label exists");
   const tabs = read("app/(tabs)/_layout.tsx");
-  assert.ok(tabs.includes('"Coach, Premium"') && tabs.includes('"Explore, Premium"'), "locked tabs are named");
+  // The names are built by one helper so they cannot depend on an in-flight
+  // entitlement read: a Premium surface is named Premium unless entitlement has
+  // RESOLVED with access.
+  assert.ok(tabs.includes("`${title}, Premium`"), "locked tabs are named");
+  assert.ok(tabs.includes("isPremiumSurface(surface) && !resolution.access"), "the name never waits on a read");
+  assert.ok(
+    tabs.includes('tabBarAccessibilityLabel: tabName("Coach", "coach")') &&
+      tabs.includes('tabBarAccessibilityLabel: tabName("Explore", "explore")'),
+    "the gated tabs use it",
+  );
+  assert.ok(
+    tabs.includes('tabBarAccessibilityLabel: tabName("Plan", "plan")') &&
+      tabs.includes('tabBarAccessibilityLabel: tabName("Workout", "workout.session")') &&
+      tabs.includes('tabBarAccessibilityLabel: tabName("Library", "library.exercises")'),
+    "the free tabs are named too",
+  );
   const library = read("app/(tabs)/library.tsx");
   assert.ok(library.includes("`${SEG_LABELS[s]}, Premium`"), "locked Library segments are named");
 });
