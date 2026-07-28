@@ -4,7 +4,7 @@ import { Platform, View, StyleSheet } from "react-native";
 
 import { T } from "@/src/anatomy/ui";
 import { usePremium } from "@/src/premium/PremiumContext";
-import { gate } from "@/src/premium/entitlement";
+import { gate, isPremiumSurface, Surface } from "@/src/premium/entitlement";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { usePlanStore } from "@/src/plan/planStore";
 import { ONBOARDING_STEP_COUNT, routeStep } from "@/src/plan/onboarding";
@@ -27,6 +27,11 @@ export default function TabsLayout() {
   // One gating contract decides the lock affordance too.
   const coachLocked = gate("coach", resolution) !== "allow";
   const exploreLocked = gate("explore", resolution) !== "allow";
+  // The accessible name must never depend on an in-flight entitlement read: a
+  // Premium surface is named Premium unless entitlement has RESOLVED with access,
+  // so the name is identical on every launch.
+  const tabName = (title: string, surface: Surface) =>
+    isPremiumSurface(surface) && !resolution.access ? `${title}, Premium` : title;
   const { T: theme } = useTheme();
 
   // Welcome and the three onboarding questions are a single-purpose flow: there is
@@ -60,18 +65,26 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="plan"
-        options={{ title: "Plan", tabBarIcon: ({ color, size }) => <TabIcon name="calendar-outline" size={size} color={color} /> }}
+        options={{
+          title: "Plan",
+          tabBarAccessibilityLabel: tabName("Plan", "plan"),
+          tabBarIcon: ({ color, size }) => <TabIcon name="calendar-outline" size={size} color={color} />,
+        }}
       />
       <Tabs.Screen
         name="workout"
-        options={{ title: "Workout", tabBarIcon: ({ color, size }) => <TabIcon name="barbell-outline" size={size} color={color} /> }}
+        options={{
+          title: "Workout",
+          tabBarAccessibilityLabel: tabName("Workout", "workout.session"),
+          tabBarIcon: ({ color, size }) => <TabIcon name="barbell-outline" size={size} color={color} />,
+        }}
       />
       <Tabs.Screen
         name="coach"
         options={{
           title: "Coach",
           // The lock is never icon-only: the accessible name says "Premium".
-          tabBarAccessibilityLabel: coachLocked ? "Coach, Premium" : "Coach",
+          tabBarAccessibilityLabel: tabName("Coach", "coach"),
           tabBarIcon: ({ color, size }) => <TabIcon name="sparkles-outline" size={size} color={color} locked={coachLocked} />,
         }}
       />
@@ -79,13 +92,17 @@ export default function TabsLayout() {
         name="explore"
         options={{
           title: "Explore",
-          tabBarAccessibilityLabel: exploreLocked ? "Explore, Premium" : "Explore",
+          tabBarAccessibilityLabel: tabName("Explore", "explore"),
           tabBarIcon: ({ color, size }) => <TabIcon name="cube-outline" size={size} color={color} locked={exploreLocked} />,
         }}
       />
       <Tabs.Screen
         name="library"
-        options={{ title: "Library", tabBarIcon: ({ color, size }) => <TabIcon name="library-outline" size={size} color={color} /> }}
+        options={{
+          title: "Library",
+          tabBarAccessibilityLabel: tabName("Library", "library.exercises"),
+          tabBarIcon: ({ color, size }) => <TabIcon name="library-outline" size={size} color={color} />,
+        }}
       />
       <Tabs.Screen name="learn" options={{ href: null }} />
     </Tabs>

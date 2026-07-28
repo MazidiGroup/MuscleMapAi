@@ -11,7 +11,7 @@
 // Answers persist per step through the owner-scoped plan store.
 
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -82,6 +82,7 @@ export function Welcome({ onStart, onSignIn }: { onStart: () => void; onSignIn: 
         <Pressable
           onPress={onSignIn}
           accessibilityRole="button"
+          accessibilityLabel="Already have an account?"
           style={[styles.secondaryLink, { minHeight: t.target.min }]}
           testID="cta-sign-in"
         >
@@ -172,12 +173,19 @@ function OptionCard({
   testID?: string;
 }) {
   const t = useSemanticTokens();
+  // react-native-web no longer derives aria-checked from accessibilityState, and a
+  // radio must state itself. Native keeps reading accessibilityState.
+  const aria = Platform.OS === "web" ? ({ "aria-checked": selected } as any) : null;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, checked: selected }}
+      // The name carries the option and the line that qualifies it, so the
+      // choice is understandable without the visual pairing.
+      accessibilityLabel={sub ? `${label}, ${sub.charAt(0).toLowerCase()}${sub.slice(1)}` : label}
       testID={testID}
+      {...aria}
       style={[
         styles.optCard,
         {
@@ -202,12 +210,15 @@ function OptionCard({
 
 function Pill({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
   const t = useSemanticTokens();
+  const aria = Platform.OS === "web" ? ({ "aria-checked": on } as any) : null;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: on }}
+      accessibilityLabel={label}
       testID={testID}
+      {...aria}
       style={{
         paddingHorizontal: t.space.lg,
         minHeight: t.target.min,

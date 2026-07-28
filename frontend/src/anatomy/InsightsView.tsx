@@ -24,6 +24,7 @@ import {
 import { legacyPalette, LegacyPalette } from "./ui";
 import { FLAGS } from "@/src/config/featureFlags";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { A11yControl } from "@/src/ui/A11yControl";
 
 type Period = "week" | "month";
 
@@ -179,16 +180,16 @@ export function InsightsView() {
           {/* Volume trend — rolling 7-day periods, with an equivalent table. */}
           <View style={styles.chartHead}>
             <Text style={[styles.section, { flex: 1 }]}>{VOLUME_CHART_TITLE}</Text>
-            <TouchableOpacity
-              style={styles.tableToggle}
+            <A11yControl
+              label={showTable ? "Show chart" : "Show volume as a table"}
+              hint="Switches between the volume chart and the same figures as a table"
               onPress={() => setShowTable((v) => !v)}
-              accessibilityRole="button"
-              accessibilityLabel={showTable ? "Show chart" : "Show volume as a table"}
+              style={styles.tableToggle}
               testID="insights-chart-toggle"
             >
               <Ionicons name={showTable ? "stats-chart" : "list"} size={14} color={T.text} />
               <Text style={styles.tableToggleText}>{showTable ? "Chart" : "Table"}</Text>
-            </TouchableOpacity>
+            </A11yControl>
           </View>
 
           <Text style={styles.hint} testID="insights-chart-summary">

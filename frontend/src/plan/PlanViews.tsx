@@ -16,6 +16,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { useSemanticTokens } from "@/src/theme/semantic";
 import { R } from "@/src/theme/tokens";
 import { ActionButton, InfoBanner, InterruptedSessionCard } from "@/src/ui/state";
+import { A11yControl } from "@/src/ui/A11yControl";
 import { usePlanStore, todayISO } from "./planStore";
 import { AdjustPlanSheet } from "./AdjustPlanSheet";
 import { daysSummary } from "./onboarding";
@@ -165,10 +166,16 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
     return live || !!completions[`${dateKey}:${ex.id}`];
   }).length;
   const allDone = exs.length > 0 && doneCount === exs.length;
+  // The card is the control that starts this day's workout, so it is a real
+  // button and its name carries the day, the session and its length.
+  const label =
+    `${day.dow}, ${day.typeName}, about ${day.minutes} minutes` +
+    (doneCount > 0 ? `, ${doneCount} of ${exs.length} done` : "");
   return (
-    <TouchableOpacity
-      style={[styles.dayCard, { backgroundColor: T.card, borderColor: allDone ? T.accent : T.border }]}
+    <A11yControl
+      label={label}
       onPress={onPress}
+      style={[styles.dayCard, { backgroundColor: T.card, borderColor: allDone ? T.accent : T.border }]}
       testID={`day-card-${day.dow}`}
     >
       <View style={styles.dayCardTop}>
@@ -204,7 +211,7 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
       <Text style={[styles.dayMuscles, { color: T.text2 }]} numberOfLines={1}>
         {(day.focusMuscles || []).map(m => MUSCLE_LABEL[m]).slice(0, 4).join(" · ")}
       </Text>
-    </TouchableOpacity>
+    </A11yControl>
   );
 }
 
