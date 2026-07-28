@@ -229,7 +229,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
   // resuming never rewrites the session the user is already logging.
   const startWorkout = () => {
     // The planned set count travels with the exercise into the session.
-    for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets);
+    for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets, day.typeName);
     router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
   };
   const resumeWorkout = () => router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
@@ -314,7 +314,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
                     { borderColor: inSession ? T.accent : T.border, backgroundColor: inSession ? T.accent + "22" : "transparent" },
                   ]}
                   onPress={() => {
-                    if (!inSession) w.addExerciseFromPlan(ex.id, dateKey, ex.sets);
+                    if (!inSession) w.addExerciseFromPlan(ex.id, dateKey, ex.sets, day.typeName);
                   }}
                   testID={`add-${ex.id}`}
                 >

@@ -35,10 +35,12 @@ test("the plan-linked add path passes the planned count through", () => {
   const calls = plan.match(/addExerciseFromPlan\([^)]*\)/g) ?? [];
   assert.ok(calls.length >= 2, "both Plan call sites exist");
   for (const call of calls) {
-    assert.ok(/,\s*(it|ex)\.sets\s*\)/.test(call), `planned sets must be passed: ${call}`);
+    // The planned count is followed by the plan day name, which the title helper stores.
+    assert.ok(/,\s*(it|ex)\.sets\s*(,\s*day\.typeName\s*)?\)/.test(call), `planned sets must be passed: ${call}`);
+    assert.ok(/,\s*day\.typeName\s*\)/.test(call), `the plan day name must be passed: ${call}`);
   }
   assert.ok(
-    /addExerciseFromPlan = useCallback\(\(id: string, planDate: string, plannedSets = 1\)/.test(store),
+    /addExerciseFromPlan = useCallback\(\(id: string, planDate: string, plannedSets = 1, planName\?: string\)/.test(store),
     "the store accepts the planned set count",
   );
   assert.ok(store.includes("sets: plannedSetRows(plannedSets)"), "the session is seeded with the planned rows");

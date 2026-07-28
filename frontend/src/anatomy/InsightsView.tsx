@@ -25,9 +25,6 @@ import { legacyPalette, LegacyPalette } from "./ui";
 import { FLAGS } from "@/src/config/featureFlags";
 import { useTheme } from "@/src/theme/ThemeContext";
 
-const STATE_COLOR = { red: "#FF4438", orange: "#FFB020", green: "#2FBF71" } as const;
-const STATE_LABEL = { red: "Recently trained", orange: "Recovering", green: "Recovered" } as const;
-
 type Period = "week" | "month";
 
 const fmtVol = (v: number) => (v >= 10000 ? `${Math.round(v / 100) / 10}k` : `${v}`);
@@ -63,7 +60,7 @@ export function InsightsView() {
       <View style={[styles.full, styles.empty, { paddingTop: insets.top + 56 }]}>
         <Ionicons name="pulse-outline" size={40} color={T.textFaint} />
         <Text style={styles.emptyText}>No insights yet</Text>
-        <Text style={styles.emptySub}>Finish a few workouts to see your recovery map, training stats, records and progress charts.</Text>
+        <Text style={styles.emptySub}>Finish a few workouts to see your training stats, records and progress charts.</Text>
       </View>
     );
   }
@@ -80,16 +77,6 @@ export function InsightsView() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 80 }}
         >
-          {/* recovery legend */}
-          <View style={styles.legendRow}>
-            {(["red", "orange", "green"] as const).map((s) => (
-              <View key={s} style={styles.legendItem}>
-                <View style={[styles.dot, { backgroundColor: STATE_COLOR[s] }]} />
-                <Text style={styles.legendText}>{STATE_LABEL[s]}</Text>
-              </View>
-            ))}
-          </View>
-
           {FLAGS.insightsV2 && (
             <>
               {/* week / month toggle */}
@@ -147,17 +134,6 @@ export function InsightsView() {
             </>
           )}
 
-          <Text style={styles.section}>Muscle Recovery</Text>
-          {recovery.groups.map((g) => (
-            <View key={g.group} style={styles.recRow} testID={`rec-${g.group}`}>
-              <View style={[styles.recDot, { backgroundColor: STATE_COLOR[g.state] }]} />
-              <Text style={styles.recName}>{g.label}</Text>
-              <Text style={[styles.recStatus, { color: STATE_COLOR[g.state] }]}>
-                {g.state === "green" ? (g.lastTs ? "Ready" : "Fresh") : `~${g.hoursLeft}h left`}
-              </Text>
-            </View>
-          ))}
-
           {/* sets per muscle group */}
           <Text style={styles.section}>{period === "week" ? "Sets This Week" : "Sets Last 30 Days"}</Text>
           {activation.list
@@ -194,7 +170,6 @@ export function InsightsView() {
                   </Text>
                   <View style={{ alignItems: "flex-end" }}>
                     <Text style={styles.prWeight}>{r.maxWeight > 0 ? `${r.maxWeight} ${unit}` : "—"}</Text>
-                    <Text style={styles.prVol}>{`${fmtVol(r.maxVolume)} ${unit} best session`}</Text>
                   </View>
                 </View>
               ))}
@@ -305,16 +280,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   prBadge: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,176,32,0.14)", alignItems: "center", justifyContent: "center" },
   prName: { color: T.text, fontSize: 14, fontWeight: "700", flex: 1 },
   prWeight: { color: T.accent, fontSize: 15, fontWeight: "800" },
-  prVol: { color: T.textFaint, fontSize: 11, marginTop: 1 },
-  legendRow: { flexDirection: "row", justifyContent: "space-around", backgroundColor: T.bg2, borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: T.border },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { color: T.textDim, fontSize: 12, fontWeight: "600" },
   section: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },
-  recRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 7 },
-  recDot: { width: 12, height: 12, borderRadius: 6 },
-  recName: { color: T.text, fontSize: 15, fontWeight: "600", flex: 1 },
-  recStatus: { fontSize: 13, fontWeight: "700" },
   weekStats: { flexDirection: "row", gap: 8, marginBottom: 14 },
   wStat: { flex: 1, backgroundColor: T.bg2, borderRadius: 12, paddingVertical: 12, alignItems: "center", borderWidth: 1, borderColor: T.border },
   wValue: { color: T.accent, fontSize: 20, fontWeight: "800" },
