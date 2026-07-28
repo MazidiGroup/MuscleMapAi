@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { StatusBar, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { enableScreens } from "react-native-screens";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { WorkoutProvider } from "@/src/anatomy/workoutStore";
@@ -19,6 +20,13 @@ import { LoadingScreen } from "@/src/theme/LoadingScreen";
 // warnings are surfaced in development so application-owned problems cannot hide,
 // and no replacement blanket filter has been added under another name.
 SplashScreen.preventAutoHideAsync();
+
+// react-native-screens is enabled by default on iOS and Android but NOT on web,
+// where the fallback leaves every tab that has been visited mounted and painted
+// behind the active one — so a second route's content stays in the page and in
+// the accessibility tree. Enabling it makes the inactive scene `display: none`,
+// which is what guarantees only the active route renders.
+if (Platform.OS === "web") enableScreens(true);
 
 // Configure RevenueCat once, at module load (before any component mounts), so the
 // SDK is ready before PremiumProvider reads CustomerInfo. Native + iOS only for now

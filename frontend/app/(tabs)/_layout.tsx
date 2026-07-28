@@ -6,6 +6,8 @@ import { T } from "@/src/anatomy/ui";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { gate } from "@/src/premium/entitlement";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { usePlanStore } from "@/src/plan/planStore";
+import { ONBOARDING_STEP_COUNT, routeStep } from "@/src/plan/onboarding";
 
 function TabIcon({ name, color, size, locked }: { name: any; color: string; size: number; locked?: boolean }) {
   return (
@@ -27,20 +29,31 @@ export default function TabsLayout() {
   const exploreLocked = gate("explore", resolution) !== "allow";
   const { T: theme } = useTheme();
 
+  // Welcome and the three onboarding questions are a single-purpose flow: there is
+  // nothing to navigate to until onboarding has finished and a plan exists, so the
+  // tab bar stays out of the way (and out of the accessibility tree) until then.
+  // `hydrate()` is driven by ScopeBridge above this layout, so no read races here.
+  const hydrated = usePlanStore((s) => s.hydrated);
+  const step = usePlanStore((s) => s.step);
+  const plan = usePlanStore((s) => s.plan);
+  const preOnboarding = !hydrated || !plan || routeStep(step, !!plan) <= ONBOARDING_STEP_COUNT;
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.accent,
         tabBarInactiveTintColor: theme.textMuted,
-        tabBarStyle: {
-          backgroundColor: theme.card,
-          borderTopColor: theme.border,
-          borderTopWidth: 1,
-          height: Platform.OS === "ios" ? 86 : 64,
-          paddingTop: 6,
-          paddingBottom: Platform.OS === "ios" ? 28 : 8,
-        },
+        tabBarStyle: preOnboarding
+          ? { display: "none" }
+          : {
+              backgroundColor: theme.card,
+              borderTopColor: theme.border,
+              borderTopWidth: 1,
+              height: Platform.OS === "ios" ? 86 : 64,
+              paddingTop: 6,
+              paddingBottom: Platform.OS === "ios" ? 28 : 8,
+            },
         tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
         sceneStyle: { backgroundColor: theme.bg },
       }}

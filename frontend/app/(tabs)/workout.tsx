@@ -42,6 +42,12 @@ export default function WorkoutScreen() {
   useEffect(() => {
     if (["exercises", "session", "history", "insights"].includes(String(params.seg))) setSeg(params.seg as Seg);
   }, [params.seg]);
+  // Tapping a segment keeps the URL honest, so the segment a user is looking at is
+  // the segment a reload or a shared link reopens.
+  const selectSeg = (next: Seg) => {
+    setSeg(next);
+    router.setParams({ seg: next });
+  };
   useEffect(() => {
     if (params.ex) w.addExercise(String(params.ex));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,7 +112,7 @@ export default function WorkoutScreen() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <View style={[styles.seg, { flex: 1 }]}>
             {(["session", "history", "insights", "exercises"] as Seg[]).map((s) => (
-              <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => setSeg(s)} testID={`seg-${s}`}>
+              <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => selectSeg(s)} testID={`seg-${s}`}>
                 <Text style={[styles.segText, seg === s && styles.segTextActive]}>
                   {s === "session" ? "Session" : s === "history" ? "History" : s === "insights" ? "Insights" : "Muscle Groups"}
                 </Text>
@@ -196,7 +202,7 @@ export default function WorkoutScreen() {
                 body="Start an empty workout, or open a day in your plan to load its exercises."
                 note="Everything you log is saved on this device as you go."
                 primary={{ label: "Start empty workout", onPress: () => w.startWorkout(), testID: "start-empty" }}
-                secondary={{ label: "Browse exercises", onPress: () => setSeg("exercises"), testID: "browse-ex" }}
+                secondary={{ label: "Browse exercises", onPress: () => selectSeg("exercises"), testID: "browse-ex" }}
                 testID="session-empty"
               />
             </View>
@@ -283,7 +289,7 @@ export default function WorkoutScreen() {
                     </View>
                   );
                 })}
-                <TouchableOpacity style={styles.addExBtn} onPress={() => setSeg("exercises")} testID="add-exercise">
+                <TouchableOpacity style={styles.addExBtn} onPress={() => selectSeg("exercises")} testID="add-exercise">
                   <Ionicons name="add-circle-outline" size={18} color={T.accent} />
                   <Text style={styles.addExText}>Add Exercise</Text>
                 </TouchableOpacity>
