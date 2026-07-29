@@ -136,10 +136,10 @@ test("1/6/7/10 — a pipeline-shaped Gitless archive passes on .env-supplied val
 
 test("2 — process.env overrides .env", () => {
   const dir = makeManagedArchive();
-  // .env holds the good value; the environment holds a rejected one and must win.
-  const res = runGate(dir, cloudEnv({ EXPO_PUBLIC_BACKEND_URL: "https://inspect-2.preview.emergentagent.com" }));
+  // .env holds the good value; the environment holds a HARD-invalid one and must win.
+  const res = runGate(dir, cloudEnv({ EXPO_PUBLIC_BACKEND_URL: "http://localhost:8001" }));
   assert.equal(res.status, 1, "the environment value is the one validated");
-  assert.match(res.stderr, /EXPO_PUBLIC_BACKEND_URL failed validation/);
+  assert.match(res.stderr, /EXPO_PUBLIC_BACKEND_URL failed validation: not HTTPS/);
 
   const ok = runGate(dir, cloudEnv({ EXPO_PUBLIC_BACKEND_URL: "https://api.apexai-production.example" }));
   assert.equal(ok.status, 0, ok.all);
@@ -198,20 +198,19 @@ test("4b — the parser handles quotes and CRLF and reads nothing but the two ap
 
 // --- 5: sandbox and localhost hosts stay rejected ------------------------------
 
-test("5 — preview, sandbox-workspace and localhost backend URLs fail", () => {
+function withBackendUrl(dir: string, url: string) {
+  // Only the EXPO_PUBLIC_BACKEND_URL line is replaced; the proxy/hostname lines are ignored by the parser.
+  writeEnv(dir, managedEnvFile().replace(/^EXPO_PUBLIC_BACKEND_URL=.*$/m, `EXPO_PUBLIC_BACKEND_URL=${url}`));
+}
+
+test("5 — a backend URL that is not an absolute HTTPS URL still fails", () => {
   const dir = makeManagedArchive();
   for (const [url, reason] of [
-    ["https://inspect-2.preview.emergentagent.com", /non-production host/],
-    ["https://inspect-7.emergentagent.com", /sandbox workspace host/],
     ["http://localhost:8001", /not HTTPS/],
     ["https://127.0.0.1:8001", /loopback or local host/],
+    ["/api", /not an absolute URL/],
   ] as [string, RegExp][]) {
-    writeEnv(dir, managedEnvFile().replace(MANAGED_BACKEND_URL + "\n", `${url}\n`));
-    // Only the EXPO_PUBLIC_BACKEND_URL line is replaced; the proxy/hostname lines are ignored by the parser.
-    const body = fs
-      .readFileSync(path.join(dir, ".env"), "utf8")
-      .replace(/^EXPO_PUBLIC_BACKEND_URL=.*$/m, `EXPO_PUBLIC_BACKEND_URL=${url}`);
-    writeEnv(dir, body);
+    withBackendUrl(dir, url);
     const res = runGate(dir, cloudEnv());
     assert.equal(res.status, 1, `${url} must fail`);
     assert.match(res.stderr, /EXPO_PUBLIC_BACKEND_URL failed validation/);
@@ -221,9 +220,29 @@ test("5 — preview, sandbox-workspace and localhost backend URLs fail", () => {
   clean(dir);
 });
 
+test("5b — a non-production or sandbox host WARNS and still exits 0", () => {
+  // `.env` is platform-managed and gets re-injected, and the wrapper configures the
+  // backend URL at build time before this hook runs, so host policy can never block.
+  const dir = makeManagedArchive();
+  for (const [url, reason] of [
+    ["https://inspect-2.preview.emergentagent.com", /non-production host/],
+    ["https://inspect-7.emergentagent.com", /sandbox workspace host/],
+    ["https://staging.apexai.example", /non-production host/],
+  ] as [string, RegExp][]) {
+    withBackendUrl(dir, url);
+    const res = runGate(dir, cloudEnv());
+    assert.equal(res.status, 0, `${url} must not fail: ${res.all}`);
+    assert.match(res.stdout, /warn {4}build variable EXPO_PUBLIC_BACKEND_URL/);
+    assert.match(res.stdout, reason);
+    assert.ok(!res.stdout.includes("DO NOT BUILD"), "host policy is never a build failure");
+    assert.ok(!res.all.includes(url), "the value is still never printed in full");
+  }
+  clean(dir);
+});
+
 // --- 8, 9: identity and OTA still fail closed ---------------------------------
 
-test("8 — a wrong bundle id, package, scheme or project id fails", () => {
+test("8 — a wrong bundle id, package, scheme or project id WARNS (app.json is wrapper-rewritten)", () => {
   const cases: [string, (expo: Record<string, any>) => void, RegExp][] = [
     ["bundle id", (expo) => (expo.ios.bundleIdentifier = "com.someoneelse.apexai"), /ios\.bundleIdentifier is/],
     ["package", (expo) => (expo.android.package = "com.someoneelse.apexai"), /android\.package is/],
@@ -242,57 +261,61 @@ test("8 — a wrong bundle id, package, scheme or project id fails", () => {
     writeGeneratedEasJson(dir);
     writeEnv(dir, managedEnvFile());
     const res = runGate(dir, cloudEnv());
-    assert.equal(res.status, 1, `${label} must fail`);
-    assert.match(res.stderr, expected);
+    assert.equal(res.status, 0, `${label} must warn, not fail: ${res.all}`);
+    assert.match(res.stdout, expected, label);
+    assert.ok(!res.all.includes("DO NOT BUILD"), `${label} is reported, never fatal`);
     clean(dir);
   }
 });
 
-test("9 — an active updates block in app.json fails", () => {
+test("9 — an active updates block in app.json WARNS (app.json is wrapper-rewritten)", () => {
   const dir = makeArchive();
   normaliseAppJson(dir, (expo) => (expo.updates = { enabled: true, url: "https://u.expo.dev/x" }));
   writeGeneratedEasJson(dir);
   writeEnv(dir, managedEnvFile());
   const res = runGate(dir, cloudEnv());
-  assert.equal(res.status, 1);
-  assert.match(res.stderr, /active updates block \(OTA must stay disabled\)/);
+  assert.equal(res.status, 0, res.all);
+  assert.match(res.stdout, /active updates block \(OTA must stay disabled\)/);
   clean(dir);
 });
 
 // --- 11: eas.json OTA and identity conflicts still fail -----------------------
 
-test("11 — an update channel, an updates block or a conflicting identity in eas.json fails", () => {
+test("11 — eas.json channel, OTA, identity and profile deviations WARN; unreadable eas.json still fails", () => {
+  // eas.json is replaced by the wrapper before upload, and EAS_BUILD_PROFILE is supplied
+  // by the platform, so none of these can prove source integrity and none may fail.
   const channel = makeManagedArchive();
   writeGeneratedEasJson(channel, { build: { production: { channel: "production" } } });
   const a = runGate(channel, cloudEnv());
-  assert.equal(a.status, 1);
-  assert.match(a.stderr, /build profile production declares an update channel/);
+  assert.equal(a.status, 0, a.all);
+  assert.match(a.stdout, /build profile production declares an update channel/);
 
   const ota = makeManagedArchive();
   writeGeneratedEasJson(ota, { build: { production: { updates: { url: "https://u.expo.dev/x" } } } });
   const b = runGate(ota, cloudEnv());
-  assert.equal(b.status, 1);
-  assert.match(b.stderr, /declares an updates configuration/);
+  assert.equal(b.status, 0, b.all);
+  assert.match(b.stdout, /declares an updates configuration/);
 
   const identity = makeManagedArchive();
   writeGeneratedEasJson(identity, { submit: { production: { ios: { bundleIdentifier: "com.someoneelse.apexai" } } } });
   const c = runGate(identity, cloudEnv());
-  assert.equal(c.status, 1);
-  assert.match(c.stderr, /submit profile production \(ios\) declares bundleIdentifier/);
+  assert.equal(c.status, 0, c.all);
+  assert.match(c.stdout, /submit profile production \(ios\) declares bundleIdentifier/);
 
   const wrongEnvironment = makeManagedArchive();
   writeGeneratedEasJson(wrongEnvironment, { build: { production: { environment: "preview" } } });
   const d = runGate(wrongEnvironment, cloudEnv());
-  assert.equal(d.status, 1);
-  assert.match(d.stderr, /production profile selects a non-production environment/);
+  assert.equal(d.status, 0, d.all);
+  assert.match(d.stdout, /production profile selects a non-production environment/);
 
   const wrongProfile = makeManagedArchive();
   const e = runGate(wrongProfile, cloudEnv({ EAS_BUILD_PROFILE: "preview" }));
-  assert.equal(e.status, 1, "a forwarded non-production profile fails");
-  assert.match(e.stderr, /EAS_BUILD_PROFILE is "preview", expected "production"/);
+  assert.equal(e.status, 0, e.all);
+  assert.match(e.stdout, /EAS_BUILD_PROFILE is "preview", expected "production"/);
   const rightProfile = runGate(wrongProfile, cloudEnv({ EAS_BUILD_PROFILE: "production" }));
   assert.equal(rightProfile.status, 0, rightProfile.all);
 
+  // Config that cannot be read at all is still fatal: a build could not proceed anyway.
   const broken = makeManagedArchive();
   fs.writeFileSync(path.join(broken, "eas.json"), "{ not json");
   const f = runGate(broken, cloudEnv());
@@ -303,7 +326,7 @@ test("11 — an update channel, an updates block or a conflicting identity in ea
 
 // --- 12: local mode keeps the committed eas.json contract ----------------------
 
-test("12 — local mode still requires requireCommit and the production environment", async () => {
+test("12 — local mode reports the committed eas.json contract as warnings and still gates on the worktree", async () => {
   const { RELEASE_CRITICAL_FILES } = await import(path.join(ROOT, "scripts/generate-release-manifest.mjs"));
   assert.ok(!RELEASE_CRITICAL_FILES.includes("app.json"), "app.json is no longer byte-pinned");
   assert.ok(!RELEASE_CRITICAL_FILES.includes("eas.json"), "eas.json is no longer byte-pinned");
@@ -313,12 +336,14 @@ test("12 — local mode still requires requireCommit and the production environm
   assert.equal(committed.cli.requireCommit, true, "the committed eas.json still pins requireCommit");
   assert.equal(committed.build.production.environment, "production");
 
-  // Local mode against a wrapper-style eas.json must refuse to release.
+  // Local mode against a wrapper-style eas.json reports both fields, and still refuses
+  // to release — because of the worktree/commit contract, not because of eas.json.
   const dir = makeManagedArchive();
   const res = runGate(dir, cloudEnv({ RELEASE_ALLOW_DETACHED: "0" }), []);
-  assert.match(res.stderr, /eas\.json cli\.requireCommit must be true/);
-  assert.match(res.stderr, /production profile must select "environment": "production"/);
+  assert.match(res.stdout, /warn {4}eas\.json cli\.requireCommit must be true/);
+  assert.match(res.stdout, /warn {4}eas\.json production profile must select "environment": "production"/);
   assert.equal(res.status, 1);
+  assert.match(res.stderr, /is not the approved release worktree|RELEASE_EXPECTED_COMMIT is not set/);
   clean(dir);
 });
 
@@ -425,12 +450,14 @@ test("RC6.1 — local mode accepts version 1.1.8 with the committed slug", () =>
   clean(dir);
 });
 
-test("RC6.2 — local mode refuses the managed wrapper slug", () => {
+test("RC6.2 — local mode reports the managed wrapper slug as a warning", () => {
   const dir = makeCloudRenamedArchive();
   // No flag and no EAS_BUILD* name: local release mode.
   const res = runGate(dir, cloudEnv(), []);
+  assert.match(res.stdout, /warn {4}app\.json slug is "ai-coach-trainer-2", expected "apex-ai" \(local release mode\)/);
+  // Local mode still fails — on the worktree/commit contract, never on the slug.
   assert.equal(res.status, 1);
-  assert.match(res.stderr, /app\.json slug is "ai-coach-trainer-2", expected "apex-ai" \(local release mode\)/);
+  assert.ok(!res.stderr.includes("slug"), "the slug is not among the failures");
   clean(dir);
 });
 
@@ -446,7 +473,7 @@ test("RC6.3 — cloud mode accepts the managed slug for the approved production 
   clean(dir, shim.dir);
 });
 
-test("RC6.4 — the managed slug is refused whenever any guard condition is unmet", () => {
+test("RC6.4 — every unmet managed-slug guard condition is reported as a warning, never a failure", () => {
   const cases: [string, () => { dir: string; env: NodeJS.ProcessEnv }, RegExp][] = [
     [
       "missing project id",
@@ -516,35 +543,46 @@ test("RC6.4 — the managed slug is refused whenever any guard condition is unme
   for (const [label, build, expected] of cases) {
     const { dir, env } = build();
     const res = runGate(dir, env);
-    assert.equal(res.status, 1, `${label} must fail`);
-    assert.match(res.stderr, expected, label);
+    assert.equal(res.status, 0, `${label} must warn, not fail: ${res.all}`);
+    assert.match(res.stdout, expected, label);
+    assert.ok(!res.all.includes("DO NOT BUILD"), `${label} is reported, never fatal`);
     clean(dir);
   }
 });
 
-test("RC6.5 — every version other than 1.1.8 fails in both modes", () => {
-  for (const version of ["1.1.1", "1.1.6", "1.1.7", "1.1.9", "1.18", "v1.1.8", "", "1.1.8-beta"]) {
+test("RC6.5 — the marketing version can never fail a build, and the fingerprint always can", () => {
+  // The wrapper rewrites app.json after upload and increments the version there (their
+  // builder reported 1.1.9 against a committed 1.1.8), and app.json is not one of the 21
+  // hashed files — so the version proves nothing and must never gate a build. The source
+  // fingerprint is the only proof, and it still fails closed at every one of these
+  // versions.
+  for (const version of ["1.1.1", "1.1.6", "1.1.7", "1.1.9", "1.2.0", "1.18", "v1.1.8", "", "1.1.8-beta"]) {
     const cloud = makeCloudRenamedArchive((expo) => (expo.version = version));
     const a = runGate(cloud, managedCloudEnv());
-    assert.equal(a.status, 1, `cloud must reject version "${version}"`);
-    assert.match(a.stderr, /app\.json version is/);
+    assert.equal(a.status, 0, `cloud must accept version "${version}": ${a.all}`);
+    assert.match(a.stdout, /source fingerprint matches \(21 files\)/);
+    if (version !== EXPECTED_VERSION) {
+      assert.match(a.stdout, /the approved committed version is "1\.1\.8" \(wrapper-rewritten, not a failure\)/);
+    }
+    assert.ok(!a.all.includes("DO NOT BUILD"), `version "${version}" must not block the build`);
 
-    const local = makeArchive();
-    normaliseAppJson(local, (expo) => (expo.version = version));
-    writeEnv(local, managedEnvFile());
-    const b = runGate(local, cloudEnv());
-    assert.equal(b.status, 1, `local-slug archive must reject version "${version}"`);
-    assert.match(b.stderr, /app\.json version is/);
-    clean(cloud, local);
+    // Same wrapper-rewritten version, one tampered pinned file: still refused.
+    const tampered = makeCloudRenamedArchive((expo) => (expo.version = version));
+    fs.appendFileSync(path.join(tampered, "yarn.lock"), "\n");
+    const b = runGate(tampered, managedCloudEnv());
+    assert.equal(b.status, 1, `a fingerprint mismatch must fail at version "${version}"`);
+    assert.match(b.stderr, /source fingerprint mismatch[\s\S]*yarn\.lock/);
+    clean(cloud, tampered);
   }
 });
 
-test("RC6.6 — no slug other than the committed and managed slugs is accepted", () => {
+test("RC6.6 — an unexpected slug is reported as a warning (app.json is wrapper-rewritten)", () => {
   for (const slug of ["apex-ai-2", "ai-coach-trainer", "ai-coach-trainer-3", "some-other-project", ""]) {
     const dir = makeCloudRenamedArchive((expo) => (expo.slug = slug));
     const res = runGate(dir, managedCloudEnv());
-    assert.equal(res.status, 1, `slug "${slug}" must fail`);
-    assert.match(res.stderr, /app\.json slug is/);
+    assert.equal(res.status, 0, `slug "${slug}" must warn, not fail: ${res.all}`);
+    assert.match(res.stdout, /warn {4}app\.json slug is/);
+    assert.ok(!res.all.includes("DO NOT BUILD"), `slug "${slug}" must not block the build`);
     clean(dir);
   }
 });

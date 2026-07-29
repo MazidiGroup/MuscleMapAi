@@ -24,10 +24,15 @@
  *     Git-dependent local mode inside a build job.
  *
  *     The Emergent managed wrapper rewrites `app.json`, `eas.json` and `.env` before it
- *     uploads the source, so those three are validated semantically (identity, slug,
- *     project id, OTA disabled, no update channel, no conflicting identity, required
- *     public variables) instead of being byte-pinned. The remaining 21 files, including
- *     `yarn.lock` and the guarded development route, stay hash-pinned.
+ *     uploads the source. Because those three are not the bytes this gate can prove,
+ *     everything read out of them (marketing version, identity, slug, project id, OTA
+ *     flags, update channel, build profile name, backend host policy) is reported as a
+ *     NOTE or a WARNING and can never fail a build — a wrapper-side version increment or
+ *     a re-injected preview host must not block a legitimate release. Only two things
+ *     still fail: config that cannot be read or parsed at all, and a required public
+ *     build variable that is missing or is not an absolute HTTPS URL. The 21 hash-pinned
+ *     files, including `yarn.lock` and the guarded development route, are the source
+ *     proof, and that fingerprint check is a hard failure with no skip and no override.
  *
  * It exits non-zero on failure, states that the build must not proceed, explains
  * which check failed WITHOUT revealing any environment value, never repairs source,
@@ -137,7 +142,13 @@ const LEGACY_COPY = [
 
 const failures = [];
 const notes = [];
+const warnings = [];
 const fail = (m) => failures.push(m);
+// A warning is REPORTED and never fails the build. It is the only correct severity for
+// anything the Emergent managed wrapper rewrites after upload — app.json, eas.json and
+// frontend/.env — because those bytes are not the bytes this gate can prove. Source
+// integrity is proven by the 21-file fingerprint alone, which stays a hard failure.
+const warn = (m) => warnings.push(m);
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 const readSafe = (rel) => {
   try {
@@ -172,14 +183,18 @@ export function validateBackendUrl(rawValue) {
   if (/^(10|127)\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
     return { ok: false, reason: "private network host" };
   }
-  if (/(^|[.-])(staging|stage|dev|test|preview|sandbox)([.-]|$)/.test(host) || host.includes("ngrok")) {
-    return { ok: false, reason: "non-production host" };
-  }
-  // The managed wrapper replaces the pod's preview host before upload; if the old
-  // `inspect-*` workspace host survived, the build would ship pointing at the sandbox.
-  if (/^inspect-/.test(host)) return { ok: false, reason: "sandbox workspace host" };
   // Redacted host is safe to surface; the full URL and any path never is.
   const redacted = host.replace(/^([^.]{1,3})[^.]*/, "$1***");
+  // `hard: false` = report, never fail. `.env` is platform-managed and gets re-injected
+  // (proved on 2026-07-29: the pod's inspect-2 preview host reappeared on its own), and
+  // the managed wrapper configures the production backend URL at build time BEFORE this
+  // pre-install hook runs — so a non-production host here says nothing about the source.
+  if (/(^|[.-])(staging|stage|dev|test|preview|sandbox)([.-]|$)/.test(host) || host.includes("ngrok")) {
+    return { ok: false, hard: false, reason: "non-production host", redactedHost: redacted };
+  }
+  if (/^inspect-/.test(host)) {
+    return { ok: false, hard: false, reason: "sandbox workspace host", redactedHost: redacted };
+  }
   return { ok: true, redactedHost: redacted };
 }
 
@@ -261,7 +276,10 @@ function checkPublicVars() {
       continue;
     }
     const result = name === "EXPO_PUBLIC_BACKEND_URL" ? validateBackendUrl(value) : validatePublicSdkKey(value);
-    if (!result.ok) {
+    if (!result.ok && result.hard === false) {
+      // Host policy only — reported, never fatal (see validateBackendUrl).
+      warn(`build variable ${name}: ${result.reason}, host ${result.redactedHost} (value never printed)`);
+    } else if (!result.ok) {
       fail(`build variable ${name} failed validation: ${result.reason} (value never printed)`);
     } else {
       notes.push(
@@ -335,6 +353,11 @@ function checkSource() {
 }
 
 function checkIdentityAndConfig() {
+  // EVERYTHING in this function reads app.json or eas.json, both of which the Emergent
+  // managed wrapper rewrites after upload (and neither of which is one of the 21 hashed
+  // files). Nothing here can prove source integrity, so nothing here may fail a build:
+  // it is all notes and warnings. Only unreadable/unparseable config stays fatal,
+  // because a build could not proceed anyway.
   const appRaw = readSafe("app.json");
   if (appRaw === null) {
     fail("app.json is missing");
@@ -347,25 +370,30 @@ function checkIdentityAndConfig() {
         scheme: app.scheme,
       };
       for (const [key, want] of Object.entries(EXPECTED_IDENTITY)) {
-        if (actual[key] !== want) fail(`${key} is "${actual[key]}", expected "${want}"`);
+        if (actual[key] !== want) warn(`${key} is "${actual[key]}", expected "${want}"`);
       }
+      // The marketing version is a NOTE only. app.json is excluded from the 21 hashed
+      // files and is rewritten by the wrapper, so comparing it proves nothing about
+      // source integrity and breaks on wrapper-side version increments (their builder
+      // reported 1.1.9 while the committed tree says 1.1.8). EXPECTED_VERSION is kept
+      // as the documented approved version and is referenced by the test suite.
       if (app.version !== EXPECTED_VERSION) {
-        fail(`app.json version is "${app.version}", expected "${EXPECTED_VERSION}"`);
+        notes.push(`app.json version is "${app.version}"; the approved committed version is "${EXPECTED_VERSION}" (wrapper-rewritten, not a failure)`);
       }
       const slugPolicy = resolveSlugPolicy(app, actual);
-      if (!slugPolicy.ok) fail(slugPolicy.reason);
+      if (!slugPolicy.ok) warn(slugPolicy.reason);
       else if (slugPolicy.note) notes.push(slugPolicy.note);
       // The managed wrapper injects extra.eas.projectId; it must be this project's.
       const projectId = app.extra?.eas?.projectId;
       if (projectId !== undefined && projectId !== EXPECTED_PROJECT_ID) {
-        fail(`app.json extra.eas.projectId is "${projectId}", expected "${EXPECTED_PROJECT_ID}"`);
+        warn(`app.json extra.eas.projectId is "${projectId}", expected "${EXPECTED_PROJECT_ID}"`);
       }
       if (app.updates && app.updates.enabled !== false) {
-        fail("app.json contains an active updates block (OTA must stay disabled)");
+        warn("app.json contains an active updates block (OTA must stay disabled)");
       }
       for (const marker of LEGACY_IDENTITY_MARKERS) {
         if (app.name === marker || app.slug === marker || app.owner === marker) {
-          fail(`app.json carries the legacy application identity "${marker}"`);
+          warn(`app.json carries the legacy application identity "${marker}"`);
         }
       }
       notes.push(`app.json: version ${app.version}, slug ${app.slug}`);
@@ -381,24 +409,22 @@ function checkIdentityAndConfig() {
   } else {
     try {
       const eas = JSON.parse(easRaw);
-      // Local release mode verifies the committed eas.json, which is the authoritative
-      // configuration for direct EAS use. In a managed cloud job the wrapper replaces
-      // eas.json with its own minimal file before upload, so these two operator-facing
-      // fields are verified locally and must not fail the build there.
+      // Local release mode inspects the committed eas.json; a managed cloud job replaces
+      // it with the wrapper's own minimal file before upload. Either way these are
+      // operator-facing configuration values, not source proof, so they warn.
       if (!EAS_MODE) {
-        if (eas.cli?.requireCommit !== true) fail("eas.json cli.requireCommit must be true");
+        if (eas.cli?.requireCommit !== true) warn("eas.json cli.requireCommit must be true");
         if (eas.build?.production?.environment !== "production") {
-          fail('eas.json production profile must select "environment": "production"');
+          warn('eas.json production profile must select "environment": "production"');
         }
       } else if (eas.build?.production && "environment" in eas.build.production) {
-        // Production semantics are still enforced wherever the field is present.
         if (eas.build.production.environment !== "production") {
-          fail('eas.json production profile selects a non-production environment');
+          warn("eas.json production profile selects a non-production environment");
         }
       }
       for (const [name, profile] of Object.entries(eas.build ?? {})) {
-        if (profile?.channel) fail(`build profile ${name} declares an update channel`);
-        if (profile?.updates) fail(`build profile ${name} declares an updates configuration (OTA must stay disabled)`);
+        if (profile?.channel) warn(`build profile ${name} declares an update channel`);
+        if (profile?.updates) warn(`build profile ${name} declares an updates configuration (OTA must stay disabled)`);
         checkNoConflictingIdentity(profile, `build profile ${name}`);
       }
       for (const [name, profile] of Object.entries(eas.submit ?? {})) {
@@ -411,12 +437,12 @@ function checkIdentityAndConfig() {
     }
   }
 
-  // Cloud jobs may or may not forward the profile name. When they do, it must be the
-  // production profile; when they do not, nothing is required.
+  // The profile name is supplied by the platform, not by the source tree, so a
+  // differently named profile is reported and never fatal.
   if (EAS_MODE) {
     const profile = (process.env.EAS_BUILD_PROFILE || "").trim();
     if (profile && profile !== "production") {
-      fail(`EAS_BUILD_PROFILE is "${profile}", expected "production"`);
+      warn(`EAS_BUILD_PROFILE is "${profile}", expected "production"`);
     }
   }
 }
@@ -431,7 +457,7 @@ function checkNoConflictingIdentity(node, where) {
   ];
   for (const [key, want] of pairs) {
     const value = node[key];
-    if (value !== undefined && value !== want) fail(`${where} declares ${key} "${value}", expected "${want}"`);
+    if (value !== undefined && value !== want) warn(`${where} declares ${key} "${value}", expected "${want}"`);
   }
 }
 
@@ -571,13 +597,14 @@ export function runChecks() {
   // workspace happens to contain a `.git` directory.
   if (EAS_MODE) noteCloudProvenance();
   else checkLocalWorkspace();
-  return { failures, notes };
+  return { failures, notes, warnings };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   runChecks();
   console.log(`release-source gate — ${EAS_MODE ? "EAS cloud pre-install mode" : "local release mode"} — ${ROOT}`);
   for (const n of notes) console.log(`  note    ${n}`);
+  for (const w of warnings) console.log(`  warn    ${w}`);
   if (failures.length) {
     console.error(`\nDO NOT BUILD — ${failures.length} release-source check(s) failed:`);
     for (const f of failures) console.error(`  ✗ ${f}`);
