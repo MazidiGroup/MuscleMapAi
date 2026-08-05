@@ -5,6 +5,7 @@ import {
   AppStateStatus,
   Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -184,8 +185,16 @@ export function RestTimer({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.card} testID="rest-timer">
+      {/* Tapping outside the card ends the rest period. Without this the overlay
+          silently swallows every tap until the countdown runs out. */}
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close rest timer"
+        testID="rest-backdrop"
+      >
+        <Pressable style={styles.card} testID="rest-timer" onPress={() => {}}>
           <Text style={styles.label}>REST</Text>
           <Text
             style={styles.time}
@@ -253,8 +262,8 @@ export function RestTimer({
               <Text style={[styles.actionText, { color: T.bg }]}>Skip</Text>
             </TimerButton>
           </View>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }

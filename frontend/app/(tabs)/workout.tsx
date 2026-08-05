@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, useWin
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 
 import { AnatomyViewer } from "@/src/anatomy/AnatomyViewer";
 import { DraggableSheet } from "@/src/anatomy/DraggableSheet";
@@ -29,6 +30,7 @@ export default function WorkoutScreen() {
   const params = useLocalSearchParams<{ seg?: string; ex?: string }>();
   const w = useWorkout();
   const { mode } = useTheme();
+  const isFocused = useIsFocused();
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
 
@@ -62,6 +64,14 @@ export default function WorkoutScreen() {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [w.startedAt]);
+
+  // The rest timer belongs to a live session on the Session segment. Finishing or
+  // cancelling the workout, moving to another segment, or leaving the tab closes it
+  // — otherwise the modal stays mounted over whatever the user opens next and
+  // swallows their taps.
+  useEffect(() => {
+    if (!w.session || seg !== "session" || !isFocused) setRestVisible(false);
+  }, [w.session, seg, isFocused]);
 
   const list = useMemo(() => {
     return EXERCISES.filter((e) => {
@@ -112,7 +122,18 @@ export default function WorkoutScreen() {
 
       {/* segmented header */}
       <View
-        style={[styles.segWrap, { paddingTop: insets.top + 8, pointerEvents: "box-none" }]}
+        style={[
+          styles.segWrap,
+          {
+            paddingTop: insets.top + 8,
+            // The scrolling segments pass their content UNDER this floating header,
+            // so it needs an opaque backing or rows bleed through above it. Muscle
+            // Groups keeps it transparent: the 3D scene is meant to show through.
+            paddingBottom: 8,
+            backgroundColor: seg === "exercises" ? "transparent" : T.bg,
+            pointerEvents: "box-none",
+          },
+        ]}
         onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
