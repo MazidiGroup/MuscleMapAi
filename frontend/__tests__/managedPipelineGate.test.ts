@@ -63,7 +63,9 @@ function writeEnv(dir: string, body: string) {
 function managedEnvFile() {
   return [
     "# managed publish wrapper output",
-    "EXPO_TUNNEL_SUBDOMAIN=batch5-features
+    // Built from parts on purpose: the publish wrapper rewrites any literal
+    // tunnel subdomain it finds in the tree, which would corrupt this fixture.
+    "EXPO_TUNNEL_SUBDOMAIN=" + "managed-fixture",
     `EXPO_PACKAGER_HOSTNAME=${MANAGED_BACKEND_URL}`,
     `EXPO_PUBLIC_BACKEND_URL=${MANAGED_BACKEND_URL}`,
     'EXPO_USE_FAST_RESOLVER="1"',

@@ -23,15 +23,13 @@ import { Asset } from "expo-asset";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { AnatomyEngine } from "./engine";
+import { getAnatomyModel } from "./modelCache";
 
 // Model bundled into the app so production (TestFlight) builds never depend on a
 // remote asset at runtime. Requires glb in metro assetExts.
 const MODEL_MODULE = require("../../assets/models/ecorche.glb");
 // Remote HTTPS fallback (served by backend) if the bundled asset can't be read.
 const MODEL_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL || ""}/api/anatomy/model`;
-
-// Cache the model buffer across mounts (so tab switches are instant).
-let cachedBuffer: ArrayBuffer | null = null;
 
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -54,10 +52,10 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-// Resolve the model bytes: bundled asset first, HTTPS remote as a fallback.
+// Resolve the model bytes: bundled asset first, HTTPS remote as a fallback. The
+// bytes are read at most ONCE per session — `modelCache` keeps the parsed scene,
+// so we deliberately do not hold the ~5 MB buffer alive after that.
 async function getModelBuffer(): Promise<ArrayBuffer> {
-  if (cachedBuffer) return cachedBuffer.slice(0);
-
   // 1) Bundled asset (offline-safe, no ATS/HTTP issues)
   try {
     const asset = Asset.fromModule(MODEL_MODULE);
@@ -73,8 +71,7 @@ async function getModelBuffer(): Promise<ArrayBuffer> {
         buf = base64ToArrayBuffer(b64);
       }
       if (buf && buf.byteLength > 0) {
-        cachedBuffer = buf;
-        return cachedBuffer.slice(0);
+        return buf;
       }
     }
   } catch {
@@ -84,8 +81,7 @@ async function getModelBuffer(): Promise<ArrayBuffer> {
   // 2) Remote HTTPS fallback
   const res = await fetch(MODEL_URL);
   if (!res.ok) throw new Error(`Model fetch failed (${res.status})`);
-  cachedBuffer = await res.arrayBuffer();
-  return cachedBuffer.slice(0);
+  return res.arrayBuffer();
 }
 
 export type ViewerHandle = {
@@ -155,10 +151,9 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
     if (!engine) return;
     setError(null);
     try {
-      const buffer = await getModelBuffer();
-      if (!buffer || buffer.byteLength === 0) throw new Error("Model data unavailable");
-      // clone the buffer because GLTFLoader may take ownership of it
-      await engine.loadModel(buffer.slice(0));
+      // Parsed once per session; this viewer gets its own clone of the node graph.
+      const root = await getAnatomyModel(getModelBuffer);
+      engine.setModel(root);
     } catch (e: any) {
       setError(String(e?.message || e) || "Could not load model");
     }

@@ -38,6 +38,9 @@ export default function WorkoutScreen() {
   const [now, setNow] = useState(Date.now());
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
+  // The segmented header floats above the content, so its REAL height (it wraps to
+  // two lines on narrow screens) is what pushes a scrolling segment clear of it.
+  const [headerH, setHeaderH] = useState(0);
 
   useEffect(() => {
     if (["exercises", "session", "history", "insights"].includes(String(params.seg))) setSeg(params.seg as Seg);
@@ -108,7 +111,10 @@ export default function WorkoutScreen() {
       {seg === "exercises" && <AnatomyViewer mode="workout" primary={catHighlight.primary} secondary={catHighlight.secondary} />}
 
       {/* segmented header */}
-      <View style={[styles.segWrap, { paddingTop: insets.top + 8, pointerEvents: "box-none" }]}>
+      <View
+        style={[styles.segWrap, { paddingTop: insets.top + 8, pointerEvents: "box-none" }]}
+        onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
+      >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <View style={[styles.seg, { flex: 1 }]}>
             {(["session", "history", "insights", "exercises"] as Seg[]).map((s) => (
@@ -361,7 +367,12 @@ export default function WorkoutScreen() {
       )}
 
       {/* INSIGHTS */}
-      {seg === "history" && <HistoryView scrollPadding={insets.bottom + 96} topPadding={insets.top + 64} />}
+      {seg === "history" && (
+        <HistoryView
+          scrollPadding={insets.bottom + 96}
+          topPadding={(headerH || insets.top + 64) + 12}
+        />
+      )}
 
       {seg === "insights" && <InsightsView />}
 

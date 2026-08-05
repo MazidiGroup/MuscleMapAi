@@ -1,7 +1,4 @@
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-
-import { FLAGS } from "@/src/config/featureFlags";
 
 // React Native (Hermes) defines a global `navigator` object but leaves
 // `navigator.userAgent` undefined. three.js GLTFLoader does
@@ -51,6 +48,12 @@ export class AnatomyEngine {
   private byName: Map<string, THREE.Object3D> = new Map();
   private running = true;
   private cb: EngineCallbacks;
+  /**
+   * Frames still owed to the GL surface. The scene is static between gestures and
+   * state changes, so we draw ON DEMAND instead of burning a frame 60× a second.
+   * Two frames per change covers both buffers of the double-buffered surface.
+   */
+  private pending = 2;
 
   // orbit state
   private target = new THREE.Vector3(0, 0, 0);
@@ -94,6 +97,9 @@ export class AnatomyEngine {
       antialias: true,
       alpha: false,
     });
+    // expo-gl hands us a drawing buffer that is ALREADY device-scaled, so the
+    // renderer's own ratio stays at 1: the effective pixel ratio can never climb
+    // past the 2× cap we want on high-density screens.
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(width, height, false);
     this.renderer.setClearColor(0x070a0f, 1);
@@ -123,15 +129,14 @@ export class AnatomyEngine {
     this.animate();
   }
 
-  async loadModel(buffer: ArrayBuffer) {
+  /**
+   * Adopts an already-parsed model (a clone from `modelCache`). The engine never
+   * parses the GLB itself, so opening a second 3D surface costs a node-graph
+   * clone rather than a full re-parse.
+   */
+  setModel(root: THREE.Object3D) {
     try {
-      const loader = new GLTFLoader();
-      loader.parse(
-        buffer,
-        "",
-        (gltf) => this.onLoaded(gltf.scene),
-        (err: any) => this.cb.onError?.(String(err?.message || err)),
-      );
+      this.onLoaded(root);
     } catch (e: any) {
       this.cb.onError?.(String(e?.message || e));
     }
@@ -178,12 +183,8 @@ export class AnatomyEngine {
       }
     });
 
-    // Give muscles a gym-style physique by inflating major-group meshes along
-    // their vertex normals. Runs once at load, before framing/scene add so the
-    // updated bounding box is used for the camera fit.
-    if (FLAGS.gymPhysique) {
-      this.applyGymPhysique();
-    }
+    // The gym-physique inflation is geometry-level work and already ran once in
+    // `modelCache`, on the geometry every clone shares.
 
     // centre + frame
     const box = new THREE.Box3().setFromObject(root);
@@ -211,9 +212,16 @@ export class AnatomyEngine {
   private animate = () => {
     if (!this.running) return;
     requestAnimationFrame(this.animate);
+    if (this.pending <= 0) return;
+    this.pending--;
     this.renderer.render(this.scene, this.camera);
     if (this.gl.endFrameEXP) this.gl.endFrameEXP();
   };
+
+  /** Requests a redraw. Every state change that can alter a pixel calls this. */
+  private markDirty() {
+    this.pending = 2;
+  }
 
   private updateCamera() {
     const sinPhi = Math.sin(this.phi);
@@ -222,6 +230,7 @@ export class AnatomyEngine {
     const z = this.target.z + this.radius * sinPhi * Math.cos(this.theta);
     this.camera.position.set(x, y, z);
     this.camera.lookAt(this.target);
+    this.markDirty();
   }
 
   // ---------- gestures ----------
@@ -298,107 +307,7 @@ export class AnatomyEngine {
       const inf = m.morphTargetInfluences!;
       for (let i = 0; i < inf.length; i++) inf[i] = v;
     }
-  }
-
-  // ---------- gym physique (bodybuilder-style inflation) ----------
-  //
-  // For every mesh whose unit name matches one of our known major-group
-  // prefixes, displace each vertex along its own vertex normal by a fraction
-  // of the mesh's smallest bounding-box half-extent. This "inflates" the
-  // muscle uniformly outward: the biceps peak grows, quads swell laterally,
-  // shoulders cap up — exactly the way real gym growth reads. Because we edit
-  // the base position attribute (not any morph target), the shrink morph and
-  // all picking/materials continue to work unchanged.
-  //
-  // We recompute vertex normals afterwards so lighting stays correct.
-  private applyGymPhysique() {
-    // Athletic-athlete defaults. Values are a fraction of each mesh's smallest
-    // bounding-box half-extent — enough to look lean and trained, not bulky.
-    const RULES: [RegExp, number][] = [
-      [/^Pectoralis_Major/i, 0.08],
-      [/^Pectoralis_Minor$/i, 0.06],
-      [/^Serratus_Anterior$/i, 0.06],
-      [/^Deltoid/i, 0.10],
-      [/^Biceps_Brachii$/i, 0.10],
-      [/^Brachialis$/i, 0.10],
-      [/^Brachioradialis$/i, 0.08],
-      [/^Triceps_/i, 0.10],
-      [/^Latissimus_Dorsi$/i, 0.09],
-      [/^Teres_(Major|Minor)$/i, 0.08],
-      [/^Rhomboideus_/i, 0.06],
-      [/^Trapezius$/i, 0.07],
-      [/^Infraspinatus$/i, 0.05],
-      [/^Supraspinatus$/i, 0.04],
-      [/^Rectus_Abdominis$/i, 0.06],
-      [/^External_Oblique$/i, 0.05],
-      [/^Gluteus_Maximus$/i, 0.10],
-      [/^Gluteus_(Medius|Minimus)$/i, 0.07],
-      [/^Rectus_Femoris$/i, 0.09],
-      [/^Vastus_/i, 0.09],
-      [/^Biceps_Femoris_/i, 0.09],
-      [/^Semi(tendinosus|membranosus)$/i, 0.09],
-      [/^Adductor_/i, 0.07],
-      [/^Gracilis$/i, 0.05],
-      [/^Gastrocnemius/i, 0.10],
-      [/^Soleus$/i, 0.09],
-      [/^Tibialis_Anterior$/i, 0.06],
-      [/^Sternocleidomastoid$/i, 0.06],
-      [/^Psoas_Major$/i, 0.05],
-    ];
-
-    const inflatedCount = { n: 0 };
-    for (const mesh of this.meshes) {
-      const ud = mesh.userData.anat as MeshUD | undefined;
-      if (!ud || ud.isBone) continue;
-      let factor = 0;
-      for (const [re, f] of RULES) {
-        if (re.test(ud.unitName)) {
-          factor = f;
-          break;
-        }
-      }
-      if (factor === 0) continue;
-      if (this.inflateMesh(mesh, factor)) inflatedCount.n++;
-    }
-    // Uncomment to debug in dev
-    // console.log(`[gymPhysique] inflated ${inflatedCount.n} muscle meshes`);
-  }
-
-  private inflateMesh(mesh: THREE.Mesh, factor: number): boolean {
-    const geom = mesh.geometry as THREE.BufferGeometry;
-    const posAttr = geom.getAttribute("position") as THREE.BufferAttribute | undefined;
-    if (!posAttr) return false;
-
-    // Ensure we have per-vertex normals (a few pack meshes ship without them).
-    let normAttr = geom.getAttribute("normal") as THREE.BufferAttribute | undefined;
-    if (!normAttr) {
-      geom.computeVertexNormals();
-      normAttr = geom.getAttribute("normal") as THREE.BufferAttribute;
-    }
-
-    // Displacement magnitude = factor × min half-extent of the mesh's local AABB.
-    geom.computeBoundingBox();
-    const bb = geom.boundingBox!;
-    const sx = (bb.max.x - bb.min.x) * 0.5;
-    const sy = (bb.max.y - bb.min.y) * 0.5;
-    const sz = (bb.max.z - bb.min.z) * 0.5;
-    const characteristic = Math.min(sx, sy, sz);
-    if (!isFinite(characteristic) || characteristic <= 0) return false;
-    const delta = characteristic * factor;
-
-    const p = posAttr.array as Float32Array;
-    const n = normAttr.array as Float32Array;
-    for (let i = 0; i < posAttr.count; i++) {
-      const j = i * 3;
-      p[j] += n[j] * delta;
-      p[j + 1] += n[j + 1] * delta;
-      p[j + 2] += n[j + 2] * delta;
-    }
-    posAttr.needsUpdate = true;
-    geom.computeVertexNormals(); // relight the inflated surface
-    geom.computeBoundingBox();
-    geom.computeBoundingSphere();
-    return true;
+    this.markDirty();
   }
 
   toggleHidden(container: string) {
@@ -476,6 +385,7 @@ export class AnatomyEngine {
 
   // recompute visibility + colour for every mesh
   refresh() {
+    this.markDirty();
     for (const m of this.meshes) {
       const ud = m.userData.anat as MeshUD;
       const mat = m.material as THREE.MeshStandardMaterial;
@@ -532,11 +442,18 @@ export class AnatomyEngine {
   dispose() {
     this.running = false;
     try {
+      // Materials are created per engine, so they are ours to free. GEOMETRY is
+      // NOT: it belongs to the cached parse that every viewer clones from, and
+      // disposing it here would blank the next 3D surface the user opens.
       this.meshes.forEach((m) => {
-        (m.material as THREE.Material).dispose();
-        m.geometry.dispose();
+        const mat = m.material as THREE.Material | THREE.Material[];
+        if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+        else mat?.dispose?.();
       });
+      if (this.model) this.scene.remove(this.model);
+      this.scene.clear();
       this.renderer?.dispose?.();
+      this.renderer?.forceContextLoss?.();
     } catch {}
     this.meshes = [];
     this.morphMeshes = [];
