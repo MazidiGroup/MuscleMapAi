@@ -12,6 +12,7 @@
 // Pure logic only — no React, no storage — so the whole step machine is testable.
 
 import type { Answers, Equipment, Experience, Goal, Region } from "./exercises";
+import { ADVANCED_MIN_DAYS } from "./exercises";
 
 export const ONBOARDING_STEPS = ["goal", "days", "equipment"] as const;
 export type OnboardingStepKey = (typeof ONBOARDING_STEPS)[number];
@@ -81,6 +82,8 @@ export function isStepComplete(step: number, answers: Partial<Answers>): boolean
     case "goal":
       return !!answers.goal;
     case "days":
+      // Advanced Lifter Mode cannot be programmed under five training days.
+      if (answers.advanced) return !!answers.days && answers.days.length >= ADVANCED_MIN_DAYS;
       return !!answers.days && answers.days.length >= 1;
     case "equipment":
       return true; // bodyweight-only is a valid answer
@@ -107,6 +110,8 @@ export function normalizeAnswers(partial: Partial<Answers>): Answers {
     equip: Array.isArray(partial.equip) ? partial.equip : ANSWER_DEFAULTS.equip,
     focus: Array.isArray(partial.focus) ? partial.focus : ANSWER_DEFAULTS.focus,
     posture: typeof partial.posture === "boolean" ? partial.posture : ANSWER_DEFAULTS.posture,
+    // Advanced Lifter Mode only survives normalisation while it is programmable.
+    advanced: !!partial.advanced && days.length >= ADVANCED_MIN_DAYS,
   };
 }
 

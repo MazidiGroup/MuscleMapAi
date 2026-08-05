@@ -361,7 +361,7 @@ export default function WorkoutScreen() {
       )}
 
       {/* INSIGHTS */}
-      {seg === "history" && <HistoryView scrollPadding={insets.bottom + 96} />}
+      {seg === "history" && <HistoryView scrollPadding={insets.bottom + 96} topPadding={insets.top + 64} />}
 
       {seg === "insights" && <InsightsView />}
 

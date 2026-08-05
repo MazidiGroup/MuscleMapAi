@@ -20,6 +20,7 @@ import {
   searchPlaceholder,
 } from "@/src/library/catalogQuery";
 import { FilterSheet } from "@/src/library/FilterSheet";
+import { usePlanStore } from "@/src/plan/planStore";
 import { DestructiveConfirm, EmptyState } from "@/src/ui/state";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { muscleAliasMatches } from "@/src/anatomy/search";
@@ -47,6 +48,7 @@ const CATALOGUE_COUNT = catalogIntegrity().count;
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
+  const advancedOn = !!usePlanStore((s) => s.answers.advanced);
   const router = useRouter();
   const { user, logout, deleteAccount } = useAuth();
   const { resolution } = usePremium();
@@ -406,6 +408,20 @@ export default function LibraryScreen() {
           <View style={styles.about}>
             <Text style={styles.aboutTitle}>Account</Text>
             <View style={styles.linkList}>
+              {/* Training days and Advanced Lifter Mode are edited together, because the
+                  mode is a constraint on how many days are selected. */}
+              <TouchableOpacity
+                style={styles.linkRow}
+                onPress={() => router.push({ pathname: "/(tabs)/plan", params: { edit: "days" } })}
+                accessibilityRole="button"
+                accessibilityLabel={`Training days and Advanced Lifter Mode, currently ${advancedOn ? "on" : "off"}`}
+                testID="edit-training-days"
+              >
+                <Ionicons name="calendar-outline" size={18} color={T.accent} />
+                <Text style={styles.linkRowText}>Training days &amp; Advanced Lifter Mode</Text>
+                <Text style={[styles.linkRowText, { flex: 0, color: T.textDim }]}>{advancedOn ? "On" : "Off"}</Text>
+                <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+              </TouchableOpacity>
               {!user ? (
                 <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/login")} testID="signin-btn">
                   <Ionicons name="log-in-outline" size={18} color={T.accent} />

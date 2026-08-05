@@ -33,7 +33,7 @@ import {
   workoutTotals,
 } from "./metrics";
 
-export function HistoryView({ scrollPadding = 24 }: { scrollPadding?: number }) {
+export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?: number; topPadding?: number }) {
   const t = useSemanticTokens();
   const router = useRouter();
   const w = useWorkout();
@@ -67,7 +67,15 @@ export function HistoryView({ scrollPadding = 24 }: { scrollPadding?: number }) 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: t.color.bg }}
-      contentContainerStyle={{ padding: t.space.lg, paddingBottom: scrollPadding, gap: t.space.lg }}
+      // The screen's segmented header floats ABOVE this list, so the first row has to
+      // start below it — including the notch inset — at every scroll position.
+      contentContainerStyle={{
+        padding: t.space.lg,
+        paddingTop: topPadding ?? t.space.lg,
+        paddingBottom: scrollPadding,
+        gap: t.space.lg,
+      }}
+      scrollIndicatorInsets={{ top: (topPadding ?? 0) - t.space.lg }}
       testID="history-view"
     >
       {w.readFailed && (

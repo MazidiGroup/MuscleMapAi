@@ -11,7 +11,7 @@
 // `routeStep`, which preserves whatever the user had already selected.
 
 import React, { useCallback, useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { usePlanStore } from "@/src/plan/planStore";
 import { Building, Onboarding, PlanBuildError, Welcome } from "@/src/plan/OnboardingFlow";
@@ -35,6 +35,13 @@ export default function PlanTab() {
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  // Profile deep-links straight to the training-days question, which is where the
+  // days selection and Advanced Lifter Mode are edited after onboarding.
+  const editParam = useLocalSearchParams<{ edit?: string }>().edit;
+  useEffect(() => {
+    if (editParam === "days" && hydrated) setStep(2);
+  }, [editParam, hydrated, setStep]);
 
   const build = useCallback(() => {
     setPhase("building");

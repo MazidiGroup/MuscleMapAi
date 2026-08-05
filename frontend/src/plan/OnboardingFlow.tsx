@@ -30,6 +30,7 @@ import {
   toggleWeekday,
 } from "./onboarding";
 import type { Equipment, Goal } from "./exercises";
+import { ADVANCED_MIN_DAYS } from "./exercises";
 
 // ---- Question data -------------------------------------------------------
 const GOAL_OPTS: { k: Goal; label: string; sub: string }[] = [
@@ -205,6 +206,77 @@ function OptionCard({
   );
 }
 
+/**
+ * Advanced Lifter Mode — lives with the training-days question because it is a
+ * constraint ON those days: it needs five or more of them to be programmable. The
+ * same control is reachable after onboarding through "Change my answers".
+ */
+export function AdvancedLifterToggle({
+  on,
+  dayCount,
+  onChange,
+}: {
+  on: boolean;
+  dayCount: number;
+  onChange: (next: boolean) => void;
+}) {
+  const t = useSemanticTokens();
+  const [tipOpen, setTipOpen] = useState(false);
+  const short = on && dayCount < ADVANCED_MIN_DAYS;
+  const aria = Platform.OS === "web" ? ({ "aria-checked": on } as any) : null;
+  return (
+    <View style={{ marginTop: t.space.lg, gap: t.space.sm }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: t.space.sm }}>
+        <Pressable
+          onPress={() => onChange(!on)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: on }}
+          accessibilityLabel="Advanced Lifter Mode"
+          testID="advanced-lifter-toggle"
+          style={{ flexDirection: "row", alignItems: "center", gap: t.space.sm, minHeight: t.target.min, flexShrink: 1 }}
+          {...aria}
+        >
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: t.radius.sm,
+              borderWidth: 2,
+              borderColor: on ? t.color.accent : t.color.border,
+              backgroundColor: on ? t.color.accent : "transparent",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {on ? <Ionicons name="checkmark" size={16} color={t.color.bg} /> : null}
+          </View>
+          <Text style={[t.type.bodyStrong, { color: t.color.text }]}>Advanced Lifter Mode</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setTipOpen((v) => !v)}
+          accessibilityRole="button"
+          accessibilityLabel={tipOpen ? "Hide what Advanced Lifter Mode does" : "What is Advanced Lifter Mode?"}
+          accessibilityState={{ expanded: tipOpen }}
+          testID="advanced-lifter-info"
+          style={{ width: t.target.min, height: t.target.min, alignItems: "center", justifyContent: "center" }}
+        >
+          <Ionicons name="information-circle-outline" size={20} color={t.color.textSecondary} />
+        </Pressable>
+      </View>
+      {tipOpen ? (
+        <Text style={[t.type.caption, { color: t.color.textSecondary }]} testID="advanced-lifter-tip">
+          For experienced lifters. Requires 5+ training days. Uses muscle group specialization with higher weekly volume.
+        </Text>
+      ) : null}
+      {short ? (
+        <Text style={[t.type.bodyStrong, { color: t.status.warning.fg }]} testID="advanced-lifter-warning">
+          {`Advanced Lifter Mode needs 5 or more training days — ${dayCount} selected. Pick ${ADVANCED_MIN_DAYS - dayCount} more, or untick the box.`}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 function Pill({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
   const t = useSemanticTokens();
   const aria = Platform.OS === "web" ? ({ "aria-checked": on } as any) : null;
@@ -308,6 +380,11 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         <Text style={[t.type.bodyStrong, { color: t.color.accentSoft, marginTop: t.space.lg }]} testID="days-summary">
           {days.length === 0 ? "Pick at least one day." : daysSummary(days)}
         </Text>
+        <AdvancedLifterToggle
+          on={!!answers.advanced}
+          dayCount={days.length}
+          onChange={(next) => setAnswers({ advanced: next })}
+        />
       </Shell>
     );
   }

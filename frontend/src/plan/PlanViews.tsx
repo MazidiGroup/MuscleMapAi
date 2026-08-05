@@ -139,9 +139,32 @@ function Chip({ label, tone }: { label: string; tone?: "focus" | "posture" }) {
   );
 }
 
+/**
+ * Resolves a planned day's exercises against the stored swaps, so the weekly
+ * schedule, the day view and the session all show the exercise the user actually
+ * chose. Anything unswapped passes through untouched.
+ */
+export function resolveDayExercises(
+  exercises: PlanExerciseEntry[] | undefined,
+  swaps: Record<string, string>,
+  answers: any,
+): PlanExerciseEntry[] {
+  return (exercises || []).map((e) => {
+    const to = swaps[e.id];
+    if (!to || to === e.id) return e;
+    try {
+      return { ...entryFor(to, answers), badge: e.badge };
+    } catch {
+      return e; // an id we can no longer resolve must never blank the plan
+    }
+  });
+}
+
 function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
   const { T } = useTheme();
   const completions = usePlanStore(s => s.completions);
+  const swaps = usePlanStore(s => s.swaps);
+  const answers = usePlanStore(s => s.answers);
   const w = useWorkout();
   if (day.rest) {
     return (
@@ -152,7 +175,8 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
     );
   }
   const dateKey = todayISO();
-  const exs = day.exercises || [];
+  // The weekly card shows the exercises the user actually chose, swaps included.
+  const exs = resolveDayExercises(day.exercises, swaps, answers);
   const doneCount = exs.filter((ex) => {
     const se = w.session?.find((s) => s.exerciseId === ex.id);
     const live = !!se && se.sets.length > 0 && se.sets.every((s) => s.done);
@@ -223,14 +247,17 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
   const plan = usePlanStore(s => s.plan);
   const completions = usePlanStore(s => s.completions);
   const [swapId, setSwapId] = useState<string | null>(null);
-  const [replaced, setReplaced] = useState<Record<string, PlanExerciseEntry>>({});
   const [startFailed, setStartFailed] = useState(false);
+  const swaps = usePlanStore(s => s.swaps);
+  const setSwap = usePlanStore(s => s.setSwap);
+  const answers = usePlanStore(s => s.answers);
   if (!plan) return null;
   const day = plan.days[dayIndex];
   if (day.rest) return null;
   const dateKey = todayISO();
 
-  const items = (day.exercises || []).map(e => replaced[e.id] || e);
+  const planned = day.exercises || [];
+  const items = resolveDayExercises(planned, swaps, answers);
   const hasActiveWorkout = w.session !== null;
 
   // Starting a new workout and resuming the active one are distinct actions:
@@ -296,7 +323,9 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
             />
           </View>
         )}
-        {items.map((ex) => {
+        {items.map((ex, exIdx) => {
+          // Swaps are keyed by the PLANNED id, which is what survives regeneration.
+          const plannedId = planned[exIdx]?.id ?? ex.id;
           const sessionEx = w.session?.find((s) => s.exerciseId === ex.id);
           const sessionDone = !!sessionEx && sessionEx.sets.length > 0 && sessionEx.sets.every((s) => s.done);
           const done = sessionDone || !!completions[`${dateKey}:${ex.id}`];
@@ -350,7 +379,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.swapBtn, { borderColor: T.border }]}
-                  onPress={() => setSwapId(ex.id)}
+                  onPress={() => setSwapId(plannedId)}
                   testID={`swap-${ex.id}`}
                 >
                   <Ionicons name="swap-horizontal" size={16} color={T.text2} />
@@ -367,7 +396,9 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
         excludeIds={items.map(i => i.id)}
         onDismiss={() => setSwapId(null)}
         onPick={(newEntry) => {
-          if (swapId) setReplaced(r => ({ ...r, [swapId]: newEntry }));
+          // Stored against the planned id, so swapping again just updates the mapping
+          // and swapping back to the original removes it.
+          if (swapId) setSwap(swapId, newEntry.id);
           setSwapId(null);
         }}
       />

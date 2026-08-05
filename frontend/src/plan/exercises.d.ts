@@ -18,6 +18,8 @@ export type Answers = {
   equip: Equipment[];
   focus: Region[];        // max 3
   posture: boolean;
+  /** Advanced Lifter Mode: muscle-group specialisation split, needs 5+ training days. */
+  advanced?: boolean;
 };
 
 export type LibraryExercise = {
@@ -69,6 +71,8 @@ export const REGION: Record<MuscleKey, Region | null>;
 export const REGION_LABEL: Record<Region, string>;
 export const GOAL_LABEL: Record<Goal, string>;
 export const SPLIT_LABEL: Record<number, string>;
+/** Advanced Lifter Mode requires at least this many training days. */
+export const ADVANCED_MIN_DAYS: number;
 export const PROGRESS_TIP: Record<Goal, string>;
 export const posterUrl: (id: string) => string;
 export function buildPlan(answers: Answers, seed: number): Plan;

@@ -286,7 +286,21 @@ const TEMPLATES = {
   upper: [{ p: ['hpush'], m: 'chest' }, { p: ['hpull'], m: 'back' }, { p: ['vpush'], m: 'shoulders' }, { p: ['vpull'], m: 'back' }, { p: ['curl'], m: 'biceps' }, { p: ['ext'], m: 'triceps' }, { p: ['latraise', 'facepull'] }],
   lower: [{ p: ['squat'], m: 'quads' }, { p: ['hinge'], m: 'hams' }, { p: ['lunge'] }, { p: ['hipthrust', 'abduction', 'legcurl'], m: 'glutes' }, { p: ['calf'] }, { p: ['core'] }, { p: ['legext'] }],
 };
+// Advanced Lifter Mode — one muscle group owns the day, so weekly volume for that
+// group lands around 18-21 working sets (7 exercises x 3 sets) instead of the 6-9 a
+// generic split gives it. Seven slots each so the advanced set count is never short.
+const SPEC_TEMPLATES = {
+  spChest: [{ p: ['hpush'], m: 'chest' }, { p: ['hpush'], m: 'chest' }, { p: ['fly'], m: 'chest' }, { p: ['hpush', 'fly'], m: 'chest' }, { p: ['fly', 'hpush'], m: 'chest' }, { p: ['ext'], m: 'triceps' }, { p: ['core'] }],
+  spBack: [{ p: ['vpull'], m: 'back' }, { p: ['hpull'], m: 'back' }, { p: ['hpull'], m: 'back' }, { p: ['vpull', 'hpull'], m: 'back' }, { p: ['shrug', 'facepull'], m: 'traps' }, { p: ['curl'], m: 'biceps' }, { p: ['core'] }],
+  spLegs: [{ p: ['squat'], m: 'quads' }, { p: ['hinge'], m: 'hams' }, { p: ['lunge'], m: 'quads' }, { p: ['legext'], m: 'quads' }, { p: ['legcurl'], m: 'hams' }, { p: ['hipthrust', 'abduction'], m: 'glutes' }, { p: ['calf'], m: 'calves' }],
+  spShoulders: [{ p: ['vpush'], m: 'shoulders' }, { p: ['vpush'], m: 'shoulders' }, { p: ['latraise'], m: 'shoulders' }, { p: ['latraise'], m: 'shoulders' }, { p: ['facepull'], m: 'shoulders' }, { p: ['shrug'], m: 'traps' }, { p: ['core'] }],
+  spArms: [{ p: ['curl'], m: 'biceps' }, { p: ['ext'], m: 'triceps' }, { p: ['curl'], m: 'biceps' }, { p: ['ext'], m: 'triceps' }, { p: ['ext', 'fly'], m: 'triceps' }, { p: ['curl'], m: 'forearms' }, { p: ['core'] }],
+};
+Object.assign(TEMPLATES, SPEC_TEMPLATES);
+
 const DAY_REGIONS = {
+  spChest: ['chest', 'arms'], spBack: ['back', 'arms'], spLegs: ['legs', 'glutes'],
+  spShoulders: ['shoulders', 'back'], spArms: ['arms', 'core'],
   full: ['chest', 'shoulders', 'arms', 'back', 'core', 'glutes', 'legs'],
   push: ['chest', 'shoulders', 'arms'], pull: ['back', 'arms'],
   legs: ['legs', 'glutes', 'core'], upper: ['chest', 'back', 'shoulders', 'arms'], lower: ['legs', 'glutes', 'core'],
@@ -294,15 +308,34 @@ const DAY_REGIONS = {
 const FOCUS_PATS = { chest: ['fly', 'hpush'], shoulders: ['latraise', 'facepull'], arms: ['curl', 'ext'], back: ['shrug', 'vpull', 'facepull'], core: ['core'], glutes: ['abduction', 'hipthrust'], legs: ['calf', 'legext', 'legcurl'] };
 const FOCUS_M = { chest: 'chest', shoulders: 'shoulders', arms: 'biceps', back: 'back', core: 'core', glutes: 'glutes', legs: 'calves' };
 
-const TYPE_NAME = { full: 'Full Body', push: 'Push', pull: 'Pull', legs: 'Legs', upper: 'Upper Body', lower: 'Lower Body' };
+const TYPE_NAME = {
+  full: 'Full Body', push: 'Push', pull: 'Pull', legs: 'Legs', upper: 'Upper Body', lower: 'Lower Body',
+  spChest: 'Chest Specialisation', spBack: 'Back Specialisation', spLegs: 'Legs Specialisation',
+  spShoulders: 'Shoulder Specialisation', spArms: 'Arm Specialisation',
+};
 const TYPE_BLURB = {
   full: 'Every major muscle, one session.', push: 'Chest, shoulders & triceps.',
   pull: 'Back, rear delts & biceps.', legs: 'Quads, hamstrings, glutes & calves.',
   upper: 'Chest, back, shoulders & arms.', lower: 'Legs, glutes & core.',
+  spChest: 'High-volume chest, triceps support.', spBack: 'High-volume back, biceps support.',
+  spLegs: 'High-volume quads, hamstrings & glutes.', spShoulders: 'High-volume delts, traps support.',
+  spArms: 'High-volume biceps & triceps.',
 };
+
+/** Advanced Lifter Mode needs at least this many training days to be programmable. */
+export const ADVANCED_MIN_DAYS = 5;
 export const SPLIT_LABEL = { 1: 'Full Body', 2: 'Full Body \u00d72', 3: 'Full Body \u00d73', 4: 'Upper / Lower', 5: 'Hybrid PPL', 6: 'Push / Pull / Legs', 7: 'Push / Pull / Legs +' };
 
-function splitFor(n) {
+function splitFor(n, advanced) {
+  // Specialisation never puts the same group on back-to-back days: repeats sit at
+  // least two days apart, including across the week boundary.
+  if (advanced && n >= ADVANCED_MIN_DAYS) {
+    return {
+      5: ['spChest', 'spBack', 'spLegs', 'spShoulders', 'spArms'],
+      6: ['spChest', 'spBack', 'spLegs', 'spShoulders', 'spArms', 'spLegs'],
+      7: ['spChest', 'spBack', 'spLegs', 'spShoulders', 'spArms', 'spLegs', 'spBack'],
+    }[Math.min(7, n)];
+  }
   return {
     1: ['full'], 2: ['full', 'full'], 3: ['full', 'full', 'full'],
     4: ['upper', 'lower', 'upper', 'lower'], 5: ['push', 'pull', 'legs', 'upper', 'lower'],
@@ -381,13 +414,16 @@ const DOW = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
 export function buildPlan(ans, seed) {
   const rnd = mulberry32(seed || 1);
   const dayIdxs = (ans.days && ans.days.length ? [...ans.days].sort((a, b) => a - b) : [0, 2, 4]);
-  const types = splitFor(dayIdxs.length);
-  const count = ans.exp === 'beginner' ? 5 : ans.exp === 'advanced' ? 7 : 6;
+  const advanced = !!ans.advanced && dayIdxs.length >= ADVANCED_MIN_DAYS;
+  const types = splitFor(dayIdxs.length, advanced);
+  // Advanced Lifter Mode always programmes the full seven slots: the higher weekly
+  // volume per muscle group is the whole point of the mode.
+  const count = advanced ? 7 : ans.exp === 'beginner' ? 5 : ans.exp === 'advanced' ? 7 : 6;
   const used = new Set();
   const typeCount = {};
   const days = types.map((type, i) => {
     typeCount[type] = (typeCount[type] || 0) + 1;
-    let slots = TEMPLATES[type].slice(0, ans.goal === 'fatloss' ? count - 1 : count);
+    let slots = TEMPLATES[type].slice(0, !advanced && ans.goal === 'fatloss' ? count - 1 : count);
     let extras = 0;
     for (const r of (ans.focus || [])) {
       if (extras >= 2) break;
@@ -424,7 +460,8 @@ export function buildPlan(ans, seed) {
       cooldown: { id: st, name: slugName(st), img: posterUrl(st), note: '30\u201360 sec \u00b7 breathe slow' },
     };
   });
-  return { days, split: SPLIT_LABEL[dayIdxs.length], goalLabel: GOAL_LABEL[ans.goal], tip: PROGRESS_TIP[ans.goal] };
+  const split = advanced ? 'Muscle Specialisation \u00d7' + dayIdxs.length : SPLIT_LABEL[dayIdxs.length];
+  return { days, split, goalLabel: GOAL_LABEL[ans.goal], tip: PROGRESS_TIP[ans.goal] };
 }
 
 export function alternativesFor(id, ans, excludeIds) {

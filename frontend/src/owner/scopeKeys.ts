@@ -32,6 +32,7 @@ export type OwnerState =
 export const DOMAINS = [
   "plan",
   "planAnswers",
+  "planSwaps",
   "planSeed",
   "onboardingStep",
   "planCompletions",
@@ -48,6 +49,7 @@ export type Domain = (typeof DOMAINS)[number];
 export const DOMAIN_SCHEMA_VERSION: Record<Domain, number> = {
   plan: 1,
   planAnswers: 1,
+  planSwaps: 1,
   planSeed: 1,
   onboardingStep: 1,
   planCompletions: 1,

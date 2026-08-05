@@ -21,7 +21,7 @@ const newSeed = () => Math.floor(Math.random() * 2_147_483_647);
 
 type CompletionsMap = Record<string, boolean>;
 
-const PLAN_DOMAINS: Domain[] = ["plan", "planAnswers", "planSeed", "onboardingStep", "planCompletions"];
+const PLAN_DOMAINS: Domain[] = ["plan", "planAnswers", "planSwaps", "planSeed", "onboardingStep", "planCompletions"];
 
 /** Bound by `ScopeBridge` whenever the resolved owner changes. */
 type Scope = { store: ScopedStore; token: OwnerToken } | null;
@@ -49,6 +49,13 @@ type PlanStore = {
   plan: Plan | null;
   seed: number;
   completions: CompletionsMap;
+  /**
+   * Exercise swaps for this program: planned exercise id → the id the user chose
+   * instead. Applied to every occurrence of that exercise in the weekly schedule,
+   * so a swap sticks across restarts and across a schedule adjust. Generating a
+   * brand new program from the answers clears them (see rebuildFromAnswers).
+   */
+  swaps: Record<string, string>;
 
   hydrate: () => Promise<void>;
   /** Drops every hydrated value so a previous owner's data can never be shown. */
@@ -59,13 +66,15 @@ type PlanStore = {
   previewAdjust: (hasActiveWorkout: boolean) => AdjustOutcome;
   /** Publishes an already-verified replacement. The old plan survives a failure. */
   publishAdjusted: (plan: Plan) => Promise<boolean>;
+  /** Records or updates one swap. Swapping back to the original removes the entry. */
+  setSwap: (plannedId: string, replacementId: string) => void;
   rebuildFromAnswers: (final: Answers) => void;
   resetAll: () => void;
   toggleCompletion: (dateISO: string, exId: string, done: boolean) => void;
   isCompleted: (dateISO: string, exId: string) => boolean;
 };
 
-const EMPTY = { step: 0, answers: {}, plan: null, seed: 0, completions: {}, ownerKey: null } as const;
+const EMPTY = { step: 0, answers: {}, plan: null, seed: 0, completions: {}, swaps: {}, ownerKey: null } as const;
 
 /** Captures the owner at mutation start and writes through the guarded journal. */
 const persist = (entries: [Domain, unknown][]) => {
@@ -86,9 +95,10 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     if (get().hydrated) return;
     const owner = { kind: active.token.kind, id: active.token.id };
     try {
-      const [plan, answers, seed, step, completions] = await Promise.all([
+      const [plan, answers, swaps, seed, step, completions] = await Promise.all([
         active.store.read<Plan | null>(owner, "plan", null),
         active.store.read<Partial<Answers>>(owner, "planAnswers", {}),
+        active.store.read<Record<string, string>>(owner, "planSwaps", {}),
         active.store.read<number>(owner, "planSeed", 0),
         active.store.read<number>(owner, "onboardingStep", 0),
         active.store.read<CompletionsMap>(owner, "planCompletions", {}),
@@ -100,6 +110,7 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
         ownerKey: scopeKeyOf(active.token),
         plan: plan || null,
         answers: answers || {},
+        swaps: swaps || {},
         seed: seed || 0,
         step: plan ? 100 : step || 0,
         completions: completions || {},
@@ -120,6 +131,14 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     const next = { ...get().answers, ...patch };
     set({ answers: next });
     persist([["planAnswers", next]]);
+  },
+
+  setSwap: (plannedId, replacementId) => {
+    const next = { ...get().swaps };
+    if (!replacementId || replacementId === plannedId) delete next[plannedId];
+    else next[plannedId] = replacementId;
+    set({ swaps: next });
+    persist([["planSwaps", next]]);
   },
 
   previewAdjust: (hasActiveWorkout) => {
@@ -152,11 +171,15 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     const answers = normalizeAnswers(final);
     const seed = newSeed();
     const plan = buildPlan(answers, seed);
-    set({ plan, seed, answers, step: 100 });
+    // A brand new program replaces every planned exercise, so swaps made against the
+    // old one no longer refer to anything: they are cleared, not silently carried over.
+    // A schedule ADJUST (publishAdjusted) keeps them.
+    set({ plan, seed, answers, step: 100, swaps: {} });
     persist([
       ["plan", plan],
       ["planSeed", seed],
       ["planAnswers", answers],
+      ["planSwaps", {}],
       ["onboardingStep", 100],
     ]);
   },
