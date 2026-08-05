@@ -1,1 +1,947 @@
-<analysis>three.jsexpo-videoplanStore_layout.tsxThemeContext_layout.tsxtabBarworkout.tsxlibrary.tsxexplore.tsxcoach.tsxTui.tsimport { T } from @/src/anatomy/uiconst theme = useTheme()StyleSheet.create()useMemothemeplanStore.toggleCompletion(planDate, exId, true)deleteSetupdateSetworkoutStorefalseworkoutStoreplanStoreexercises.jsmanual_premium_grantsExerciseAnimation.tsxexpo-videoplanStoreOnboardingFlowPlanViewsecorche.glbGymStyle_Working/app/frontend/src/plan/exercises.jsplanStore.tsplanAdapter.ts/app/frontend/src/theme/ThemeContext.tsxtokens.ts/app/frontend/src/anatomy/engine.tsworkoutStore.tsxmedia.ts/app/frontend/app/(tabs)/plan.tsxworkout.tsxcoach.tsxexplore.tsxlibrary.tsx/app/backend/server.pyexpo-videothree.jsexpo-glmanual_premium_grants{email, tier, granted_at, note}users{user_id, email, full_name, providers, is_guest}subscriptions{user_id, source, status, tier, updated_at}expo-videozustand/app/frontend/src/plan/planStore.ts/app/frontend/src/plan/exercises.js/app/frontend/src/theme/ThemeContext.tsx/app/frontend/src/components/ExerciseAnimation.tsxexpo-videouseFocusEffect/app/frontend/src/anatomy/engine.tsapplyGymPhysique/app/frontend/app/(tabs)/_layout.tsx/app/backend/server.pyworkout.tsxlibrary.tsxexplore.tsxcoach.tsxTimport { T } from @/src/anatomy/uiconst theme = useTheme()GET /api/exercise-media/{id}/animationGET /api/exercise-media/manifestPOST /api/coach/chat_layout.tsxuseTheme()/app/frontend/src/plan/exercises.js/app/backend/static/exercise_media/app/test_reports/iteration_17.jsonplanAdapter.ts_layout.tsxThemeContexttesting_agent/app/memory/test_credentials.mdabrarulhaq1994@gmail.comuseTheme()workout.tsxlibrary.tsxexplore.tsxcoach.tsx/app/frontend/app/(tabs)/workout.tsx/app/frontend/app/(tabs)/library.tsx/app/frontend/app/(tabs)/explore.tsx/app/frontend/app/(tabs)/coach.tsx/app/frontend/app/exercise/[id].tsxuseTheme@/src/theme/ThemeContextimport { T } from @/src/anatomy/uiconst theme = useTheme()StyleSheet.create()useMemoStyleSheet.createthemetheme.bgtheme.cardscreenshot_tool</analysis>
+<analysis>### Handover Summary
+
+**original_problem_statement**: The user wants to implement 4 new items on the live v1.1.9 application. PRODUCT REQUIREMENTS: 
+1. **Advanced Lifter Mode**: Add a checkbox to Onboarding Q2. Enforces 5+ days, switches program generation to a muscle group specialization split, and persists to profile. 
+2. **Persistent Exercise Swaps**: Swapping an exercise must save the swap (original → replacement) persistently to the user's program, survive app restarts/schedule regenerations, and update all future occurrences. 
+3. **3D Model Performance**: Optimize Anatomy/Insights/Explore 3D views. Report sizes, compress textures (KTX2/Basis/WebP, max 2048x2048) and geometries (Draco/meshopt), cache the parsed model globally (do not re-parse per tab), lazy load scenes, cap pixel ratio at 2, and dispose resources properly on unmount.
+4. **History Page Layout Bug**: History content renders underneath the tab bar/header. Fix the layout/safe-area insets so content is fully visible below the tabs.
+
+**User's preferred language**: English (INSTRUCT next agent to respond in English only)
+
+**what currently exists?**: 
+The app is located in the  directory on the  branch. EAS pipeline release gate bugs have been resolved, and Batches 1, 2, 3, 4, and 7 are fully complete. In this session, the agent reviewed git diffs and codebase state using bash tools to verify the partial work done on the 4 pending items by the previous agent (modifications exist in , , , and ). The agent then invoked  to present the plan and is currently waiting for user approval. No files were modified in this specific fork yet.
+
+**Last working item**: 
+    - **Last item agent was working**: Investigating the codebase to understand the partial implementations for Items 1-4 and formulating an execution plan to send to the user via .
+    - **Status**: IN PROGRESS
+    - **Agent Testing Done**: N
+    - **Which testing method agent to use?**: testing_agent (Required by user prompt for verifying bugs/features) and screenshot tool for UI checks.
+    - **User Testing Done**: N
+
+**All Pending/In progress Issue list**: 
+  - Issue 1: **Item 4 - History page content hidden under tabs (P0)**
+     - **Attempted fixes**: Previous agent added  to  in  but it is unverified.
+     - **Next debug checklist**: Check  and  to ensure  and padding combined actually push the content safely below the notch/header.
+     - **Why fix this issue and what will be achieved with the fix?**: Content is obscured by the header/notch. Fixing it ensures readability on modern iPhones.
+     - **Status**: TESTING PENDING
+     - **Is recurring issue?**: N
+     - **Should Test frontend/backend/both after fix?**: Frontend (Screenshot & testing_agent)
+  
+  - Issue 2: **Item 2 - Exercise swaps must persist (P0)**
+     - **Attempted fixes**: Logic for  was added to  and UI triggers were added in  and .
+     - **Next debug checklist**: Verify that the Zustand store successfully persists this swap mapping and accurately applies it to all future schedule generations and app restarts.
+     - **Why fix this issue and what will be achieved with the fix?**: Swaps currently revert on app restart. This fix makes replacements permanent for the active program.
+     - **Status**: TESTING PENDING
+     - **Is recurring issue?**: N
+     - **Should Test frontend/backend/both after fix?**: Frontend (testing_agent)
+
+**In progress Task List**: 
+  - Task 1: **Item 3 - 3D model performance optimization (P0)**
+     - **Where to resume**: Review . The previous agent added some  logic and capped , but global model caching needs validation. Discard any lingering python scripts () and use standard  for future edits.
+     - **What will be achieved with this?**: Cache GLTF models, prevent memory leaks via proper geometry/material disposal, and cap pixel ratio to stabilize performance.
+     - **Status**: IN PROGRESS
+     - **Should Test frontend/backend/both after fix?**: Frontend
+     - **Blocked on something**: None.
+
+  - Task 2: **Item 1 - Advanced Lifter Mode (P1)**
+     - **Where to resume**: Verify changes made to , , and . Ensure the Advanced flag effectively generates a 5+ day split and allows editing via Settings.
+     - **What will be achieved with this?**: Allows experienced users to bypass standard programming for a specialized muscle-group split.
+     - **Status**: TESTING PENDING
+     - **Should Test frontend/backend/both after fix?**: Frontend
+     - **Blocked on something**: None.
+
+**Upcoming and Future Tasks**:
+  - **Task 3: Compress 3D Assets (Item 3) (P0)**
+    - *Details*: Compress PNG textures to WebP/KTX2 (max 2048x2048) and GLB geometries using Draco/meshopt. Assets are located in  and . *Note: Agent MUST report before/after sizes.*
+
+**Completed work in this session**:
+- Explored codebase state and partial commits via Bash/Git commands.
+- *Note: Batch 1-4, 7, and EAS pipeline checks were completed in earlier forks.*
+
+**Earlier issues found/mentioned but not fixed**:
+   - Issue 1: **TypeScript Baseline Exception (6 Errors) & ESLint (2 Errors)**
+   - **Why to solve this issue and what will be achieved with this?**: DO NOT FIX. These are an ACCEPTED BASELINE. Ensure no *new* errors are introduced.
+
+**Known issue recurrence from previous fork**:
+  - None.
+
+**Code Architecture**:
+- Core frontend resides in .
+-  handles file-based routing.
+-  handles the Three.js/expo-gl rendering for 3D models.
+-  (Zustand) manages user state, onboarding answers, plan generation, and exercise swaps.
+
+**Key Technical Concepts**:
+Frontend: Expo, React Native, Zustand (State Management), Three.js / expo-gl (3D rendering)
+
+**key DB schema**:
+- Relies primarily on persisted Zustand stores for user plans.
+
+**changes in tech stack**:
+- None.
+
+**All files of reference**:
+- 
+- 
+- 
+- 
+- 
+- 
+- 
+
+**Areas that need refactoring**:
+- Cleanup: If  or  are still present, they can be ignored/deleted as the previous python string-replacement strategy was abandoned.
+
+**key api endpoints**:
+- N/A
+
+**Critical Info for New Agent**:
+- **REGRESSION GUARD (CRITICAL)**: Do not touch these features: Volume calculation (completed sets only), Exclusion of uncompleted sets from totals, the exact text Not completed (never use Skipped), Personal record logic, History calendar accessible buttons, History disclosure text, and all existing color values.
+- **TESTING REQUIREMENT**: The user explicitly demanded the use of  to verify bug fixes (Items 2 and 4) prior to finishing. Do NOT skip this step.
+- Only use standard  tool for modifications; avoid Python-based script hacks for file editing.
+
+**documents and test reports created in this job**:
+- N/A (Only terminal evaluations were performed)
+
+**Last 10 User Messages and any pending HUMAN messages**:
+- *User*: Provided extensive handover summary of the 4 pending items.
+- *User*: Please use ask_human tool and confirm your plan now.
+- *Assistant*: Evaluated codebase using commit 79259d0a09d1462235aafd2f49481f09c73b11d6
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Aug 5 00:09:22 2026 +0000
+
+    auto-commit for 302e8616-702d-4bb1-9808-479581a79b66
+
+commit e139da3ce51ef42ebcd184c9cef1574a34a766ea
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 29 10:03:56 2026 +0000
+
+    Record the release-gate repair in PRD
+
+commit 6d41df8390e7ebfffbab9a8cb37c4d3decebc470
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 29 10:01:27 2026 +0000
+
+    Release gate: only source integrity can fail a build — wrapper-rewritten values (app.json version/identity/slug, eas.json policy, .env host) are now notes or warnings; the 21-file fingerprint stays a hard failure
+
+commit 52316dd418d7d5d078d250443efbc723e420c0b5
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 21:12:01 2026 +0000
+
+    auto-commit for 8f58dcef-89de-4631-9c0a-44d32bf4b930
+
+commit 39593681d9ba50f41224a1881a758534c8265138
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 17:03:23 2026 +0000
+
+    auto-commit for 47bd63e3-ca6d-47db-9bd0-c61bbb85b48e
+
+commit e1682a07526daf2aaea82ab7e0929e1884306d35
+Merge: baa80bd dcac816
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 16:54:27 2026 +0000
+
+    Release: promote Batches 1, 2, 3, 4 and 7 into the live release source (RC6 freeze lifted)
+
+commit dcac816253b52fe944b0b4091df9e3048d184803
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 16:53:22 2026 +0000
+
+    Name the target month on the History next-month control (Batch 4d.6 follow-through) and refresh the manifest
+
+commit 87afecdf9f0ce9034ff6512248b8535c7aa94395
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 16:51:35 2026 +0000
+
+    Regenerate the 21-file release-source manifest for the Batch 1-4 + 7 release
+
+commit baa80bd4fbaeb881509a6ed9d4051499758786b0
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 16:41:53 2026 +0000
+
+    auto-commit for dda9f2e9-a23e-4ef5-a684-2a5d433da91a
+
+commit 69903966feafd75b7f304cf7cf71885f9705b6ab
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 16:40:53 2026 +0000
+
+    Batch 7: plan build/adjust/start failure + loading states, premium gate never stalls empty, per-day muscle summaries, light mode removed
+
+commit df52b6b62b0756879ec1ab25a88d12fdc097f8e6
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 16:16:40 2026 +0000
+
+    auto-commit for 4bb1d038-c6f5-46be-8790-8cf90cd817ba
+
+commit 14f7717cee1078e8d396f78c7d930da6e8a3f297
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 16:15:53 2026 +0000
+
+    Batch 4: accessible set-row controls, plan day buttons, named onboarding options, named tabs/inputs/actions, real Insights table toggle; SPA rewrite config for the web export
+
+commit 477b566b3888090e278fe0a492f083f4944eca53
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 15:44:01 2026 +0000
+
+    auto-commit for a25dd76a-a420-493a-9d86-baba3c42dd15
+
+commit 22452c067cdf9e69ed112b22ba9647ebf404aee5
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 15:42:28 2026 +0000
+
+    Batch 2 + 3: only the active tab route renders, tab bar hidden pre-onboarding, deep-linkable workout segments, accessible rest timer with +15s
+
+commit 68215dede188a0ed6b8973296daefd9bfee0b152
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 15:01:58 2026 +0000
+
+    auto-commit for 2fd12be5-b668-4572-87a1-e1d36e30d93b
+
+commit efe82dc6b8366b3cc472a41763d0451db4e83218
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 15:00:43 2026 +0000
+
+    Batch 1: remove unreviewed claim panels, fix records, titles and bodyweight typing
+
+commit 34ca55584f012dcdf3dd0946a1ea25c09092bdb0
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 28 11:40:31 2026 +0000
+
+    Auto-generated changes
+
+commit 7395d0401ef7eff612421474ebecb50d10aeee17
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 27 19:14:10 2026 +0000
+
+    Release: align managed cloud identity with version 1.1.8
+
+commit 3b343924194ea87ab8c7b71aa9ce762e4b0e2e18
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 27 16:41:00 2026 +0000
+
+    Release: make managed-pipeline cloud builds pass the release gate
+
+commit 21b0fea8e867d9a94750b08785e4f5d7ade9fb84
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 27 11:43:02 2026 +0000
+
+    Release: make cloud source gate independent of Git metadata
+
+commit dd2f488ec5a3ae412b3655168b2828511aebcbdf
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 27 09:38:17 2026 +0000
+
+    Release: block development paywall fixtures in production
+
+commit f99ad24864aa01590066b9218709c8d220b4f8cd
+Author: Emergent Agent <agent@emergent.sh>
+Date:   Sun Jul 26 22:50:28 2026 +0000
+
+    Release: bind deterministic Yarn dependencies to source gate
+
+commit e22739efc8aa4813239b264ff85ca1ed9d2db182
+Author: Emergent Agent <agent@emergent.sh>
+Date:   Sun Jul 26 20:53:42 2026 +0000
+
+    App Store blockers: Apple token revocation on delete, root error boundary, EAS release gate
+    
+    Three submission blockers from APPSTORE_READINESS_REVIEW.md, remediated with tests
+    and no new dependency.
+    
+    1. Sign in with Apple token revocation (Guideline 5.1.1(v))
+       - backend/apple_tokens.py: server-only ES256 client secret, one-time
+         authorisation-code exchange, Fernet-encrypted refresh-token storage, bounded
+         best-effort revocation against Apple, and one honest "was it verified?" rule.
+       - server.py: /auth/apple/session exchanges the code and stores the token for that
+         account only (subject mismatch is refused); DELETE /auth/me revokes with Apple
+         first, then deletes everything regardless of the outcome, and reports
+         apple_revocation + manual_revocation_required without ever over-claiming.
+       - AuthContext/Library: the app forwards the authorisation code and shows manual
+         iOS Settings guidance ONLY when revocation could not be verified.
+       - No token, code, client secret or private key is logged, returned or committed.
+    
+    2. Root error boundary (Guideline 2.1: no blank screen)
+       - src/ui/RootErrorBoundary.tsx wraps the whole router tree above every provider,
+         presents the shared BlockingError surface with one recovery action, cannot loop,
+         sends no telemetry and shows the user no stack trace or technical detail.
+    
+    3. EAS release configuration and source gate
+       - eas.json: cli.requireCommit true, production profile selects the "production"
+         environment; no update channel or inlined values.
+       - package.json: eas-build-pre-install runs the release-source gate before any
+         dependency is installed, so a cloud build cannot package unapproved source or
+         start without EXPO_PUBLIC_BACKEND_URL / EXPO_PUBLIC_REVENUECAT_IOS_KEY.
+       - verify-release-source.mjs: rejects a non-HTTPS/loopback/private/staging backend
+         URL and IPv6 loopback, verifies the committed fingerprint of 21 release-critical
+         files (release-source.manifest.json, added here), and no longer hardcodes a
+         commit sha - RELEASE_EXPECTED_COMMIT must be supplied for a local release check.
+    
+    Tests: frontend 283/283 (node scripts/run-logic-tests.mjs), including new
+    __tests__/appstoreRemediation.test.ts and __tests__/verifyReleaseSource.test.mjs;
+    backend 39/39 (tests/test_apple_tokens.py with Apple fully mocked,
+    tests/test_apple_revocation_endpoints.py, tests/test_account_deletion.py).
+    No build, publish, deploy or submission was performed.
+
+commit 5c3d09a68475d3b083286840c687e307d196aea5
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sun Jul 26 18:08:13 2026 +0000
+
+    Release prep: verify build source, and carry planned set counts into the session
+    
+    Build-source gate
+    - scripts/verify-release-source.mjs fails before a build when the working
+      directory is not the approved release worktree (explicitly rejecting
+      /app/frontend, the legacy source the rejected release was built from), when
+      Git is dirty or off the expected commit/branch, when a required Direction B
+      marker is missing, when the legacy six-step onboarding or a "Shuffle" Plan
+      action is active, when owner-scoped storage is absent, or when the bundle or
+      package identifier differs from the approved value. No secrets, no network,
+      no new dependency.
+    
+    Proven source defect corrected
+    - A Plan day promising 3 sets arrived in the Active Workout as a single set:
+      addExerciseFromPlan hardcoded one empty set and both Plan call sites dropped
+      the planned count. plannedSetCount() (pure, in workoutScope) now floors and
+      clamps the value to 1..10, falling back to one set for unusable data, and the
+      session is seeded with that many empty rows. A second add still only stamps
+      planLink, so work already logged is never rewritten.
+    - The Plan tick therefore solidifies only when every planned set is done.
+    
+    Tests: 257 pass (252 inherited + 5 new in plannedSets.test.ts).
+
+commit 54ba23644c938917db1af6e65592b6ec4578edae
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sun Jul 26 12:43:49 2026 +0000
+
+    Phase 4: one Premium contract, paywall correction, warning removal, release evidence
+    
+    Premium resolution (one contract, one provider, one gate)
+    - New src/premium/entitlement.ts: the designated entitlement is the exact id
+      "premium"; an unrelated active entitlement never unlocks Premium. Precedence is
+      reviewer bypass > manual grant > designated entitlement > no access. Loading
+      never unlocks, and a failed read never fabricates access.
+    - PremiumContext now delegates every decision to that contract, resets the
+      entitlement flag on any owner change before rendering, guards against
+      overlapping purchase/restore taps, and verifies the entitlement by reading it
+      back before reporting success. Offering and product ids stay dynamic.
+    - New src/premium/PremiumGate.tsx is the single gating contract. Coach, Explore,
+      Library Muscles and Library Learn are the only gated surfaces; Plan, Workout,
+      History, Insights, Muscle Groups, Exercises, exercise details and Account are
+      untouched and free.
+    - Backend applies the identical exact-entitlement rule (the name-agnostic "any
+      active entitlement" loop is gone) and /auth/me now reports which grant applies
+      using the same precedence. The reviewer bypass and manual grant are unchanged
+      and not broadened. No RevenueCat product, offering, entitlement or key changed.
+    
+    Paywall
+    - The value list contains only the four frozen Premium areas; the stale
+      Muscle Groups and Insights claims are gone and the free areas are named.
+    - Prices, periods and per-period text come from store data only; no currency,
+      price, billing period, trial length or discount is hardcoded. Trial wording
+      requires verified eligibility.
+    - Nothing is preselected, the CTA is disabled until an explicit choice, selection
+      exposes a radio role, selected state and a visible label. Restore, Terms and
+      Privacy remain visible. Loading, no-offering, purchase and restore outcomes all
+      use the shared State System; cancellation is a no-op.
+    
+    Warnings and accessibility
+    - The blanket LogBox suppression is removed and not replaced.
+    - Fixed the application-owned deprecated pointerEvents prop usages (now style).
+    - Locked tabs and Library segments announce "Premium" instead of relying on an
+      icon; locked value paths never trap the user.
+    
+    Evidence
+    - app/dev/paywall-states.tsx: development-only fixture harness for the store
+      states that cannot exist on web.
+    - Tests: 252 pass (55 added in premium.test.ts and release.test.ts).
+
+commit bfa38074c400f3981b9ff48220eb29cc06ec39f1
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sun Jul 26 11:56:24 2026 +0000
+
+    Phase 3: Exercise Library, History, Insights and State-System integration
+    
+    Library
+    - Exercises segment on the Library tab: derived count (208), local
+      case-insensitive search over name/equipment/movement/muscles/tags, and
+      Equipment/Muscle/Movement facets whose counts come from the catalogue.
+    - "My equipment" pre-selects filters only; it never shrinks the catalogue.
+    - Exercise detail with real instructions, muscles and per-exercise history.
+    - Library -> workout routing for the three honest contexts (active session,
+      planned day, no Plan). The add uses the verified Phase 2 mutation and is
+      confirmed by reading the session back; duplicates are matched by exact id
+      and ID space. Copy never promises a Plan change or an automatic retry.
+    
+    History / Insights
+    - History as a Workout-tab segment: Monday-start week card, grouped list,
+      month calendar, and an explicit storage disclosure.
+    - Completed sets only; incomplete sets are stored but excluded; bodyweight
+      adds 0 to volume; values are shown in the unit they were logged in.
+    - Damaged records are skipped and counted, never deleted.
+    - Personal records, rolling-7-day volume series with a table alternative and
+      a text summary, period totals and Monday-week consistency.
+    
+    State System / offline
+    - Media failures are worded as connection problems with a retry, and never
+      block the rest of the screen; Reduce Motion suppresses autoplay.
+    - History read failure renders the shared RetryPanel with a preserved-data
+      list; partial data renders a WarningBanner.
+    
+    Fixes in this pass
+    - The add confirmation was rendered twice (visible StatusAnnouncement plus
+      InfoBanner); the announcement is now invisible so it announces once.
+    - Exercise-detail back control raised from 42 to 44 px.
+    
+    Tests: 197 pass (74 added across catalog, history, media and safetyCopy).
+
+commit 546f944e1c6d27d5423f3ce4b65429128b398767
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sun Jul 26 10:37:06 2026 +0000
+
+    Phase 2: add day-back testID for deterministic navigation back to the weekly plan
+
+commit eecc148be3d9dfcf1ff5a7f28f434ab273a44270
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sun Jul 26 09:45:56 2026 +0000
+
+    Phase 2: two-action Welcome, local-first entry, 3-question onboarding with weekday picker, Adjust plan with safeguards, verified workout finish, wall-clock rest timer, account-deletion namespace teardown
+
+commit ab529e4ef49987b098ca3b78591783d53b28f0b7
+Author: Direction B Implementation <redesign@local>
+Date:   Sun Jul 26 08:28:56 2026 +0000
+
+    Phase 1 remediation: unclaimed legacy policy, lossless quarantine, non-destructive owner guard, opaque owner ids, regional units, live scoped adapters
+    
+    - legacy data is never adopted automatically (unclaimed_without_verified_owner);
+      launch only scans and reports; adoption requires explicit human approval
+    - quarantine keeps the exact payload, source key, encoding, hash and destination ref
+    - ScopedStore uses a pending journal + owner generation; a canonical value is never
+      deleted because the active owner changed; no atomicity is claimed
+    - account ids treated as opaque, encoded with injective base64url
+    - units resolve by locale REGION only; bare 'en' is kg; legacy values stay kg
+    - live Plan and Workout adapters read/write owner-scoped keys only; the ten legacy
+      keys are read-only outside the migration subsystem
+    - 72 deterministic tests including production-adapter integration tests
+
+commit a0ab45153833b0d72790a949fe464e108cb21176
+Author: Direction B Implementation <redesign@local>
+Date:   Sun Jul 26 00:40:04 2026 +0000
+
+    Phase 1: semantic tokens, State System components, owner-safe local data layer
+    
+    - one semantic token layer (status/focus/disabled/elevation/typography/targets)
+    - fifteen shared State System components + seven-category taxonomy
+    - central owner resolver: verified account / stable local guest / unresolved / transitioning
+    - versioned owner-scoped storage keys; legacy keys stay read-only sources
+    - copy-verify-marker migration with quarantine and idempotent retry
+    - PRs recalculated from verified History with real achieving dates
+    - one owner-scoped stored unit preference (lb|kg), legacy values preserved as kg
+    - owner-scoped persisted active session with one-session-per-owner guarantee
+    - launch safety: cold launch lands on Plan; Workout muscle groups/History/Insights are free
+    - deterministic logic tests via existing TypeScript + node:test (no new dependency)
+
+commit 15ef77d2760af94d5b3cc58a36e9e1deb57cedfa
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 23:58:32 2026 +0000
+
+    Auto-generated changes
+
+commit 914c4d03d3c6ab01b5e189cb1120e63cdb87254e
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 20:52:55 2026 +0000
+
+    auto-commit for a1c339bc-eb08-4a2f-964d-6407db436c62
+
+commit b2f835a239a9ac416942d2e03809ae516a9c3f9a
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 20:50:38 2026 +0000
+
+    auto-commit for 29058d65-c4b0-4519-a9dd-b650c43a17ba
+
+commit 2566c4103d7d4c002ac5db1053d303695b3c8562
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 18:12:37 2026 +0000
+
+    auto-commit for 7d33ad79-c137-4743-907d-69053ccdc5b3
+
+commit d94588e3f2dfa2099313a737f431d893e5a1cc96
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 16:52:13 2026 +0000
+
+    auto-commit for 281a1d0d-4868-4284-a071-e717a82f18e2
+
+commit e66dec125b06abfd8b44d6e9485ac2ec40c2f961
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 16:47:43 2026 +0000
+
+    auto-commit for 7e9d7129-81e7-4fef-b67b-106d08656359
+
+commit 7f3492cbd11c782a081cf26b8e75b92fb6d4b1b0
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 16:10:56 2026 +0000
+
+    auto-commit for 844ff2a6-1d9a-4217-b3b8-e658c1e9bf34
+
+commit da968fb4ded59a570015b662ac2b2afc1e8e986f
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 16:10:02 2026 +0000
+
+    auto-commit for bb58928a-e3cb-415d-9bee-17a2514608a9
+
+commit 5807b45c3172ff22a575d306b2cd901fa752a0a0
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 15:25:27 2026 +0000
+
+    auto-commit for de840bd8-3c06-4d7a-ba10-75d39604a650
+
+commit 1320888e96f22200e93dffbdff64e7b038909bbc
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 15:13:06 2026 +0000
+
+    auto-commit for 0bf85978-2685-4d2d-b0cf-fa644ccb20e1
+
+commit 3f5a7da59506311b74b17735c4650e0242f38f18
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 14:32:32 2026 +0000
+
+    auto-commit for 871e300c-a2ca-4379-83dc-47e3f0b4d2cd
+
+commit e53157b7d6b050b52ae5d0829cf0cda896ec9622
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 22 13:46:15 2026 +0000
+
+    auto-commit for 8a7135fe-a6e1-4d0e-a279-e1ea2ca93630
+
+commit 2afb12d67cde8ad2e1f03b36d45556dd2ee0e863
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 20 17:38:27 2026 +0000
+
+    auto-commit for 9877634e-4b24-4d73-ad40-019934cf94fb
+
+commit febcca0244b6e13d746a57e65df2bb596a3cec3f
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 20 14:35:33 2026 +0000
+
+    auto-commit for 1c0e6453-5da4-47a9-8834-9cc5b1c82109
+
+commit 1b4c070cea423b390e5a01c70ea26c2f16d4edf6
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 20 14:33:23 2026 +0000
+
+    auto-commit for bdd92211-f479-4a7e-b373-f9d47d5b9506
+
+commit 8699cfbade686ef58e23b1b510c18ae5080c778e
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 20 14:19:16 2026 +0000
+
+    auto-commit for 92881d42-dce0-455b-9d39-6c918768bf75
+
+commit 595150763c1cadf8144e4d0f3793ef8c7e30185c
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 20 14:04:05 2026 +0000
+
+    auto-commit for 98039bd1-9a86-4e3c-b1c2-4bd61545ab24
+
+commit e404f5012d53e2d89f1a143612f05c3ed1a43b28
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 20 13:45:09 2026 +0000
+
+    auto-commit for 78cc629b-7225-4b9b-a9c9-34f4125be33a
+
+commit 36b7da8e6e43eecb7b21d103e988a3ca19455c32
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 20 13:05:00 2026 +0000
+
+    auto-commit for 4ae77104-a99d-49f0-8a2b-05fad8e40ac7
+
+commit f44280b93b73475cca41a14bc42f0a23b008c55f
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sun Jul 19 08:46:45 2026 +0000
+
+    auto-commit for 318a5a51-50ba-4ce8-adbd-db0d9221ae88
+
+commit b92680c3dbe171ef85b943697571e1bd76bb7610
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sat Jul 18 00:28:45 2026 +0000
+
+    auto-commit for 9f97d6b3-cdc1-4d58-b997-add95893218c
+
+commit 34138b05a38bb8f5ca7c36d9d85a551f538a6238
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Fri Jul 17 23:40:34 2026 +0000
+
+    Smooth 30fps animations: ANMF timeline resample + crossfade interpolation (all 31 pass audit); Library defaults to Exercises segment
+
+commit 0fcf682b7b5218c691fb75615330f8fbefcac2c9
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Fri Jul 17 22:44:50 2026 +0000
+
+    RepDB pack complete: 32/32 exercises with animations+posters; swap cuban-rotation->cable-external-rotation, tibialis-raise->single-leg-calf-raise; backend media tests
+
+commit 2b45a5c5bfeeb948b873588b706f929a9879bd11
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Fri Jul 17 22:44:30 2026 +0000
+
+    auto-commit for fc7b4b3a-d47c-4ea9-82c9-b4fb7490b554
+
+commit a31d7850413aef9e77298e12ab81f0968048c46b
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Fri Jul 17 22:32:50 2026 +0000
+
+    RepDB pack import (parts 1-5): 25 of 32 exercise animations (960px webp) + mapping script
+
+commit b465524a301d6894e33ff64ac2d801345cfd6c91
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Fri Jul 17 22:19:46 2026 +0000
+
+    Exercise animation infrastructure: backend media endpoints (manifest/animation/poster), ExerciseAnimation player (hero/thumb/card/workout variants, reduced-motion aware, focus-pause, one-at-a-time cards), wired into detail/library/muscle-sheet/session
+
+commit 79f5ca64525b6e4ed2f666fd5b821b93e9135297
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Fri Jul 17 20:53:58 2026 +0000
+
+    v1.1.0: Insights draggable panel fix + streaks/PRs/period stats, Library exercise directory with alias search, Coach stop/cancel + context suggestions, language pass, feature flags
+
+commit 706d1125477af1f4a4bbbc9f164eba92a260abb3
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Fri Jul 17 20:53:05 2026 +0000
+
+    auto-commit for b16afc9f-c11d-4adf-9f11-f5e0b6214f79
+
+commit a85dd4163e6ba8d78de0ebaadc57d0f9513a6802
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jul 13 15:39:56 2026 +0000
+
+    auto-commit for 365e67f2-dbf7-4ea8-9e3a-1d2f60afc9f7
+
+commit e1fa5bbd1b997aa03307face3d98060ad5b968ef
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sat Jul 11 06:49:28 2026 +0000
+
+    auto-commit for 8b147414-c915-47bb-a1f5-b67d3c809319
+
+commit d8dbf3087701d8391beb2c7aa2f3cb5c6d5fecbc
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Thu Jul 9 21:00:21 2026 +0000
+
+    auto-commit for dce1c6de-8b69-46cb-91d9-75b2b1715e48
+
+commit 3db7cfcc10fc5b9b43f7ca8bf4baeb4b47037904
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Thu Jul 9 20:30:50 2026 +0000
+
+    auto-commit for c5ae05ff-b1d3-4478-83bb-004b0bb4accd
+
+commit b1c2e5fc1f1d5dffb7906ad888b41cea125555f7
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Thu Jul 9 20:24:11 2026 +0000
+
+    auto-commit for 9172c014-187f-434b-a1f1-92342b2d35b2
+
+commit f588e44dbcfdd9b1d88bdc339471ca9aa55df821
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 8 09:49:29 2026 +0000
+
+    auto-commit for f5726c1f-f9c6-48e5-b320-2dbde61e35a8
+
+commit 94172a50d7c2744951b6cea9ecaeb81a63db31b5
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 8 09:35:41 2026 +0000
+
+    auto-commit for 734ab4d2-2ac2-4e9a-9b61-e9de49755515
+
+commit 8295e8dee6e18ed3c1c8671f1985887c5ef8d5cf
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 8 09:34:26 2026 +0000
+
+    auto-commit for 7665914b-31f5-4283-9a46-ee2c34136e9b
+
+commit a4fd8256105fc5806a66be24d00ce6bfc0f1e103
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 8 09:26:38 2026 +0000
+
+    auto-commit for fa5cf0d9-240d-4ca0-bcec-0e89996b1bb6
+
+commit a78ee8a2329e1147ce7468364fd807412b55af15
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 7 19:24:28 2026 +0000
+
+    auto-commit for 36c131ca-b199-4f6d-bfd7-c6d377d1856e
+
+commit 33cb97adb75d7cb2754c7c052efb094370ee010f
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 7 18:37:32 2026 +0000
+
+    auto-commit for 59d7295e-71ec-4e46-b8f3-1c0df38f292b
+
+commit 255144036e2bdc49297f4c1158476aa51b212a6e
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 7 18:32:34 2026 +0000
+
+    auto-commit for 1ac82cbe-2d9f-4aa3-8034-b8be1b7a66f6
+
+commit 77f4b5a8bc2e78c134bed9c9f67dd1e00d29e7c3
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 7 14:54:49 2026 +0000
+
+    auto-commit for 4ad23a43-bdb5-42b3-b3d5-938d1966a6e2
+
+commit 6da037ed27f49fc44c9ddb8af8887e5ee6324a70
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 7 14:34:54 2026 +0000
+
+    auto-commit for bb00807d-c983-4b2f-81f8-990eebedf4e5
+
+commit d90ac2164818f208d26a9d1a8d78b5cddea7eea8
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 7 14:18:56 2026 +0000
+
+    auto-commit for 732526c1-4ad5-4e76-8ef6-6c3be67a8768
+
+commit 18538fef9e484757329eaf49acaafbc07e17c73a
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 7 13:56:46 2026 +0000
+
+    auto-commit for 77dc1f95-5759-4ce6-bbc7-efeb95aa9843
+
+commit 7fd43faef9d52f030a9586af90c700a398437872
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 7 13:47:19 2026 +0000
+
+    auto-commit for 615dbb65-3d7f-48aa-8d4f-85aebeccfbc2
+
+commit cef10b091b588040ca057c3a5d9f51d20f3251b1
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 7 13:22:31 2026 +0000
+
+    auto-commit for f184ceed-e56c-41df-8098-7aa7782127aa
+
+commit f68a76b824cc4cf83f41db38963b36583954c3ab
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jul 7 13:21:38 2026 +0000
+
+    auto-commit for 394c6ff2-10f4-490b-988e-a176a8a4475d
+
+commit 5d4c45fa5460be8cb7bbebac3dbe5b3f2f05bb55
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sat Jul 4 22:18:46 2026 +0000
+
+    auto-commit for 941ac36b-f4cd-45fd-966b-2b2e12b018e9
+
+commit f4ac56c7a0c1e67be08386750a29f3dfe8a00d89
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sat Jul 4 22:17:57 2026 +0000
+
+    auto-commit for 1aaef25b-01e5-47ae-9a3f-d0c87d1b2b53
+
+commit 61ca35751015ec42f4be59d785b6cc6befb7f4d2
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Thu Jul 2 16:57:04 2026 +0000
+
+    auto-commit for e9e5a3b6-2683-45d1-86fc-606adc9ad351
+
+commit 69187d15d76399225e6a79a8f9110a1efa0995db
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 1 04:45:34 2026 +0000
+
+    auto-commit for 410b7abe-7bbb-4acf-8296-d0b64c89f011
+
+commit a58662caece3f1da7528379eed3634934cbe89ce
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 1 04:44:38 2026 +0000
+
+    auto-commit for 847b1e07-2da9-41a8-9047-0865ce39153e
+
+commit adeaf352600e5ebdefa97e8870b68f7e94666415
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Wed Jul 1 04:01:39 2026 +0000
+
+    auto-commit for 5ef99fad-d60a-4b71-8941-fd3dbfe7df41
+
+commit 1689fed203bb9080d74a64502cd7b07a6ae8a56e
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 19:56:43 2026 +0000
+
+    auto-commit for 94732b80-5c25-4aea-b05a-3e50125f3652
+
+commit 51c54ef5f5c70376ab1ec4389c5be7ed94a32822
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 18:37:24 2026 +0000
+
+    auto-commit for a9df08cc-a941-4cc1-9375-336df3076397
+
+commit 36bf159d3e7aecb3e5cfc0e3d4b4a9316adcd767
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 18:32:50 2026 +0000
+
+    auto-commit for 3e07b5c7-edd2-418a-b2c5-85a0af306c61
+
+commit 5e1b5c19e7882ee9c3c92526380af62d1580af79
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 15:31:05 2026 +0000
+
+    auto-commit for 6cb0fd68-8177-413b-a2de-91da1d026f5a
+
+commit 88034638730dc1b6d057c0c79bb6cd22c20f695c
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 12:55:48 2026 +0000
+
+    auto-commit for c50fd0b0-144c-4ce9-8879-d39a239400c1
+
+commit 80b1365d5eca9e0737385c4abf7ac3d5b7651d4f
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 11:26:08 2026 +0000
+
+    auto-commit for 2feb51e9-5427-489b-90d7-f83840e6f325
+
+commit 09e51c3c122b31e9caaf4b33741771358aad13c5
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 11:25:42 2026 +0000
+
+    auto-commit for af28f794-0181-4f00-b51b-66b6e5197482
+
+commit 4dcfe35fa71ade7618655c3cc729a38c3690142a
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 11:05:49 2026 +0000
+
+    auto-commit for 148fc544-6c37-46e9-936e-63596de659b3
+
+commit c82eda1d97acd5fc5c57592979fbff66f6a4d649
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 07:44:58 2026 +0000
+
+    auto-commit for 6640f365-04c6-475f-b419-806ea6e60387
+
+commit efe633ca7db9f1dc449de11035ba10394cc5df62
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 07:43:52 2026 +0000
+
+    auto-commit for 8b3fe220-834b-4e36-8333-e189849bdb79
+
+commit 0098234ecaf5511a3a98c0b606fdac90fcac1213
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 00:31:40 2026 +0000
+
+    auto-commit for 15f4d81a-07cf-4d8b-9d51-0a98b9907fee
+
+commit 854478da11624eaa6495bd05a2fbf2c3c89f8a36
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Tue Jun 30 00:30:42 2026 +0000
+
+    auto-commit for 3844d77e-b8e1-4d43-80bc-1002581d004e
+
+commit 04f1f90e792d7859cae4348e529c41d3edd2a365
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 23:54:22 2026 +0000
+
+    auto-commit for 59bc99f5-5c92-4684-8888-d362c4a30297
+
+commit 729db5f71e9b7decfd38b96053160813b7062e31
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 23:26:30 2026 +0000
+
+    auto-commit for 0de10420-7f73-44fb-9bc8-aa5af73b1b7d
+
+commit 707fed130cd99f49a97084697a9fa5d8b4d72ac0
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 23:24:48 2026 +0000
+
+    auto-commit for 6d672572-2c0c-41e2-a36f-403b1f227d72
+
+commit 6dc29803a288c920a1917bef221222bcc3e24526
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 21:43:51 2026 +0000
+
+    auto-commit for bd49c6bc-5820-440a-85fe-3382c2279628
+
+commit 7a1830fd594a2f05b31f082efe3325e325fb48de
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 19:00:09 2026 +0000
+
+    auto-commit for 9033ce6c-f2c8-48dd-95ea-bd709624e517
+
+commit 1a2d9de6073bc51405641b2161dd81fd497ff696
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 18:07:47 2026 +0000
+
+    auto-commit for ca9ed211-3d1f-48d1-89dd-7597da22fb5d
+
+commit ca6e478d73d1983649ec9937bea1116e43249e18
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 13:23:47 2026 +0000
+
+    auto-commit for 6fe685b0-cfe7-4fe0-b704-4f9d162ede12
+
+commit c5ca2aaf022ffa572699763bf0e164e208d5ae6b
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 13:15:24 2026 +0000
+
+    auto-commit for 2f626fd1-6a5b-4249-a00c-5b474e192f20
+
+commit fa4a204c8a2e27b4111292c8ce2b02742a17b620
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 12:57:19 2026 +0000
+
+    auto-commit for 3fb313f0-bfec-4af4-b846-00d53ca10b32
+
+commit a96325f42754ed28f1e6e7db4ea667a34750085d
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 12:55:41 2026 +0000
+
+    auto-commit for 78e9e947-262d-4b2f-aa4d-cc1444af5f8c
+
+commit 9cdfb78a8aadb71b159855f57ebc5441fb6bf862
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 12:39:53 2026 +0000
+
+    auto-commit for dd46baba-43f5-4363-8644-0b97c9bbe62f
+
+commit cd1e60032fca5b11775295a12cb19dc4969ba094
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Mon Jun 29 12:38:09 2026 +0000
+
+    auto-commit for 8c0d1ff0-0da7-49f6-b501-61eb2746a145
+
+commit 326d0f5a669a58f33bc1a29db0bc1260330fa06a
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sun Jun 28 17:53:04 2026 +0000
+
+    auto-commit for 0a022cfe-7108-4d0f-8a24-8559778cdcc4
+
+commit 457893646757fa6839055704015ed7f035144a0f
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sun Jun 28 17:50:22 2026 +0000
+
+    auto-commit for b33342ad-5c46-4d94-8e58-c99077810781
+
+commit 049c502990d1f455bc820f1379bbe118d3173c3b
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Sun Jun 28 17:23:02 2026 +0000
+
+    auto-commit for d19b9fde-c0e8-45f3-b648-f5116c8a55a2
+
+commit aebdfc2f84396c74af31bdfbb9f56320893e5be2
+Author: emergent-agent-e1 <github@emergent.sh>
+Date:   Fri Jun 26 16:13:13 2026 +0000
+
+    Initial commit, On branch release/direction-b-publish
+nothing to commit, working tree clean, , and  to review the current diffs in frontend files.
+- *Assistant (Pending)*: Submitted its development plan to the user via  tool and is currently awaiting approval.
+
+**Project Health Check**:
+- Broken: N/A. The repository is generally stable, but multiple frontend files have untested, partial logic committed from the prior session.
+
+**3rd Party Integrations**:
+- RevenueCat (Payments) — Requires iOS Key (handled in  configuration).
+
+**Testing status**:
+- Testing agent used after significant changes: NO (MUST BE USED for Items 2 and 4 before completion).
+- Troubleshoot agent used after agent stuck in loop: NO
+- Test files created: None
+- Known regressions: None
+
+**Credentials to test flow**:
+- Rely on variables in the existing  files.
+
+**What agent forgot to execute**:
+- The current agent did not make any active file modifications because it properly paused to ask for human confirmation of its plan. The pending requirement to compress 3D assets (Draco/WebP) and report sizes remains completely untouched.</analysis>

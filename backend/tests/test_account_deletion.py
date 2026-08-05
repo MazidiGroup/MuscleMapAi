@@ -20,7 +20,7 @@ import pytest
 import requests
 
 BASE_URL = (os.environ.get("EXPO_BACKEND_URL") or
-            "https://anatomy-coach-1.preview.emergentagent.com").rstrip("/")
+            "https://batch5-features.preview.emergentagent.com").rstrip("/")
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "apex_ai")
 BYPASS_EMAIL = "applereview@mazidigroup.com"

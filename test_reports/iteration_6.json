@@ -30,6 +30,6 @@
   "seed_data_creation": "None required.",
   "retest_needed": false,
   "should_main_agent_self_test": true,
-  "context_for_next_testing_agent": "DraggableSheet auto-expands on muscle select via useEffect → sheet.current.snapTo('expanded'). Tap roughly centre of viewer (fraction 0.5, 0.45) for reliable raycast; the first tap landed on Latissimus Dorsi (back of model) which is fine. AI Coach Insight is still in budget-exceeded mode so the static fallback path is the EXPECTED behaviour — do NOT mark it as a bug. EXPO_PUBLIC_BACKEND_URL = https://anatomy-coach-1.preview.emergentagent.com.",
+  "context_for_next_testing_agent": "DraggableSheet auto-expands on muscle select via useEffect → sheet.current.snapTo('expanded'). Tap roughly centre of viewer (fraction 0.5, 0.45) for reliable raycast; the first tap landed on Latissimus Dorsi (back of model) which is fine. AI Coach Insight is still in budget-exceeded mode so the static fallback path is the EXPECTED behaviour — do NOT mark it as a bug. EXPO_PUBLIC_BACKEND_URL = https://batch5-features.preview.emergentagent.com.",
   "rca_of_issue": "N/A — no failing flows."
 }

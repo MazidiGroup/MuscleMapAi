@@ -63,7 +63,7 @@ function writeEnv(dir: string, body: string) {
 function managedEnvFile() {
   return [
     "# managed publish wrapper output",
-    "EXPO_TUNNEL_SUBDOMAIN=inspect-2",
+    "EXPO_TUNNEL_SUBDOMAIN=batch5-features
     `EXPO_PACKAGER_HOSTNAME=${MANAGED_BACKEND_URL}`,
     `EXPO_PUBLIC_BACKEND_URL=${MANAGED_BACKEND_URL}`,
     'EXPO_USE_FAST_RESOLVER="1"',
@@ -225,7 +225,7 @@ test("5b — a non-production or sandbox host WARNS and still exits 0", () => {
   // backend URL at build time before this hook runs, so host policy can never block.
   const dir = makeManagedArchive();
   for (const [url, reason] of [
-    ["https://inspect-2.preview.emergentagent.com", /non-production host/],
+    ["https://batch5-features.preview.emergentagent.com", /non-production host/],
     ["https://inspect-7.emergentagent.com", /sandbox workspace host/],
     ["https://staging.apexai.example", /non-production host/],
   ] as [string, RegExp][]) {
