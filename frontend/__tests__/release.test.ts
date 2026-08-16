@@ -211,7 +211,7 @@ test("no EAS project linkage, update channel or OTA configuration was introduced
 
 test("app identifiers, version and build configuration are unchanged", () => {
   const app = JSON.parse(read("app.json"));
-  assert.equal(app.expo.version, "1.1.8");
+  assert.equal(app.expo.version, "1.2.0");
   assert.equal(app.expo.ios.bundleIdentifier, "com.mazidigroup.apexai");
   assert.equal(app.expo.android.package, "com.mazidigroup.apexai");
   const eas = JSON.parse(read("eas.json"));

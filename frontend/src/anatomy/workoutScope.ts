@@ -10,7 +10,14 @@ import { OwnerToken, ScopedStore, WriteResult } from "@/src/owner/scopedStore";
 import { ActiveSession, ExerciseIdSpace, endSession, readActiveSession } from "@/src/session/activeSession";
 import { WeightUnit, resolveUnitPreference } from "@/src/units/unitPreference";
 
-export type LoggedSet = { id: string; weight: number; reps: number; done: boolean };
+export type LoggedSet = {
+  id: string;
+  weight: number;
+  reps: number;
+  done: boolean;
+  /** v1.2.0. Saved and shown, but excluded from volume and records. */
+  warmup?: boolean;
+};
 
 /**
  * How many empty set rows a planned exercise starts with in the session.
@@ -29,6 +36,8 @@ export type SessionExercise = {
   sets: LoggedSet[];
   notes: string;
   planLink?: { planDate: string; planName?: string };
+  /** v1.2.0. Exercises sharing an id are alternated as a superset. */
+  supersetId?: string;
 };
 export type Workout = { id: string; date: number; durationSec: number; exercises: SessionExercise[] };
 export type PRs = { byExercise: Record<string, { maxWeight: number; maxVolume: number }>; longestSec: number };
@@ -83,6 +92,7 @@ export function buildActiveSession(
   startedAt: number,
   exercises: SessionExercise[],
   now: () => number = Date.now,
+  planSeed?: number,
 ): ActiveSession {
   return {
     schema: 1,
@@ -91,12 +101,14 @@ export function buildActiveSession(
     ownerId: token.id,
     startedAt,
     updatedAt: now(),
+    planSeed,
     exercises: exercises.map((e) => ({
       exerciseId: e.exerciseId,
       idSpace: e.idSpace ?? "anatomy",
       sets: e.sets,
       notes: e.notes,
       planLink: e.planLink,
+      supersetId: e.supersetId,
     })),
   };
 }

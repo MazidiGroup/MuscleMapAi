@@ -16,6 +16,7 @@ import {
   workoutTitle,
   workoutTotals,
 } from "@/src/history/metrics";
+import { isCountableSet } from "@/src/anatomy/setRules";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 
@@ -102,7 +103,7 @@ export default function SummaryScreen() {
             const ex = getExercise(e.exerciseId);
             const bodyweight = isBodyweightEquipment(ex?.equipment);
             const status = exerciseStatus(e);
-            const done = e.sets.filter((s) => s.done).length;
+            const done = e.sets.filter(isCountableSet).length;
             const icon = status === "Completed" ? "checkmark-done" : status === "Incomplete" ? "remove-circle-outline" : "ellipse-outline";
             const tint = status === "Completed" ? T.accent : status === "Incomplete" ? "#FFB020" : T.textDim;
             return (
@@ -123,13 +124,14 @@ export default function SummaryScreen() {
                 {e.sets.length > 0 && (
                   <View style={{ gap: 2, marginTop: 6 }}>
                     {e.sets.map((set, i) => (
-                      <Text key={set.id} style={[styles.setLine, !set.done && { color: T.textDim }]}>
+                      <Text key={set.id} style={[styles.setLine, !isCountableSet(set) && { color: T.textDim }]}>
                         {`Set ${i + 1}: ${
                           // "BW" belongs to bodyweight exercises only. A loaded exercise with
                           // no weight entered has no weight — it is not bodyweight.
                           bodyweight ? formatSetLoad(set.weight, unit, true) : set.weight > 0 ? `${set.weight} ${unit}` : "—"
                         } × ${set.reps}`}
-                        {set.done ? "" : " · not completed"}
+                        {set.warmup ? " · warm-up" : ""}
+                        {isCountableSet(set) ? "" : " · not completed"}
                       </Text>
                     ))}
                   </View>

@@ -117,7 +117,7 @@ const EXPECTED_SLUG = "apex-ai";
  * approved project and profile — see `resolveSlugPolicy()`.
  */
 const MANAGED_CLOUD_SLUG = "ai-coach-trainer-2";
-const EXPECTED_VERSION = "1.1.8";
+const EXPECTED_VERSION = "1.2.0";
 const EXPECTED_PROJECT_ID = "7f544570-f0e2-45ce-bc88-97a50226e5cb";
 const LEGACY_IDENTITY_MARKERS = ["frontend", "muscle-map-ai", "musclemapai", "expo-template", "my-app"];
 
@@ -375,7 +375,7 @@ function checkIdentityAndConfig() {
       // The marketing version is a NOTE only. app.json is excluded from the 21 hashed
       // files and is rewritten by the wrapper, so comparing it proves nothing about
       // source integrity and breaks on wrapper-side version increments (their builder
-      // reported 1.1.9 while the committed tree says 1.1.8). EXPECTED_VERSION is kept
+      // reported 1.1.9 while the committed tree said 1.1.8). EXPECTED_VERSION is kept
       // as the documented approved version and is referenced by the test suite.
       if (app.version !== EXPECTED_VERSION) {
         notes.push(`app.json version is "${app.version}"; the approved committed version is "${EXPECTED_VERSION}" (wrapper-rewritten, not a failure)`);

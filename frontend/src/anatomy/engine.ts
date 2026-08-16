@@ -23,6 +23,10 @@ const COL_SECONDARY = new THREE.Color("#FFB020");
 const COL_DIM = new THREE.Color("#3A3D45");
 const COL_SELECT = new THREE.Color("#34C7FF");
 const GLOW_SELECT = new THREE.Color("#1E9BFF");
+// Recovery mode fallback for a muscle with no completed sets recorded. Kept in
+// step with RECOVERY_COLORS.untrained in ./workoutStore — duplicated as a literal
+// rather than imported so the render engine stays free of React modules.
+const RECOVERY_UNTRACKED = "#48566B";
 
 type MeshUD = {
   unitName: string;
@@ -402,7 +406,10 @@ export class AnatomyEngine {
         if (ud.isBone) {
           mat.color.copy(COL_BONE).multiplyScalar(0.6);
         } else {
-          const hex = this.recoveryMap[ud.unitName] || "#2FBF71"; // default = recovered (green)
+          // A muscle absent from the map has no completed sets recorded, which is
+          // NOT the same as recovered — defaulting it to green is what made a
+          // legs-only session light the whole body up. Neutral is the honest state.
+          const hex = this.recoveryMap[ud.unitName] || RECOVERY_UNTRACKED;
           mat.color.set(hex);
           mat.emissive.set(hex);
           mat.emissiveIntensity = 0.18;

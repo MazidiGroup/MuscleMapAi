@@ -24,6 +24,7 @@ import { entryFor, alternativesFor, MUSCLE_LABEL, GOAL_LABEL, REGION_LABEL } fro
 import type { PlanDay, PlanExerciseEntry } from "./exercises";
 import { posterUrl } from "@/src/anatomy/media";
 import { useWorkout } from "@/src/anatomy/workoutStore";
+import { isCountableSet } from "@/src/anatomy/setRules";
 
 export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number) => void; onEditAnswers: () => void }) {
   const { T } = useTheme();
@@ -37,9 +38,16 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
 
   const hasActiveWorkout = w.session !== null;
   const activeSets = (w.session || []).reduce((a, e) => a + e.sets.length, 0);
-  const activeDone = (w.session || []).reduce((a, e) => a + e.sets.filter(s => s.done).length, 0);
+  const activeDone = (w.session || []).reduce((a, e) => a + e.sets.filter(isCountableSet).length, 0);
   const todayIdx = (new Date().getDay() + 6) % 7;
   const todayDay = days[todayIdx];
+
+  // A session started under a previous plan must not be advertised as part of
+  // this week. The seed changes whenever the plan is regenerated, so a mismatch
+  // is proof the session outlived the plan it came from. A session saved before
+  // v1.2.0 carries no seed and is left alone rather than guessed at.
+  const staleSession =
+    hasActiveWorkout && w.sessionPlanSeed !== null && w.sessionPlanSeed !== plan.seed;
 
   const openSession = () => router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
 
@@ -75,14 +83,29 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
       <View style={{ marginTop: 20 }}>
         {hasActiveWorkout ? (
           <InterruptedSessionCard
-            title="Workout in progress"
-            body="Pick up exactly where you left off — every set you logged is saved on this device."
+            title={staleSession ? "Workout from your previous plan" : "Workout in progress"}
+            body={
+              staleSession
+                ? "You rebuilt your plan while this workout was open. It is still here and every set you logged is saved — finishing it will record it to your History."
+                : "Pick up exactly where you left off — every set you logged is saved on this device."
+            }
             facts={[
               ["Exercises", String((w.session || []).length)],
               ["Sets logged", `${activeDone} of ${activeSets}`],
             ]}
-            resume={{ label: "Resume workout", onPress: openSession, testID: "wp-resume-session" }}
-            testID="wp-active-session"
+            resume={{
+              label: staleSession ? "Resume anyway" : "Resume workout",
+              onPress: openSession,
+              testID: "wp-resume-session",
+            }}
+            // Discarding is only offered for a session the current plan no longer
+            // knows about, and it is the user's explicit choice — never automatic.
+            discard={
+              staleSession
+                ? { label: "Discard it and start fresh", onPress: w.cancel, testID: "wp-discard-stale" }
+                : undefined
+            }
+            testID={staleSession ? "wp-stale-session" : "wp-active-session"}
           />
         ) : todayDay && !todayDay.rest ? (
           <ActionButton
@@ -179,7 +202,7 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
   const exs = resolveDayExercises(day.exercises, swaps, answers);
   const doneCount = exs.filter((ex) => {
     const se = w.session?.find((s) => s.exerciseId === ex.id);
-    const live = !!se && se.sets.length > 0 && se.sets.every((s) => s.done);
+    const live = !!se && se.sets.length > 0 && se.sets.every(isCountableSet);
     return live || !!completions[`${dateKey}:${ex.id}`];
   }).length;
   const allDone = exs.length > 0 && doneCount === exs.length;
@@ -326,8 +349,10 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
         {items.map((ex, exIdx) => {
           // Swaps are keyed by the PLANNED id, which is what survives regeneration.
           const plannedId = planned[exIdx]?.id ?? ex.id;
+          // Swapped when the resolved exercise is no longer the planned one.
+          const swappedFrom = swaps[plannedId] && swaps[plannedId] !== plannedId ? planned[exIdx] : null;
           const sessionEx = w.session?.find((s) => s.exerciseId === ex.id);
-          const sessionDone = !!sessionEx && sessionEx.sets.length > 0 && sessionEx.sets.every((s) => s.done);
+          const sessionDone = !!sessionEx && sessionEx.sets.length > 0 && sessionEx.sets.every(isCountableSet);
           const done = sessionDone || !!completions[`${dateKey}:${ex.id}`];
           const inSession = !!sessionEx;
           return (
@@ -356,6 +381,23 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
                 <Text style={[styles.exMeta, { color: T.textMuted }]}>
                   {ex.sets} sets · {ex.repsOrTime}
                 </Text>
+                {/* Says what was replaced and undoes it in one tap. Clearing the
+                    swap restores the planned exercise; nothing logged is touched. */}
+                {swappedFrom && (
+                  <TouchableOpacity
+                    style={[styles.swappedRow, { borderColor: T.border, backgroundColor: T.cardAlt }]}
+                    onPress={() => setSwap(plannedId, plannedId)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Swapped from ${swappedFrom.name}. Restore ${swappedFrom.name}.`}
+                    testID={`restore-${plannedId}`}
+                  >
+                    <Ionicons name="swap-horizontal" size={11} color={T.textCaps} />
+                    <Text style={[styles.swappedText, { color: T.text2 }]} numberOfLines={1}>
+                      Swapped from {swappedFrom.name}
+                    </Text>
+                    <Text style={[styles.swappedUndo, { color: T.accentText }]}>Restore</Text>
+                  </TouchableOpacity>
+                )}
               </View>
               <View style={{ gap: 8, alignItems: "center" }}>
                 {/* Read-only tick — becomes solid once every set is completed in Session. */}
@@ -520,6 +562,12 @@ const styles = StyleSheet.create({
   exBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: R.pill },
   exName: { fontSize: 14.5, fontWeight: "600", marginTop: 4 },
   exMeta: { fontSize: 12, marginTop: 4 },
+  swappedRow: {
+    flexDirection: "row", alignItems: "center", gap: 5, marginTop: 7,
+    paddingHorizontal: 8, minHeight: 30, borderRadius: R.pill, borderWidth: 1, alignSelf: "flex-start",
+  },
+  swappedText: { fontSize: 10.5, fontWeight: "600", flexShrink: 1 },
+  swappedUndo: { fontSize: 10.5, fontWeight: "800", textDecorationLine: "underline" },
   tickBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   addBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   swapBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center" },

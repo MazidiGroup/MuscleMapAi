@@ -2,7 +2,9 @@
 //
 // Every number rendered by History, the calendar and Insights comes from here,
 // so the same verified rules apply everywhere:
-//   · only sets with done === true count;
+//   · a set counts only when it is done AND records at least one rep — the rule
+//     lives in ../anatomy/setRules so no screen can apply a looser one;
+//   · warm-up sets are stored and shown, but stay out of volume and records;
 //   · incomplete entered sets stay visible but never enter a total or a record;
 //   · bodyweight sets carry weight 0 and therefore add no external-load volume;
 //   · calendar weeks are Monday–Sunday; volume periods are discrete rolling
@@ -12,6 +14,7 @@
 // Pure logic — no React, no storage.
 
 import type { LoggedSet, SessionExercise, Workout } from "@/src/anatomy/workoutScope";
+import { isCountableSet, isWorkingSet, setVolume } from "@/src/anatomy/setRules";
 import type { ExerciseIdSpace } from "@/src/session/activeSession";
 
 export const DAY_MS = 24 * 3.6e6;
@@ -112,10 +115,12 @@ export function workoutTotals(exercises: SessionExercise[]): WorkoutTotals {
   for (const e of exercises || []) {
     for (const s of e.sets || []) {
       totalSets++;
-      if (!s.done) continue; // incomplete sets are stored, never counted
+      // Incomplete sets — and sets ticked with 0 reps — are stored, never counted.
+      if (!isCountableSet(s)) continue;
       completedSets++;
       reps += s.reps;
-      volume += s.weight * s.reps; // bodyweight carries weight 0 → adds nothing
+      // Bodyweight carries weight 0 → adds nothing. Warm-ups add nothing either.
+      if (isWorkingSet(s)) volume += setVolume(s);
     }
   }
   return { exercises: (exercises || []).length, completedSets, totalSets, volume, reps };
@@ -126,7 +131,7 @@ export type ExerciseStatus = "Completed" | "Incomplete" | "Not completed";
 /** Never "Skipped": no skip-intent flag exists in the data model. */
 export function exerciseStatus(e: SessionExercise): ExerciseStatus {
   const total = (e.sets || []).length;
-  const done = (e.sets || []).filter((s) => s.done).length;
+  const done = (e.sets || []).filter(isCountableSet).length;
   if (done === 0) return "Not completed";
   return done === total ? "Completed" : "Incomplete";
 }
@@ -316,14 +321,15 @@ export function exercisePerformances(
     for (const e of w.exercises || []) {
       if (e.exerciseId !== exerciseId) continue;
       if ((e.idSpace ?? "anatomy") !== idSpace) continue;
-      const completedSets = (e.sets || []).filter((s) => s.done);
+      // Working sets only — a performance is what the records compare.
+      const completedSets = (e.sets || []).filter(isWorkingSet);
       if (completedSets.length === 0) continue;
       out.push({
         workoutId: w.id,
         date: w.date,
         completedSets,
         maxWeight: Math.max(0, ...completedSets.map((s) => s.weight)),
-        volume: completedSets.reduce((a, s) => a + s.weight * s.reps, 0),
+        volume: completedSets.reduce((a, s) => a + setVolume(s), 0),
         reps: completedSets.reduce((a, s) => a + s.reps, 0),
       });
     }
@@ -433,6 +439,8 @@ export const HISTORY_COPY = {
     "Workout History is stored on this device for this account or guest profile. It is not automatically transferred between profiles or devices.",
   whatCounts: [
     "Completed sets only (weight × reps)",
+    "A set needs at least 1 rep to count",
+    "Warm-up sets are stored but excluded",
     "Incomplete sets are stored but excluded",
     "Bodyweight sets add 0 to volume",
   ],

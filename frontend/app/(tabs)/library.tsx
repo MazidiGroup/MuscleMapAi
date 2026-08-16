@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal,
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
+import Constants from "expo-constants";
 
 import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
 import { GYM_GROUPS, GYM_GROUP_ORDER, prettyName } from "@/src/anatomy/groups";
@@ -28,6 +29,9 @@ import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette, GROUP_COLORS } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
+
+/** The shipped version, straight from app.json. Never hand-typed in a screen. */
+const APP_VERSION = Constants.expoConfig?.version ?? "—";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { PremiumGate } from "@/src/premium/PremiumGate";
 import { gate } from "@/src/premium/entitlement";
@@ -471,7 +475,9 @@ export default function LibraryScreen() {
               Muscle Map Ai — explore a life-size 3D muscle model with 270 named structures,
               build a personalized weekly workout plan, and track your training.
             </Text>
-            <Text style={styles.version}>v1.1.1 · Plan · Workout · Coach · Explore · Library</Text>
+            {/* Read from the app config rather than typed here, so the About
+                screen can never disagree with the version that shipped. */}
+            <Text style={styles.version}>v{APP_VERSION} · Plan · Workout · Coach · Explore · Library</Text>
 
             <View style={styles.linkList}>
               <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/references")} testID="link-references">
