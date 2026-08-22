@@ -1,10 +1,13 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from "react-native";
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet, ScrollView, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 type Ref = { title: string; publisher: string; url: string };
 type Category = { title: string; blurb: string; refs: Ref[] };
@@ -69,6 +72,9 @@ const CATEGORIES: Category[] = [
 export default function ReferencesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
 
   return (
     <View style={styles.root}>
@@ -77,11 +83,12 @@ export default function ReferencesScreen() {
           <Ionicons name="chevron-back" size={24} color={T.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sources & References</Text>
-        <View style={styles.back} />
+        <View style={styles.backPlaceholder} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         <View style={styles.notice}>
+          <LiquidSheen tone="subtle" />
           <Ionicons name="information-circle-outline" size={16} color={T.accent} />
           <Text style={styles.noticeText}>
             Muscle Map Ai is an educational anatomy and fitness reference. The information below is
@@ -124,7 +131,7 @@ export default function ReferencesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   header: {
     flexDirection: "row",
@@ -135,7 +142,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.border,
   },
-  back: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  back: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" },
+  backPlaceholder: { width: 40, height: 40 },
   headerTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
   notice: {
     flexDirection: "row",
@@ -147,6 +155,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 20,
+    overflow: "hidden",
   },
   noticeText: { flex: 1, color: T.textDim, fontSize: 13, lineHeight: 19 },
   category: { marginBottom: 24 },

@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import { COLORS, RADIUS, SPACING } from "@/src/theme";
+import { COLORS, RADIUS } from "@/src/theme";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 type Day = {
   day: number;
@@ -37,9 +38,9 @@ export function WeeklyPlanner({ week, onPressDay, variant = "compact" }: Props) 
   const handlePress = (d: Day) => {
     if (onPressDay) return onPressDay(d);
     if (d.status === "completed" && d.workout_id) {
-      router.push(`/workout/${d.workout_id}`);
+      router.push({ pathname: "/summary", params: { id: d.workout_id } });
     } else if (d.status === "today") {
-      router.push("/(tabs)");
+      router.push("/(tabs)/workout");
     }
   };
 
@@ -64,6 +65,7 @@ export function WeeklyPlanner({ week, onPressDay, variant = "compact" }: Props) 
                 d.status === "today" && styles.cardToday,
               ]}
             >
+              <LiquidSheen tone={d.status === "today" ? "accent" : d.status === "missed" ? "danger" : "neutral"} />
               <Text style={[styles.dayShort, d.status === "today" && { color: COLORS.primary }]}>{d.day_short}</Text>
               <Text style={[styles.dayNum, d.status === "today" && { color: COLORS.primary }]}>
                 {new Date(d.date).getDate()}
@@ -94,6 +96,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     flexShrink: 0,
+    overflow: "hidden",
   },
   cardLarge: { width: 64, paddingVertical: 12 },
   cardToday: { borderWidth: 1.5 },

@@ -15,17 +15,19 @@
 // play()/pause() control. The poster is drawn as a background layer so there
 // is never a black flash while the video buffers.
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useExerciseMedia, animationUrl, posterUrl } from "@/src/anatomy/media";
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { FLAGS } from "@/src/config/featureFlags";
 import { useReducedMotion } from "./useReducedMotion";
 import { MEDIA_UNAVAILABLE, altText, mediaKind, shouldPlay as decideShouldPlay } from "./mediaState";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 type Variant = "hero" | "thumb" | "card" | "workout";
 
@@ -54,6 +56,9 @@ export function ExerciseAnimation({
   fallback = null,
   exerciseName,
 }: Props) {
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const media = useExerciseMedia(exerciseId);
   const reducedMotion = useReducedMotion();
   const [userPlaying, setUserPlaying] = useState<boolean | null>(null); // null = variant default
@@ -284,7 +289,7 @@ const AnimationPlayer = React.memo(function AnimationPlayer({ exerciseId, playin
   );
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   thumb: { borderRadius: 10, backgroundColor: T.surfaceHi },
   playBadge: {
     position: "absolute",

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -14,6 +14,9 @@ import {
   computeStreaks,
   periodStats,
   topPRs,
+  RECOVERY_COLORS,
+  RECOVERY_LEGEND,
+  RECOVERY_NOTE,
 } from "./workoutStore";
 import {
   CONSISTENCY_NOTE,
@@ -25,6 +28,7 @@ import { legacyPalette, LegacyPalette } from "./ui";
 import { FLAGS } from "@/src/config/featureFlags";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { A11yControl } from "@/src/ui/A11yControl";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 
 type Period = "week" | "month";
 
@@ -78,6 +82,29 @@ export function InsightsView() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 80 }}
         >
+          {/* Key to the 3D model above. Without it the colours are unreadable —
+              the model is the first thing on this screen, so the key comes first. */}
+          <View style={styles.legendCard} testID="recovery-legend">
+            <Text style={styles.legendTitle}>Recovery map</Text>
+            <View style={styles.legendGrid}>
+              {RECOVERY_LEGEND.map((item) => (
+                <View
+                  key={item.state}
+                  style={styles.legendItem}
+                  accessible
+                  accessibilityLabel={`${item.label}: ${item.help}`}
+                >
+                  <View style={[styles.legendDot, { backgroundColor: RECOVERY_COLORS[item.state] }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.legendLabel}>{item.label}</Text>
+                    <Text style={styles.legendHelp}>{item.help}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+            <Text style={styles.legendNote}>{RECOVERY_NOTE}</Text>
+          </View>
+
           {FLAGS.insightsV2 && (
             <>
               {/* week / month toggle */}
@@ -257,6 +284,21 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   empty: { alignItems: "center", justifyContent: "center", gap: 10, padding: 30 },
   emptyText: { color: T.text, fontSize: 17, fontWeight: "700" },
   emptySub: { color: T.textDim, fontSize: 14, textAlign: "center", lineHeight: 20 },
+  legendCard: {
+    backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 14,
+    padding: 14, marginTop: 12,
+  },
+  legendTitle: {
+    color: T.textDim, fontSize: 11.5, fontWeight: "800",
+    textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10,
+  },
+  legendGrid: { gap: 9 },
+  legendItem: { flexDirection: "row", alignItems: "flex-start", gap: 9 },
+  legendDot: { width: 12, height: 12, borderRadius: 6, marginTop: 2 },
+  legendLabel: { color: T.text, fontSize: 13, fontWeight: "700" },
+  legendHelp: { color: T.textFaint, fontSize: 11.5, marginTop: 1 },
+  legendNote: { color: T.textFaint, fontSize: 10.5, lineHeight: 15, marginTop: 11 },
+
   periodSeg: { flexDirection: "row", backgroundColor: T.bg2, borderRadius: 12, padding: 4, gap: 4, marginTop: 12, borderWidth: 1, borderColor: T.border },
   periodBtn: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" },
   periodBtnActive: { backgroundColor: T.accent },

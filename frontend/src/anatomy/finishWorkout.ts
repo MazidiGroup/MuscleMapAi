@@ -11,6 +11,7 @@ import { Owner } from "@/src/owner/scopeKeys";
 import { OwnerToken, ScopedStore } from "@/src/owner/scopedStore";
 
 import { PRs, SessionExercise, Workout, clearActiveSession, persistHistory, persistPRs } from "./workoutScope";
+import { isWorkingSet, setVolume } from "./setRules";
 
 export type PRUpdate = { prs: PRs; newPRs: string[] };
 
@@ -30,10 +31,12 @@ export function computePRUpdate(prev: PRs, exercises: SessionExercise[], ctx: PR
   const next: PRs = { byExercise: { ...prev.byExercise }, longestSec: prev.longestSec };
 
   for (const e of exercises) {
-    const done = e.sets.filter((s) => s.done);
+    // Working sets only: a 0-rep tick records no work, and a warm-up is not a
+    // record attempt, so neither may establish or beat a PR.
+    const done = e.sets.filter(isWorkingSet);
     if (done.length === 0) continue;
     const maxWeight = Math.max(0, ...done.map((s) => s.weight));
-    const volume = done.reduce((a, s) => a + s.weight * s.reps, 0);
+    const volume = done.reduce((a, s) => a + setVolume(s), 0);
     const cur = next.byExercise[e.exerciseId] || { maxWeight: 0, maxVolume: 0 };
     const label = ctx.nameOf?.(e.exerciseId) || e.exerciseId;
 

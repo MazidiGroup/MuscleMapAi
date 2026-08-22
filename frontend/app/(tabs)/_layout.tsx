@@ -1,23 +1,50 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Platform, View, StyleSheet } from "react-native";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 
-import { T } from "@/src/anatomy/ui";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { gate, isPremiumSurface, Surface } from "@/src/premium/entitlement";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { usePlanStore } from "@/src/plan/planStore";
 import { ONBOARDING_STEP_COUNT, routeStep } from "@/src/plan/onboarding";
+import { ScalePressable } from "@/src/ui/ScalePressable";
 
-function TabIcon({ name, color, size, locked }: { name: any; color: string; size: number; locked?: boolean }) {
+function TabIcon({ name, color, size, locked, lockBg, lockFg }: { name: any; color: string; size: number; locked?: boolean; lockBg: string; lockFg: string }) {
   return (
     <View>
       <Ionicons name={name} size={size} color={color} />
       {locked && (
-        <View style={styles.lockBadge}>
-          <Ionicons name="lock-closed" size={11} color="#070A0F" />
+        <View style={[styles.lockBadge, { backgroundColor: lockBg }]}>
+          <Ionicons name="lock-closed" size={11} color={lockFg} />
         </View>
       )}
+    </View>
+  );
+}
+
+function DeckButton({ children, style, ...props }: any) {
+  return (
+    <ScalePressable {...props} style={[style, styles.deckButton]} accessibilityRole="button">
+      {children}
+    </ScalePressable>
+  );
+}
+
+function DeckBackground({ mode }: { mode: string }) {
+  const colors = mode === "day"
+    ? ["rgba(237,243,251,0.28)", "rgba(255,255,255,0.82)", "rgba(241,247,255,0.92)"]
+    : mode === "dim"
+      ? ["rgba(21,25,32,0.32)", "rgba(42,48,61,0.84)", "rgba(27,32,42,0.94)"]
+      : ["rgba(7,10,16,0.28)", "rgba(22,28,39,0.84)", "rgba(9,13,21,0.94)"];
+  return (
+    <View style={styles.deckBackground} pointerEvents="none">
+      <BlurView intensity={62} tint={mode === "day" ? "light" : "dark"} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={colors as [string, string, ...string[]]}
+        style={StyleSheet.absoluteFill}
+      />
     </View>
   );
 }
@@ -45,21 +72,35 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      detachInactiveScreens
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.accent,
         tabBarInactiveTintColor: theme.textMuted,
+        tabBarHideOnKeyboard: true,
+        lazy: true,
+        freezeOnBlur: true,
+        animation: "fade",
+        tabBarButton: (props) => <DeckButton {...props} />,
+        tabBarBackground: () => <DeckBackground mode={theme.mode} />,
+        tabBarActiveBackgroundColor: theme.accent + "12",
         tabBarStyle: preOnboarding
           ? { display: "none" }
           : {
-              backgroundColor: theme.card,
-              borderTopColor: theme.border,
-              borderTopWidth: 1,
-              height: Platform.OS === "ios" ? 86 : 64,
-              paddingTop: 6,
-              paddingBottom: Platform.OS === "ios" ? 28 : 8,
+              backgroundColor: "transparent",
+              borderTopColor: "transparent",
+              borderTopWidth: 0,
+              height: Platform.OS === "ios" ? 80 : 66,
+              marginHorizontal: 0,
+              marginBottom: 0,
+              paddingTop: 7,
+              paddingBottom: Platform.OS === "ios" ? 19 : 6,
+              borderRadius: 0,
+              overflow: "hidden",
+              elevation: 0,
             },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
+        tabBarItemStyle: { borderRadius: 15, marginHorizontal: 2, marginVertical: 3 },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "700", letterSpacing: 0.15 },
         sceneStyle: { backgroundColor: theme.bg },
       }}
     >
@@ -68,7 +109,7 @@ export default function TabsLayout() {
         options={{
           title: "Plan",
           tabBarAccessibilityLabel: tabName("Plan", "plan"),
-          tabBarIcon: ({ color, size }) => <TabIcon name="calendar-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="calendar-outline" size={size} color={color} lockBg={theme.accent} lockFg={theme.ctaText} />,
         }}
       />
       <Tabs.Screen
@@ -76,7 +117,7 @@ export default function TabsLayout() {
         options={{
           title: "Workout",
           tabBarAccessibilityLabel: tabName("Workout", "workout.session"),
-          tabBarIcon: ({ color, size }) => <TabIcon name="barbell-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="barbell-outline" size={size} color={color} lockBg={theme.accent} lockFg={theme.ctaText} />,
         }}
       />
       <Tabs.Screen
@@ -85,7 +126,7 @@ export default function TabsLayout() {
           title: "Coach",
           // The lock is never icon-only: the accessible name says "Premium".
           tabBarAccessibilityLabel: tabName("Coach", "coach"),
-          tabBarIcon: ({ color, size }) => <TabIcon name="sparkles-outline" size={size} color={color} locked={coachLocked} />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="sparkles-outline" size={size} color={color} locked={coachLocked} lockBg={theme.accent} lockFg={theme.ctaText} />,
         }}
       />
       <Tabs.Screen
@@ -93,7 +134,7 @@ export default function TabsLayout() {
         options={{
           title: "Explore",
           tabBarAccessibilityLabel: tabName("Explore", "explore"),
-          tabBarIcon: ({ color, size }) => <TabIcon name="cube-outline" size={size} color={color} locked={exploreLocked} />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="cube-outline" size={size} color={color} locked={exploreLocked} lockBg={theme.accent} lockFg={theme.ctaText} />,
         }}
       />
       <Tabs.Screen
@@ -101,7 +142,7 @@ export default function TabsLayout() {
         options={{
           title: "Library",
           tabBarAccessibilityLabel: tabName("Library", "library.exercises"),
-          tabBarIcon: ({ color, size }) => <TabIcon name="library-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="library-outline" size={size} color={color} lockBg={theme.accent} lockFg={theme.ctaText} />,
         }}
       />
       <Tabs.Screen name="learn" options={{ href: null }} />
@@ -110,6 +151,13 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
+  deckButton: { flex: 1, minHeight: 48 },
+  deckBackground: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(120,130,150,0.18)",
+  },
   lockBadge: {
     position: "absolute",
     top: -5,
@@ -117,7 +165,6 @@ const styles = StyleSheet.create({
     width: 17,
     height: 17,
     borderRadius: 9,
-    backgroundColor: T.accent,
     alignItems: "center",
     justifyContent: "center",
   },

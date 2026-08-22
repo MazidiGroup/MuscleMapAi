@@ -18,8 +18,16 @@ import { getExercise } from "./exercises";
 import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS, GYM_GROUP_ORDER } from "./groups";
 import { usePlanStore } from "@/src/plan/planStore";
+import { canMarkDone, isCountableSet, isWorkingSet, setVolume } from "./setRules";
 
-export type LoggedSet = { id: string; weight: number; reps: number; done: boolean };
+export type LoggedSet = {
+  id: string;
+  weight: number;
+  reps: number;
+  done: boolean;
+  /** v1.2.0 warm-up flag. Saved, but excluded from volume and records. */
+  warmup?: boolean;
+};
 export type SessionExercise = {
   /** The exact source id — never renamed, never inferred from a display name. */
   exerciseId: string;
@@ -30,6 +38,8 @@ export type SessionExercise = {
   /** When the exercise was added via the Plan tab, this remembers the plan-day
    *  it belongs to so we can auto-tick it once every set is done. */
   planLink?: { planDate: string; planName?: string };
+  /** v1.2.0. Exercises sharing an id are alternated as a superset. */
+  supersetId?: string;
 };
 export type Workout = { id: string; date: number; durationSec: number; exercises: SessionExercise[] };
 export type PRs = { byExercise: Record<string, { maxWeight: number; maxVolume: number }>; longestSec: number };
@@ -51,11 +61,12 @@ export function workoutStats(exs: SessionExercise[]) {
   for (const e of exs) {
     for (const s of e.sets) {
       sets++;
-      if (s.done) {
-        completed++;
-        reps += s.reps;
-        volume += s.weight * s.reps;
-      }
+      // A ticked set with 0 reps records no work and is not counted.
+      if (!isCountableSet(s)) continue;
+      completed++;
+      reps += s.reps;
+      // Warm-ups are logged work but carry no volume.
+      if (isWorkingSet(s)) volume += setVolume(s);
     }
   }
   return { sets, completed, reps, volume };
@@ -69,8 +80,8 @@ export function muscleActivation(exs: SessionExercise[]): { list: Activation[]; 
   for (const e of exs) {
     const ex = getExercise(e.exerciseId);
     if (!ex) continue;
-    const completed = e.sets.filter((s) => s.done).length || (e.sets.length ? 0 : 0);
-    const weight = completed > 0 ? completed : 0;
+    // Warm-ups do not drive activation shading either.
+    const weight = e.sets.filter(isWorkingSet).length;
     if (weight === 0) continue;
     for (const m of ex.primary) {
       score[m] = (score[m] || 0) + weight * 1;
@@ -100,6 +111,12 @@ export function muscleActivation(exs: SessionExercise[]): { list: Activation[]; 
 type Ctx = {
   session: SessionExercise[] | null;
   startedAt: number | null;
+  /**
+   * Plan seed the active session was started under, or null when unknown
+   * (a session saved before v1.2.0). Compare with the plan's current seed to
+   * detect a session that outlived a plan regeneration.
+   */
+  sessionPlanSeed: number | null;
   restPref: number;
   history: Workout[];
   prs: PRs;
@@ -116,6 +133,10 @@ type Ctx = {
   deleteSet: (exId: string, setId: string) => void;
   duplicateSet: (exId: string, setId: string) => void;
   toggleDone: (exId: string, setId: string) => void;
+  /** Marks a set as a warm-up: logged, but outside volume and records. */
+  toggleWarmup: (exId: string, setId: string) => void;
+  /** Groups/ungroups an exercise into a superset with the one above it. */
+  toggleSuperset: (exId: string) => void;
   removeExercise: (exId: string) => void;
   setNotes: (exId: string, notes: string) => void;
   setRestPref: (n: number) => void;
@@ -152,6 +173,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [readFailed, setReadFailed] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
   const sessionIdRef = useRef<string | null>(null);
+  // The plan seed the session was started under, so a session that outlived a
+  // plan regeneration can be identified instead of silently advertised as
+  // belonging to the new week.
+  const [sessionPlanSeed, setSessionPlanSeed] = useState<number | null>(null);
 
   // Owner-scoped hydration. Stale values are dropped the moment the owner
   // changes, so a previous owner's History can never render.
@@ -166,6 +191,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setHydratedFor(null);
     setReadFailed(false);
     sessionIdRef.current = null;
+    setSessionPlanSeed(null);
     if (!ready || !owner) return;
 
     (async () => {
@@ -196,9 +222,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
             sets: e.sets,
             notes: e.notes,
             planLink: e.planLink,
+            supersetId: e.supersetId,
           })),
         );
         setStartedAt(snap.active.startedAt);
+        setSessionPlanSeed(
+          typeof snap.active.planSeed === "number" ? snap.active.planSeed : null,
+        );
       }
       setHydratedFor(ownerKey);
     })();
@@ -218,14 +248,31 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!sessionIdRef.current) sessionIdRef.current = `s_${Date.now().toString(36)}_${uid()}`;
-    const payload = buildActiveSession(token, sessionIdRef.current, startedAt ?? Date.now(), session);
+    const payload = buildActiveSession(
+      token,
+      sessionIdRef.current,
+      startedAt ?? Date.now(),
+      session,
+      Date.now,
+      sessionPlanSeed ?? undefined,
+    );
     persistActiveSession(store, token, payload).catch(() => {});
-  }, [session, startedAt, hydratedFor, ownerKey, token, owner, store]);
+  }, [session, startedAt, hydratedFor, ownerKey, token, owner, store, sessionPlanSeed]);
+
+  /**
+   * Records which plan a session belongs to, exactly once per session. Mirrors
+   * the `startedAt` pattern: only the first creator sets it.
+   */
+  const stampPlanSeed = useCallback(() => {
+    const seed = usePlanStore.getState().seed;
+    setSessionPlanSeed((s) => s ?? (typeof seed === "number" ? seed : null));
+  }, []);
 
   const startWorkout = useCallback(() => {
     setSession([]);
     setStartedAt(Date.now());
-  }, []);
+    stampPlanSeed();
+  }, [stampPlanSeed]);
 
   const addExercise = useCallback((id: string) => {
     setSession((prev) => {
@@ -237,7 +284,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       ];
     });
     setStartedAt((s) => s ?? Date.now());
-  }, []);
+    stampPlanSeed();
+  }, [stampPlanSeed]);
 
   const addExerciseFromPlan = useCallback((id: string, planDate: string, plannedSets = 1, planName?: string) => {
     setSession((prev) => {
@@ -264,7 +312,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       ];
     });
     setStartedAt((s) => s ?? Date.now());
-  }, []);
+    stampPlanSeed();
+  }, [stampPlanSeed]);
 
   const hasExercise = useCallback((id: string) => !!session?.some((e) => e.exerciseId === id), [session]);
 
@@ -279,7 +328,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateSet = useCallback((exId: string, setId: string, patch: Partial<LoggedSet>) => {
-    mutate(exId, (e) => ({ ...e, sets: e.sets.map((s) => (s.id === setId ? { ...s, ...patch } : s)) }));
+    mutate(exId, (e) => ({
+      ...e,
+      sets: e.sets.map((s) => {
+        if (s.id !== setId) return s;
+        const next = { ...s, ...patch };
+        // Editing the reps back down to 0 releases the Done tick, so a counted
+        // set can never be left holding no work.
+        return next.done && !canMarkDone(next) ? { ...next, done: false } : next;
+      }),
+    }));
   }, []);
 
   const deleteSet = useCallback((exId: string, setId: string) => {
@@ -297,8 +355,56 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Ticking a set requires at least one rep; un-ticking is always allowed so a
+  // mistaken entry can still be undone. The screen disables the control too —
+  // this is the guard that keeps the rule true for every caller.
   const toggleDone = useCallback((exId: string, setId: string) => {
-    mutate(exId, (e) => ({ ...e, sets: e.sets.map((s) => (s.id === setId ? { ...s, done: !s.done } : s)) }));
+    mutate(exId, (e) => ({
+      ...e,
+      sets: e.sets.map((s) => {
+        if (s.id !== setId) return s;
+        if (s.done) return { ...s, done: false };
+        return canMarkDone(s) ? { ...s, done: true } : s;
+      }),
+    }));
+  }, []);
+
+  /** Warm-up sets stay in the log but leave volume and records untouched. */
+  const toggleWarmup = useCallback((exId: string, setId: string) => {
+    mutate(exId, (e) => ({
+      ...e,
+      sets: e.sets.map((s) => (s.id === setId ? { ...s, warmup: !s.warmup } : s)),
+    }));
+  }, []);
+
+  /**
+   * Supersets are expressed as a shared id on adjacent exercises rather than a
+   * nested structure, so every existing reader (History, PRs, the Plan tick)
+   * keeps working untouched and a record saved without the flag still loads.
+   */
+  const toggleSuperset = useCallback((exId: string) => {
+    setSession((prev) => {
+      if (!prev) return prev;
+      const idx = prev.findIndex((e) => e.exerciseId === exId);
+      if (idx <= 0) return prev; // nothing above to pair with
+      const above = prev[idx - 1];
+      const me = prev[idx];
+      const joined = !!me.supersetId && me.supersetId === above.supersetId;
+
+      let next: SessionExercise[];
+      if (joined) {
+        next = prev.map((e, i) => (i === idx ? { ...e, supersetId: undefined } : e));
+      } else {
+        const groupId = above.supersetId || `ss_${uid()}`;
+        next = prev.map((e, i) =>
+          i === idx ? { ...e, supersetId: groupId } : i === idx - 1 ? { ...e, supersetId: groupId } : e,
+        );
+      }
+      // A group of one is not a superset — release the leftover marker.
+      const counts = new Map<string, number>();
+      for (const e of next) if (e.supersetId) counts.set(e.supersetId, (counts.get(e.supersetId) || 0) + 1);
+      return next.map((e) => (e.supersetId && counts.get(e.supersetId) === 1 ? { ...e, supersetId: undefined } : e));
+    });
   }, []);
 
   const removeExercise = useCallback((exId: string) => {
@@ -349,12 +455,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     sessionIdRef.current = null;
     setSession(null);
     setStartedAt(null);
+    setSessionPlanSeed(null);
     return { ok: true, workout, newPRs };
   }, [session, startedAt, history, prs, store, token, owner, unit]);
 
   const cancel = useCallback(() => {
     setSession(null);
     setStartedAt(null);
+    setSessionPlanSeed(null);
   }, []);
 
   // Keep the Plan tick in sync with the Session in BOTH directions: a plan-linked
@@ -365,7 +473,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     const toggle = usePlanStore.getState().toggleCompletion;
     for (const se of session) {
       if (!se.planLink) continue;
-      const allDone = se.sets.length > 0 && se.sets.every((s) => s.done);
+      const allDone = se.sets.length > 0 && se.sets.every(isCountableSet);
       toggle(se.planLink.planDate, se.exerciseId, allDone);
     }
   }, [session]);
@@ -375,6 +483,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       value={{
         session,
         startedAt,
+        sessionPlanSeed,
         restPref,
         history,
         prs,
@@ -387,6 +496,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         deleteSet,
         duplicateSet,
         toggleDone,
+        toggleWarmup,
+        toggleSuperset,
         removeExercise,
         setNotes,
         setRestPref,
@@ -433,16 +544,66 @@ export const RECOVERY_HOURS: Record<string, number> = {
   calves: 36,
 };
 
-const REC_COLORS = { red: "#FF4438", orange: "#FFB020", green: "#2FBF71" };
+/**
+ * Recovery heat map — v1.2.0.
+ *
+ * The model used to carry two meanings on one colour: a muscle you trained a
+ * month ago and a muscle you have never trained both rendered as "recovered"
+ * green, which is why a legs-only session left the whole body looking trained.
+ * Recency is now its own axis, and "no completed work recorded" is a state of
+ * its own rather than the absence of one.
+ */
+export type RecoveryState = "fatigued" | "recovering" | "ready" | "undertrained" | "untrained";
 
-export type GroupRecovery = { group: string; label: string; state: "red" | "orange" | "green"; pct: number; hoursLeft: number; lastTs: number | null };
+export const RECOVERY_COLORS: Record<RecoveryState, string> = {
+  fatigued: "#FF4438",
+  recovering: "#FFB020",
+  ready: "#2FBF71",
+  undertrained: "#3B82F6",
+  untrained: "#48566B",
+};
 
-export function computeRecovery(history: Workout[]): { colorMap: Record<string, string>; groups: GroupRecovery[] } {
-  const now = Date.now();
+/** Days without a completed working set after which a muscle reads undertrained. */
+export const UNDERTRAINED_DAYS = 10;
+
+/** The key to the colours. Rendered verbatim so the model is never unexplained. */
+export const RECOVERY_LEGEND: { state: RecoveryState; label: string; help: string }[] = [
+  { state: "fatigued", label: "Fatigued", help: "Trained recently — still early in recovery" },
+  { state: "recovering", label: "Recovering", help: "Part-way through its recovery window" },
+  { state: "ready", label: "Ready", help: "Recovered and ready to train again" },
+  { state: "undertrained", label: "Undertrained", help: `No completed sets in ${UNDERTRAINED_DAYS} days` },
+  { state: "untrained", label: "Not tracked", help: "No completed sets recorded yet" },
+];
+
+export const RECOVERY_NOTE =
+  "Based on the completed sets stored on this device and typical recovery windows of 24–72 hours by muscle group. A guide, not a medical assessment.";
+
+/** Which state one muscle is in, given when it was last worked. */
+export function recoveryStateFor(lastTs: number | null, recoveryHours: number, now: number): RecoveryState {
+  if (!lastTs) return "untrained";
+  const hoursSince = (now - lastTs) / 3.6e6;
+  if (hoursSince < recoveryHours * 0.5) return "fatigued";
+  if (hoursSince < recoveryHours) return "recovering";
+  return hoursSince > UNDERTRAINED_DAYS * 24 ? "undertrained" : "ready";
+}
+
+export type GroupRecovery = {
+  group: string;
+  label: string;
+  state: RecoveryState;
+  pct: number;
+  hoursLeft: number;
+  lastTs: number | null;
+};
+
+export function computeRecovery(
+  history: Workout[],
+  now: number = Date.now(),
+): { colorMap: Record<string, string>; groups: GroupRecovery[] } {
   const lastByMuscle: Record<string, number> = {};
   for (const wk of history) {
     for (const e of wk.exercises) {
-      if (!e.sets.some((s) => s.done)) continue;
+      if (!e.sets.some(isWorkingSet)) continue;
       const ex = getExercise(e.exerciseId);
       if (!ex) continue;
       for (const m of [...ex.primary, ...ex.secondary]) {
@@ -457,21 +618,26 @@ export function computeRecovery(history: Workout[]): { colorMap: Record<string, 
   for (const [m, ts] of Object.entries(lastByMuscle)) {
     const g = getMuscleInfo(m)?.group;
     const recH = (g && RECOVERY_HOURS[g]) || 48;
-    const hoursSince = (now - ts) / 3.6e6;
-    const pct = Math.max(0, Math.min(1, hoursSince / recH));
-    const state = pct < 0.5 ? "red" : pct < 1 ? "orange" : "green";
-    colorMap[m] = REC_COLORS[state];
+    colorMap[m] = RECOVERY_COLORS[recoveryStateFor(ts, recH, now)];
     if (g) groupLast[g] = Math.max(groupLast[g] || 0, ts);
   }
 
   const groups: GroupRecovery[] = GYM_GROUP_ORDER.map((group) => {
     const recH = RECOVERY_HOURS[group] || 48;
     const lastTs = groupLast[group] || null;
-    if (!lastTs) return { group, label: GYM_GROUPS[group].label, state: "green", pct: 1, hoursLeft: 0, lastTs: null };
+    const state = recoveryStateFor(lastTs, recH, now);
+    if (!lastTs) {
+      return { group, label: GYM_GROUPS[group].label, state, pct: 0, hoursLeft: 0, lastTs: null };
+    }
     const hoursSince = (now - lastTs) / 3.6e6;
-    const pct = Math.max(0, Math.min(1, hoursSince / recH));
-    const state = pct < 0.5 ? "red" : pct < 1 ? "orange" : "green";
-    return { group, label: GYM_GROUPS[group].label, state, pct, hoursLeft: Math.max(0, Math.round(recH - hoursSince)), lastTs };
+    return {
+      group,
+      label: GYM_GROUPS[group].label,
+      state,
+      pct: Math.max(0, Math.min(1, hoursSince / recH)),
+      hoursLeft: Math.max(0, Math.round(recH - hoursSince)),
+      lastTs,
+    };
   });
 
   return { colorMap, groups };
@@ -488,7 +654,7 @@ export function weeklySetsByGroup(history: Workout[], days = 7): { list: GroupVo
     if (wk.date < cutoff) continue;
     workouts++;
     for (const e of wk.exercises) {
-      const done = e.sets.filter((s) => s.done).length;
+      const done = e.sets.filter(isWorkingSet).length;
       if (done === 0) continue;
       totalSets += done;
       const ex = getExercise(e.exerciseId);

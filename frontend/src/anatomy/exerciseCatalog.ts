@@ -164,6 +164,26 @@ function deriveCategory(primary: string[], pattern: string[]): CatalogExercise["
 const LEGACY_BY_ID: Record<string, Exercise> = {};
 for (const e of LEGACY_EXERCISES) LEGACY_BY_ID[e.id] = e;
 
+/**
+ * Legacy equipment labels predate the pack's vocabulary. Normalising them here
+ * keeps the filter facets to one name per piece of equipment: "Cable" (from the
+ * one legacy-only record) and "Cable Machine" were listed as two separate
+ * options for the same thing.
+ */
+const EQUIPMENT_ALIAS: Record<string, string> = {
+  Cable: "Cable Machine",
+  Cables: "Cable Machine",
+  Bands: "Band",
+  "Body weight": "Bodyweight",
+  Machines: "Machine",
+};
+
+export function canonicalEquipment(label: string | undefined): string {
+  const value = (label || "").trim();
+  if (!value) return "Bodyweight";
+  return EQUIPMENT_ALIAS[value] || value;
+}
+
 function normaliseDifficulty(d: string): CatalogExercise["difficulty"] {
   const s = d.trim().toLowerCase();
   if (s.startsWith("adv")) return "Advanced";
@@ -186,7 +206,7 @@ function buildEntry(raw: RawEntry): CatalogExercise {
     id,
     name: raw.name,
     category: deriveCategory(raw.primaryMuscles, raw.movementPattern),
-    equipment: raw.equipment[0] || "Bodyweight",
+    equipment: canonicalEquipment(raw.equipment[0]),
     cue: raw.shortDescription,
     primary: primaryNodes,
     secondary: [...new Set(secondaryNodes)],
@@ -214,7 +234,7 @@ for (const [legacyId, packSlug] of Object.entries(LEGACY_ALIAS)) {
     id: legacy.id,
     name: legacy.name,
     category: legacy.category,
-    equipment: legacy.equipment,
+    equipment: canonicalEquipment(legacy.equipment),
     cue: legacy.cue,
     primary: legacy.primary,
     secondary: legacy.secondary,

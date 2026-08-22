@@ -14,6 +14,7 @@ import { getExercise } from "@/src/anatomy/exercises";
 import { useWorkout } from "@/src/anatomy/workoutStore";
 import { useSemanticTokens } from "@/src/theme/semantic";
 import { EmptyState, InfoBanner, RetryPanel, WarningBanner } from "@/src/ui/state";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 import {
   CalendarCell,
@@ -109,6 +110,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
         <>
           {/* Monday–Sunday calendar week, explicitly labelled. */}
           <View style={[styles.card, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.lg }]} testID="history-week">
+            <LiquidSheen tone="neutral" />
             <Text style={[t.type.label, { color: t.color.textMuted }]}>{week.rangeLabel}</Text>
             <Text style={[t.type.title, { color: t.color.text, marginTop: 2 }]}>{week.copy}</Text>
             <Text style={[t.type.caption, { color: t.color.textMuted, marginTop: 6 }]}>
@@ -131,6 +133,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
                     testID={`hist-${item.id}`}
                     style={[styles.card, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.lg }]}
                   >
+                    <LiquidSheen tone="neutral" />
                     <View style={styles.row}>
                       <Text style={[t.type.subheading, { color: t.color.text, flex: 1 }]}>{workoutTitle(item)}</Text>
                       {item.durationSec > 0 && (
@@ -159,6 +162,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
 
           {/* Month grid. Every action here has a list equivalent above. */}
           <View style={[styles.card, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.lg, gap: t.space.md }]} testID="history-calendar">
+            <LiquidSheen tone="neutral" />
             <View style={styles.row}>
               <Pressable
                 onPress={() => shiftMonth(-1)}
@@ -167,6 +171,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
                 testID="cal-prev"
                 style={[styles.iconBtn, { borderColor: t.color.border }]}
               >
+                <LiquidSheen tone="neutral" />
                 <Ionicons name="chevron-back" size={18} color={t.color.textSecondary} />
               </Pressable>
               <Text
@@ -183,6 +188,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
                 testID="cal-next"
                 style={[styles.iconBtn, { borderColor: t.color.border }]}
               >
+                <LiquidSheen tone="neutral" />
                 <Ionicons name="chevron-forward" size={18} color={t.color.textSecondary} />
               </Pressable>
             </View>
@@ -219,6 +225,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
                       testID={`cal-workout-${item.id}`}
                       style={[styles.card, { backgroundColor: t.color.surfaceAlt, borderColor: t.color.border, padding: t.space.md }]}
                     >
+                      <LiquidSheen tone="subtle" />
                       <Text style={[t.type.bodyStrong, { color: t.color.text }]}>{workoutTitle(item)}</Text>
                     </Pressable>
                   ))
@@ -234,8 +241,9 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
         accessibilityRole="button"
         accessibilityLabel={HISTORY_COPY.storageEntry}
         testID="history-storage-entry"
-        style={[styles.storageRow, { borderColor: t.color.border, minHeight: t.target.min }]}
+        style={[styles.storageRow, { borderColor: t.color.border, backgroundColor: t.color.surface, minHeight: t.target.min }]}
       >
+        <LiquidSheen tone="neutral" />
         <Ionicons name="phone-portrait-outline" size={16} color={t.color.textSecondary} />
         <Text style={[t.type.bodyStrong, { color: t.color.textSecondary, flex: 1 }]}>{HISTORY_COPY.storageEntry}</Text>
         <Ionicons name="chevron-forward" size={16} color={t.color.textMuted} />
@@ -268,6 +276,7 @@ function CalendarDay({ cell, selected, onPress }: { cell: CalendarCell | null; s
         },
       ]}
     >
+      <LiquidSheen tone={selected || completed ? "accent" : "subtle"} />
       <Text style={[t.type.caption, { color: completed ? t.color.accent : t.color.textSecondary, fontWeight: completed ? "800" : "600" }]}>
         {cell.day}
       </Text>
@@ -295,6 +304,7 @@ function StorageDialog({ visible, onClose }: { visible: boolean; onClose: () => 
           accessibilityLabel={HISTORY_COPY.storageEntry}
           testID="history-storage-dialog"
         >
+          <LiquidSheen tone="neutral" />
           <Text style={[t.type.heading, { color: t.color.text }]} accessibilityRole="header">
             {HISTORY_COPY.storageEntry}
           </Text>
@@ -307,6 +317,7 @@ function StorageDialog({ visible, onClose }: { visible: boolean; onClose: () => 
             testID="storage-close"
             style={[styles.closeBtn, { backgroundColor: t.color.accent, minHeight: t.target.comfortable }]}
           >
+            <LiquidSheen tone="accent" />
             <Text style={[t.type.bodyStrong, { color: t.color.onAccent }]}>Close</Text>
           </Pressable>
         </View>
@@ -316,13 +327,13 @@ function StorageDialog({ visible, onClose }: { visible: boolean; onClose: () => 
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 16, borderWidth: 1 },
+  card: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  iconBtn: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  iconBtn: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   cell: { width: `${100 / 7}%`, height: 44, alignItems: "center", justifyContent: "center" },
-  dayCell: { marginVertical: 2 },
-  storageRow: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14 },
+  dayCell: { marginVertical: 2, overflow: "hidden" },
+  storageRow: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, overflow: "hidden" },
   dialogWrap: { flex: 1, justifyContent: "center", padding: 24 },
-  closeBtn: { borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  closeBtn: { borderRadius: 14, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
 });

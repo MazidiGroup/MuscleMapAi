@@ -7,6 +7,7 @@ import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 import { ActionButton } from "./ActionButton";
 
@@ -39,8 +40,10 @@ export function InterruptedSessionCard({
         borderColor: t.color.accent,
         padding: t.space.lg,
         gap: t.space.md - 1,
+        overflow: "hidden",
       }}
     >
+      <LiquidSheen tone="neutral" />
       <View style={{ flexDirection: "row", gap: t.space.sm + 1, alignItems: "flex-start" }}>
         <Ionicons name="play-circle" size={20} color={t.color.accentSoft} style={{ marginTop: 1 }} />
         <View style={{ flex: 1 }}>

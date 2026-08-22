@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -11,6 +11,7 @@ import { EXPLORER } from "@/src/anatomy/groups";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { PremiumGate } from "@/src/premium/PremiumGate";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 
 export default function ExploreScreen() {
   return (
@@ -70,8 +71,8 @@ function ExploreContent() {
 
       <View style={[styles.header, { paddingTop: insets.top + 8, pointerEvents: "box-none" }]}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.h1, { color: "#EAF1FB" }]}>Explore Anatomy</Text>
-          <Text style={[styles.sub, { color: "#9AA7BD" }]}>Tap a muscle to learn about it · drag to rotate</Text>
+          <Text style={styles.h1}>Explore Anatomy</Text>
+          <Text style={styles.sub}>Tap a muscle to learn about it · drag to rotate</Text>
         </View>
       </View>
 
@@ -134,15 +135,6 @@ function ExploreContent() {
   );
 }
 
-function SegBtn({ label, active, onPress, icon, styles, T }: { label: string; active: boolean; onPress: () => void; icon: any; styles: any; T: LegacyPalette }) {
-  return (
-    <TouchableOpacity style={[styles.segBtn, active && styles.segBtnActive]} onPress={onPress}>
-      <Ionicons name={icon} size={15} color={active ? T.bg : T.textDim} />
-      <Text style={[styles.segText, active && styles.segTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   header: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 18, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
@@ -150,10 +142,6 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
   controls: { flex: 1, paddingHorizontal: 16, paddingTop: 2 },
   segment: { flexDirection: "row", backgroundColor: T.bg2, borderRadius: 12, padding: 4, marginBottom: 12, gap: 4 },
-  segBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 9, borderRadius: 9 },
-  segBtnActive: { backgroundColor: T.accent },
-  segText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
-  segTextActive: { color: T.bg },
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   sectionTitle: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   eyeBtn: { padding: 4 },

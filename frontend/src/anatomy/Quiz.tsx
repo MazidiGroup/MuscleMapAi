@@ -1,11 +1,17 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { QuizQuestion } from "./lessons";
-import { T } from "./ui";
+import { legacyPalette, LegacyPalette } from "./ui";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 export function Quiz({ questions, onClose }: { questions: QuizQuestion[]; onClose: () => void }) {
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const [idx, setIdx] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [score, setScore] = useState(0);
@@ -32,6 +38,7 @@ export function Quiz({ questions, onClose }: { questions: QuizQuestion[]; onClos
     const pct = Math.round((score / questions.length) * 100);
     return (
       <View style={styles.card} testID="quiz-result">
+        <LiquidSheen tone="neutral" />
         <Ionicons name={pct >= 70 ? "trophy" : "ribbon-outline"} size={48} color={T.accent} />
         <Text style={styles.resultScore}>
           {score}/{questions.length}
@@ -57,6 +64,7 @@ export function Quiz({ questions, onClose }: { questions: QuizQuestion[]; onClos
 
   return (
     <View style={styles.card}>
+      <LiquidSheen tone="neutral" />
       <View style={styles.topRow}>
         <Text style={styles.progress}>
           Question {idx + 1} of {questions.length}
@@ -107,8 +115,8 @@ export function Quiz({ questions, onClose }: { questions: QuizQuestion[]; onClos
   );
 }
 
-const styles = StyleSheet.create({
-  card: { backgroundColor: T.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderColor: T.border, padding: 20, alignItems: "stretch" },
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
+  card: { backgroundColor: T.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderColor: T.border, padding: 20, alignItems: "stretch", overflow: "hidden" },
   topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   progress: { color: T.accent, fontSize: 13, fontWeight: "700" },
   question: { color: T.text, fontSize: 18, fontWeight: "700", marginBottom: 14, lineHeight: 24 },

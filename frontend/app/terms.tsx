@@ -1,10 +1,12 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from "react-native";
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet, ScrollView, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 const SUPPORT_EMAIL = "info@mazidigroup.com";
 const UPDATED = "July 2026";
@@ -13,6 +15,7 @@ const APPLE_EULA_URL = "https://www.apple.com/legal/internet-services/itunes/dev
 export default function TermsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { T, styles } = useLegacyStyles();
 
   return (
     <View style={styles.root}>
@@ -21,7 +24,7 @@ export default function TermsScreen() {
           <Ionicons name="chevron-back" size={24} color={T.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Terms of Use</Text>
-        <View style={styles.back} />
+        <View style={styles.backPlaceholder} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
@@ -33,7 +36,7 @@ export default function TermsScreen() {
           to all apps distributed through the Apple App Store.
         </Section>
 
-        <TouchableOpacity onPress={() => Linking.openURL(APPLE_EULA_URL)} testID="terms-apple-eula">
+        <TouchableOpacity style={styles.linkButton} onPress={() => Linking.openURL(APPLE_EULA_URL)} testID="terms-apple-eula">
           <Text style={styles.link}>Read Apple&apos;s Standard EULA →</Text>
         </TouchableOpacity>
 
@@ -101,7 +104,7 @@ export default function TermsScreen() {
 
         <Text style={styles.h2}>Contact</Text>
         <Text style={styles.p}>Questions about these Terms:</Text>
-        <TouchableOpacity onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} testID="terms-email">
+        <TouchableOpacity style={styles.linkButton} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} testID="terms-email">
           <Text style={styles.link}>{SUPPORT_EMAIL}</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -110,6 +113,7 @@ export default function TermsScreen() {
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const { styles } = useLegacyStyles();
   return (
     <View style={{ marginTop: 8 }}>
       <Text style={styles.h2}>{title}</Text>
@@ -118,7 +122,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-const styles = StyleSheet.create({
+function useLegacyStyles() {
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
+  return { T, styles };
+}
+
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   header: {
     flexDirection: "row",
@@ -129,10 +140,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.border,
   },
-  back: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  back: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" },
+  backPlaceholder: { width: 40, height: 40 },
   headerTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
   updated: { color: T.textFaint, fontSize: 12, marginBottom: 14 },
   h2: { color: T.text, fontSize: 16, fontWeight: "800", marginTop: 18, marginBottom: 6 },
   p: { color: T.textDim, fontSize: 14, lineHeight: 22 },
   link: { color: T.accent, fontSize: 15, fontWeight: "700", marginTop: 6 },
+  linkButton: { minHeight: 44, alignSelf: "flex-start", justifyContent: "center", paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
 });

@@ -13,7 +13,14 @@ import { OwnerToken, ScopedStore, WriteResult } from "./../owner/scopedStore";
 /** Exercise identifiers are preserved exactly, together with their source space. */
 export type ExerciseIdSpace = "anatomy" | "plan";
 
-export type ActiveSet = { id: string; weight: number; reps: number; done: boolean };
+export type ActiveSet = {
+  id: string;
+  weight: number;
+  reps: number;
+  done: boolean;
+  /** v1.2.0. Warm-up sets persist, but stay out of volume and records. */
+  warmup?: boolean;
+};
 
 export type ActiveExercise = {
   /** Exact source ID — never renamed, never inferred from a display name. */
@@ -21,7 +28,9 @@ export type ActiveExercise = {
   idSpace: ExerciseIdSpace;
   sets: ActiveSet[];
   notes: string;
-  planLink?: { planDate: string };
+  planLink?: { planDate: string; planName?: string };
+  /** v1.2.0. Shared id marking adjacent exercises as one superset. */
+  supersetId?: string;
 };
 
 export type ActiveSession = {
@@ -32,6 +41,12 @@ export type ActiveSession = {
   startedAt: number;
   updatedAt: number;
   exercises: ActiveExercise[];
+  /**
+   * v1.2.0. The plan seed in force when the session began. Regenerating the plan
+   * mints a new seed, so a mismatch identifies a session that outlived the plan
+   * it was started from. Absent on sessions saved before v1.2.0.
+   */
+  planSeed?: number;
 };
 
 const latches = new Map<string, Promise<ActiveSession | null>>();

@@ -9,6 +9,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 
 import { useSemanticTokens } from "@/src/theme/semantic";
 import { ActionButton, EmptyState, InfoBanner } from "@/src/ui/state";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 import {
   CatalogFilters,
@@ -57,6 +58,7 @@ export function FilterSheet({
         style={[styles.sheet, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.xl }]}
         testID="library-filter-sheet"
       >
+        <LiquidSheen tone="neutral" />
         <View style={styles.head}>
           <Text style={[t.type.heading, { color: t.color.text }]}>Filters</Text>
           <Text
@@ -127,8 +129,10 @@ function Group({
                 borderWidth: on ? 2 : 1,
                 borderColor: on ? t.color.accent : t.color.border,
                 backgroundColor: on ? t.color.accent + "22" : t.color.surfaceAlt,
+                overflow: "hidden",
               }}
             >
+              <LiquidSheen tone={on ? "accent" : "neutral"} />
               {on && <Text style={[t.type.label, { color: t.color.accent }]}>✓</Text>}
               <Text style={[t.type.label, { color: on ? t.color.accent : t.color.textSecondary }]}>{f.value}</Text>
               <Text style={[t.type.caption, { color: t.color.textMuted }]}>{f.count}</Text>
@@ -151,6 +155,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     borderWidth: 1,
     gap: 12,
+    overflow: "hidden",
   },
   head: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
 });

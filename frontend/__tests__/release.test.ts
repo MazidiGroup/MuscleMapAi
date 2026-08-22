@@ -52,11 +52,13 @@ test("the paywall never hardcodes a currency, price, period or discount", () => 
   assert.ok(src.includes("productTerms("), "prices come from productTerms");
 });
 
-test("the paywall preselects nothing and only enables the CTA after a choice", () => {
+test("the paywall recommends annual access only after real store packages load", () => {
   const src = read("src/premium/Paywall.tsx");
-  assert.ok(/useState<string \| null>\(null\)/.test(src), "selection starts empty");
-  assert.ok(!/find\(\(p\) => p\.packageType === "MONTHLY"\)/.test(src), "no default selection effect");
-  assert.ok(src.includes("disabled={!chosen}"), "the CTA is disabled until a product is chosen");
+  assert.ok(/useState<string \| null>\(null\)/.test(src), "selection stays empty before store data arrives");
+  assert.ok(src.includes('offeringState !== "ready"'), "nothing is selected while products are unresolved");
+  assert.ok(src.includes('p.packageType === "ANNUAL"'), "annual is the explicit recommendation when offered");
+  assert.ok(src.includes("?? sorted[0]"), "unknown store configurations still choose a visible real product");
+  assert.ok(src.includes("disabled={!chosen}"), "the CTA remains safe if no real product exists");
 });
 
 test("the paywall keeps Restore, Terms and Privacy reachable", () => {
@@ -77,7 +79,15 @@ test("the paywall composes shared State-System components for its non-happy path
 
 test("there is exactly one Premium provider, one gate and one resolver", () => {
   const files = fs.readdirSync(path.join(ROOT, "src/premium")).sort();
-  assert.deepEqual(files, ["Paywall.tsx", "PremiumContext.tsx", "PremiumGate.tsx", "entitlement.ts"]);
+  // PremiumDiscovery holds the pre-paywall conversion surfaces only. It owns no
+  // provider, no gate and no resolver — it reads the single context like any
+  // other consumer.
+  assert.deepEqual(files, ["Paywall.tsx", "PremiumContext.tsx", "PremiumDiscovery.tsx", "PremiumGate.tsx", "entitlement.ts"]);
+  const discovery = read("src/premium/PremiumDiscovery.tsx");
+  assert.ok(
+    !/createContext|resolvePremium|usePremium|designatedEntitlementActive/.test(discovery),
+    "discovery is presentational: it never provides, reads or re-derives entitlement",
+  );
 });
 
 test("Premium screens gate through PremiumGate and never re-derive entitlement", () => {
@@ -211,7 +221,7 @@ test("no EAS project linkage, update channel or OTA configuration was introduced
 
 test("app identifiers, version and build configuration are unchanged", () => {
   const app = JSON.parse(read("app.json"));
-  assert.equal(app.expo.version, "1.1.8");
+  assert.equal(app.expo.version, "1.2.0");
   assert.equal(app.expo.ios.bundleIdentifier, "com.mazidigroup.apexai");
   assert.equal(app.expo.android.package, "com.mazidigroup.apexai");
   const eas = JSON.parse(read("eas.json"));

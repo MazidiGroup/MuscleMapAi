@@ -226,9 +226,15 @@ test("restore, terms and privacy are part of the contract", () => {
   assert.equal(PAYWALL_COPY.legal.privacy, "Privacy Policy");
 });
 
-test("the CTA only names a product once one has been chosen", () => {
+test("the CTA never names, invents or implies a product", () => {
   assert.equal(PAYWALL_COPY.ctaUnselected, "Select an option");
-  assert.equal(PAYWALL_COPY.cta("Yearly"), "Continue with Yearly");
+  // The outcome-led CTA is deliberately product-agnostic: the exact localised
+  // product, price and renewal terms are repeated beneath it from store data.
+  assert.equal(PAYWALL_COPY.cta("Yearly"), "Unlock Premium");
+  assert.ok(!PAYWALL_COPY.cta("Yearly").includes("Yearly"));
+  // Trial wording is a separate label so it can never be shown without
+  // verified eligibility and a real zero-price introductory phase.
+  assert.equal(PAYWALL_COPY.ctaTrial, "Start free trial");
 });
 
 // --- product presentation ---------------------------------------------------

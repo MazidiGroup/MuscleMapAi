@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Pressable } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Modal, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -7,11 +7,17 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { AnatomyViewer } from "@/src/anatomy/AnatomyViewer";
 import { Quiz } from "@/src/anatomy/Quiz";
 import { getLesson } from "@/src/anatomy/lessons";
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 export default function LessonDetail() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const lesson = getLesson(String(id));
   const [quizOpen, setQuizOpen] = useState(false);
@@ -35,6 +41,7 @@ export default function LessonDetail() {
       </TouchableOpacity>
 
       <View style={styles.panel}>
+        <LiquidSheen tone="neutral" />
         <View style={styles.handle} />
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}>
           <Text style={styles.title}>{lesson.title}</Text>
@@ -83,7 +90,7 @@ export default function LessonDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   viewer: { height: "42%" },
   back: {
@@ -108,6 +115,7 @@ const styles = StyleSheet.create({
     marginTop: -24,
     paddingHorizontal: 20,
     paddingTop: 10,
+    overflow: "hidden",
   },
   handle: { alignSelf: "center", width: 42, height: 5, borderRadius: 3, backgroundColor: "rgba(120,160,220,0.25)", marginBottom: 12 },
   title: { color: T.text, fontSize: 24, fontWeight: "800" },

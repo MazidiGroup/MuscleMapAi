@@ -1,8 +1,9 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Pressable, Linking, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TextInput, Modal, Pressable, Linking, Alert, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
+import Constants from "expo-constants";
 
 import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
 import { GYM_GROUPS, GYM_GROUP_ORDER, prettyName } from "@/src/anatomy/groups";
@@ -28,11 +29,18 @@ import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette, GROUP_COLORS } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
+
+/** The shipped version, straight from app.json. Never hand-typed in a screen. */
+const APP_VERSION = Constants.expoConfig?.version ?? "—";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { PremiumGate } from "@/src/premium/PremiumGate";
 import { gate } from "@/src/premium/entitlement";
 import { MANUAL_APPLE_REVOCATION_COPY, useAuth } from "@/src/auth/AuthContext";
 import { FLAGS } from "@/src/config/featureFlags";
+import { ThemeSwitcher } from "@/src/ui/ThemeSwitcher";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
+import { PremiumDiscoveryCard } from "@/src/premium/PremiumDiscovery";
 
 type LibSeg = "exercises" | "muscles" | "learn" | "account";
 
@@ -224,10 +232,10 @@ export default function LibraryScreen() {
                   <Ionicons
                     name={s === "muscles" ? "body-outline" : s === "exercises" ? "barbell-outline" : s === "learn" ? "school-outline" : "person-circle-outline"}
                     size={15}
-                    color={seg === s ? T.bg : T.textDim}
+                    color={seg === s ? T.accent : T.textDim}
                   />
                   <Text style={[styles.libSegText, seg === s && styles.libSegTextActive]}>{SEG_LABELS[s]}</Text>
-                  {isLocked && <Ionicons name="lock-closed" size={10} color={seg === s ? T.bg : T.textFaint} style={{ marginLeft: 3 }} />}
+                  {isLocked && <Ionicons name="lock-closed" size={10} color={seg === s ? T.accent : T.textFaint} style={{ marginLeft: 3 }} />}
                 </TouchableOpacity>
               );
             })}
@@ -235,6 +243,7 @@ export default function LibraryScreen() {
         )}
         {(seg === "exercises" || (seg === "muscles" && musclesDecision === "allow")) && (
           <View style={styles.search}>
+            <LiquidSheen tone="neutral" />
             <Ionicons name="search" size={18} color={T.textFaint} />
             <TextInput
               style={styles.searchInput}
@@ -406,7 +415,20 @@ export default function LibraryScreen() {
         {/* Account */}
         {seg === "account" && (
           <View style={styles.about}>
-            <Text style={styles.aboutTitle}>Account</Text>
+            <Text style={styles.aboutTitle}>Appearance</Text>
+            <ThemeSwitcher />
+            {/* Held back until entitlement resolves, so a subscriber never sees
+                a Premium pitch on their own Account screen. */}
+            {!resolution.access && resolution.state === "ready" ? (
+              <View style={{ marginTop: 18 }}>
+                <PremiumDiscoveryCard
+                  compact
+                  onPress={() => router.push("/(tabs)/coach")}
+                  testID="account-premium-entry"
+                />
+              </View>
+            ) : null}
+            <Text style={[styles.aboutTitle, { marginTop: 22 }]}>Account</Text>
             <View style={styles.linkList}>
               {/* Training days and Advanced Lifter Mode are edited together, because the
                   mode is a constraint on how many days are selected. */}
@@ -431,6 +453,7 @@ export default function LibraryScreen() {
               ) : user.is_guest ? (
                 <>
                   <View style={styles.linkRow} testID="account-info">
+                    <LiquidSheen tone="neutral" />
                     <Ionicons name="person-circle-outline" size={20} color={T.accent} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.linkRowText} numberOfLines={1}>Guest</Text>
@@ -446,6 +469,7 @@ export default function LibraryScreen() {
               ) : (
                 <>
                   <View style={styles.linkRow} testID="account-info">
+                    <LiquidSheen tone="neutral" />
                     <Ionicons name="person-circle-outline" size={20} color={T.accent} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.linkRowText} numberOfLines={1}>{user.name}</Text>
@@ -471,7 +495,9 @@ export default function LibraryScreen() {
               Muscle Map Ai — explore a life-size 3D muscle model with 270 named structures,
               build a personalized weekly workout plan, and track your training.
             </Text>
-            <Text style={styles.version}>v1.1.1 · Plan · Workout · Coach · Explore · Library</Text>
+            {/* Read from the app config rather than typed here, so the About
+                screen can never disagree with the version that shipped. */}
+            <Text style={styles.version}>v{APP_VERSION} · Plan · Workout · Coach · Explore · Library</Text>
 
             <View style={styles.linkList}>
               <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/references")} testID="link-references">
@@ -577,11 +603,11 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
   search: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 12, height: 44, marginTop: 14 },
   searchInput: { flex: 1, color: T.text, fontSize: 15 },
-  libSeg: { flexDirection: "row", backgroundColor: T.surface, borderRadius: 12, padding: 4, gap: 4, marginTop: 10, borderWidth: 1, borderColor: T.border },
-  libSegBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 9, borderRadius: 9 },
-  libSegActive: { backgroundColor: T.accent },
+  libSeg: { flexDirection: "row", backgroundColor: "transparent", padding: 0, gap: 3, marginTop: 14 },
+  libSegBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 44, paddingHorizontal: 3, borderRadius: 11 },
+  libSegActive: { backgroundColor: T.accent + "14", borderBottomWidth: 2, borderBottomColor: T.accent },
   libSegText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
-  libSegTextActive: { color: T.bg },
+  libSegTextActive: { color: T.accent },
   gbChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border },
   gbChipActive: { backgroundColor: T.accent, borderColor: T.accent },
   gbChipText: { color: T.text, fontSize: 13, fontWeight: "700" },

@@ -12,13 +12,21 @@ import { InsightsView } from "@/src/anatomy/InsightsView";
 import { HistoryView } from "@/src/history/HistoryView";
 import { EXERCISES, getExercise } from "@/src/anatomy/exercises";
 import { getExerciseMeta } from "@/src/anatomy/gymGuide";
-import { useWorkout, workoutStats } from "@/src/anatomy/workoutStore";
+import { useWorkout, workoutStats, type SessionExercise } from "@/src/anatomy/workoutStore";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { formatSetLoad, isBodyweightEquipment, loadColumnLabel, loadPlaceholder } from "@/src/anatomy/bodyweight";
+import { canMarkDone, ZERO_REP_HINT } from "@/src/anatomy/setRules";
+import { OVERLOAD_NOTE, PR_LABEL, prForSet, recordsFrom, suggestNext } from "@/src/anatomy/progression";
+import { exercisePerformances } from "@/src/history/metrics";
+import { usePlanStore } from "@/src/plan/planStore";
+import type { Workout } from "@/src/anatomy/workoutScope";
+import type { WeightUnit } from "@/src/units/unitPreference";
+import type { Goal } from "@/src/plan/exercises";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { EmptyState, ErrorBanner } from "@/src/ui/state";
 import { A11yControl } from "@/src/ui/A11yControl";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 type Seg = "session" | "history" | "insights" | "exercises";
 const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower", "Mobility"];
@@ -29,6 +37,8 @@ export default function WorkoutScreen() {
   const { height } = useWindowDimensions();
   const params = useLocalSearchParams<{ seg?: string; ex?: string }>();
   const w = useWorkout();
+  // Progression targets follow the rep range the plan was built around.
+  const goal = usePlanStore((s) => s.answers.goal);
   const { mode } = useTheme();
   const isFocused = useIsFocused();
   const T = useMemo(() => legacyPalette(mode), [mode]);
@@ -37,7 +47,6 @@ export default function WorkoutScreen() {
   const [seg, setSeg] = useState<Seg>("session");
   const [cat, setCat] = useState("All");
   const [restVisible, setRestVisible] = useState(false);
-  const [now, setNow] = useState(Date.now());
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
   // The segmented header floats above the content, so its REAL height (it wraps to
@@ -57,13 +66,6 @@ export default function WorkoutScreen() {
     if (params.ex) w.addExercise(String(params.ex));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.ex]);
-
-  // live duration tick
-  useEffect(() => {
-    if (!w.startedAt) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [w.startedAt]);
 
   // The rest timer belongs to a live session on the Session segment. Finishing or
   // cancelling the workout, moving to another segment, or leaving the tab closes it
@@ -140,6 +142,7 @@ export default function WorkoutScreen() {
           <View style={[styles.seg, { flex: 1 }]}>
             {(["session", "history", "insights", "exercises"] as Seg[]).map((s) => (
               <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => selectSeg(s)} testID={`seg-${s}`}>
+                <LiquidSheen tone={seg === s ? "accent" : "subtle"} />
                 <Text style={[styles.segText, seg === s && styles.segTextActive]}>
                   {s === "session" ? "Session" : s === "history" ? "History" : s === "insights" ? "Insights" : "Muscle Groups"}
                 </Text>
@@ -154,6 +157,7 @@ export default function WorkoutScreen() {
             accessibilityLabel={`Weight unit, ${w.unit}. Tap to switch.`}
             testID="unit-toggle"
           >
+            <LiquidSheen tone="neutral" />
             <Text style={styles.unitText}>{w.unit.toUpperCase()}</Text>
           </TouchableOpacity>
         </View>
@@ -164,20 +168,56 @@ export default function WorkoutScreen() {
       {seg === "exercises" && (
         <DraggableSheet peekHeight={230} maxHeight={Math.min(height * 0.82, height - insets.top - 60)} initial="collapsed">
           <View style={{ flex: 1, paddingHorizontal: 16 }}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 10 }}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {CATS.map((c) => (
-                  <TouchableOpacity key={c} style={[styles.cat, cat === c && styles.catActive]} onPress={() => setCat(c)} testID={`cat-${c}`}>
-                    <Text style={[styles.catText, cat === c && { color: T.bg }]}>{c}</Text>
-                  </TouchableOpacity>
-                ))}
+            {/* This model is colour-coded by the role each muscle plays in the
+                selected category — a different scale from the Insights recovery
+                map, so it states its own key rather than borrowing that one. */}
+            <View style={styles.mgLegend} testID="muscle-groups-legend">
+              <View style={styles.mgLegendItem} accessible accessibilityLabel="Red: prime mover for the selected category">
+                <View style={[styles.mgDot, { backgroundColor: "#FF4438" }]} />
+                <Text style={styles.mgLegendText}>Prime mover</Text>
               </View>
+              <View style={styles.mgLegendItem} accessible accessibilityLabel="Amber: assisting muscle">
+                <View style={[styles.mgDot, { backgroundColor: "#FFB020" }]} />
+                <Text style={styles.mgLegendText}>Assists</Text>
+              </View>
+              <View style={styles.mgLegendItem} accessible accessibilityLabel="Grey: not targeted by this category">
+                <View style={[styles.mgDot, { backgroundColor: "#3A3D45" }]} />
+                <Text style={styles.mgLegendText}>Not targeted</Text>
+              </View>
+            </View>
+            {/* The row is given an explicit height: as a horizontal scroller inside a
+                flex column it otherwise collapses on the cross axis, which left the
+                chips rendering as empty pills with their labels clipped away. The
+                height also brings each chip up to the 44pt minimum target. */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0, flexShrink: 0, height: 44, marginBottom: 10 }}
+              contentContainerStyle={{ flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 4 }}
+            >
+              {CATS.map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.cat, cat === c && styles.catActive]}
+                  onPress={() => setCat(c)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: cat === c }}
+                  accessibilityLabel={`${c} exercises`}
+                  testID={`cat-${c}`}
+                >
+                  <LiquidSheen tone={cat === c ? "accent" : "neutral"} />
+                  <Text numberOfLines={1} style={[styles.catText, cat === c && { color: T.bg }]}>
+                    {c}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </ScrollView>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
               {list.map((e) => {
                 const meta = getExerciseMeta(e.id);
                 return (
                   <TouchableOpacity key={e.id} style={styles.exItem} onPress={() => router.push(`/exercise/${e.id}`)} testID={`ex-${e.id}`}>
+                    <LiquidSheen tone="subtle" />
                     <ExerciseAnimation
                       exerciseId={e.id}
                       variant="thumb"
@@ -202,6 +242,7 @@ export default function WorkoutScreen() {
                         </View>
                       ) : (
                         <TouchableOpacity style={styles.addPill} onPress={() => w.addExercise(e.id)} testID={`add-ex-${e.id}`}>
+                          <LiquidSheen tone="accent" />
                           <Ionicons name="add" size={16} color={T.bg} />
                           <Text style={styles.addPillText}>Add</Text>
                         </TouchableOpacity>
@@ -235,123 +276,33 @@ export default function WorkoutScreen() {
           ) : (
             <>
               <View style={styles.statsBar}>
+                <LiquidSheen tone="neutral" />
                 <SBStat label="Exercises" value={`${w.session.length}`} styles={styles} />
                 <SBStat label="Sets" value={`${stats.completed}/${stats.sets}`} styles={styles} />
                 <SBStat label="Volume" value={`${stats.volume} ${w.unit}`} styles={styles} />
               </View>
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
-                {w.session.map((se) => {
-                  const ex = getExercise(se.exerciseId);
-                  const bodyweight = isBodyweightEquipment(ex?.equipment);
-                  return (
-                    <View key={se.exerciseId} style={styles.exCard}>
-                      <View style={styles.exCardHead}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-                          <Text style={styles.exCardName}>{ex?.name}</Text>
-                          {bodyweight && (
-                            <View style={styles.bwBadge}>
-                              <Text style={styles.bwBadgeText}>BW</Text>
-                            </View>
-                          )}
-                        </View>
-                        <TouchableOpacity
-                          onPress={() => w.removeExercise(se.exerciseId)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Remove ${ex?.name} from this workout`}
-                          testID={`rm-${se.exerciseId}`}
-                        >
-                          <Ionicons name="trash-outline" size={18} color={T.textFaint} />
-                        </TouchableOpacity>
-                      </View>
-                      {/* Form demo with play/pause + replay controls (paused poster by default) */}
-                      <ExerciseAnimation exerciseId={se.exerciseId} exerciseName={ex?.name} variant="workout" />
-                      <View style={styles.setHeadRow}>
-                        <Text style={[styles.setHead, { width: 30 }]}>SET</Text>
-                        <Text style={[styles.setHead, { flex: 1 }]}>{loadColumnLabel(w.unit, bodyweight)}</Text>
-                        <Text style={[styles.setHead, { flex: 1 }]}>REPS</Text>
-                        <Text style={[styles.setHead, { width: 80, textAlign: "center" }]}>DONE</Text>
-                      </View>
-                      {se.sets.map((s, idx) => (
-                        <View key={s.id} style={[styles.setRow, s.done && styles.setRowDone]}>
-                          <Text style={[styles.setIdx, { width: 30 }]}>{idx + 1}</Text>
-                          <TextInput
-                            style={styles.setInput}
-                            keyboardType="numeric"
-                            value={s.weight ? String(s.weight) : ""}
-                            placeholder={loadPlaceholder(bodyweight)}
-                            placeholderTextColor={T.textFaint}
-                            onChangeText={(t) => w.updateSet(se.exerciseId, s.id, { weight: Number(t) || 0 })}
-                            accessibilityLabel={`Set ${idx + 1} load, ${formatSetLoad(s.weight, w.unit, bodyweight)}`}
-                            testID={`w-${se.exerciseId}-${idx}`}
-                          />
-                          <TextInput
-                            style={styles.setInput}
-                            keyboardType="numeric"
-                            value={s.reps ? String(s.reps) : ""}
-                            placeholder="0"
-                            placeholderTextColor={T.textFaint}
-                            onChangeText={(t) => w.updateSet(se.exerciseId, s.id, { reps: Number(t) || 0 })}
-                            accessibilityLabel={`Set ${idx + 1} reps, ${s.reps || 0}`}
-                            testID={`r-${se.exerciseId}-${idx}`}
-                          />
-                          <View style={styles.setActions}>
-                            <A11yControl
-                              label={`Duplicate set ${idx + 1}`}
-                              onPress={() => w.duplicateSet(se.exerciseId, s.id)}
-                              style={styles.setActionBtn}
-                              testID={`dup-${se.exerciseId}-${idx}`}
-                            >
-                              <Ionicons name="copy-outline" size={18} color={T.textDim} />
-                            </A11yControl>
-                            <A11yControl
-                              label={`Delete set ${idx + 1}`}
-                              onPress={() => w.deleteSet(se.exerciseId, s.id)}
-                              style={styles.setActionBtn}
-                              testID={`del-${se.exerciseId}-${idx}`}
-                            >
-                              <Ionicons name="remove-circle-outline" size={18} color={T.textDim} />
-                            </A11yControl>
-                            <A11yControl
-                              role="checkbox"
-                              checked={s.done}
-                              label={`Set ${idx + 1} complete`}
-                              onPress={() => onToggleDone(se.exerciseId, s.id, !s.done)}
-                              style={styles.setActionBtn}
-                              testID={`done-${se.exerciseId}-${idx}`}
-                            >
-                              <Ionicons name={s.done ? "checkmark-circle" : "ellipse-outline"} size={24} color={s.done ? "#3DDC97" : T.textFaint} />
-                            </A11yControl>
-                          </View>
-                        </View>
-                      ))}
-                      <TouchableOpacity
-                        style={styles.addSet}
-                        onPress={() => w.addSet(se.exerciseId)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Add a set to ${ex?.name}`}
-                        testID={`addset-${se.exerciseId}`}
-                      >
-                        <Ionicons name="add" size={16} color={T.accent} />
-                        <Text style={styles.addSetText}>Add Set</Text>
-                      </TouchableOpacity>
-                      <TextInput
-                        style={styles.notes}
-                        placeholder="Notes…"
-                        placeholderTextColor={T.textFaint}
-                        value={se.notes}
-                        onChangeText={(t) => w.setNotes(se.exerciseId, t)}
-                        accessibilityLabel={`Notes for ${ex?.name}`}
-                        testID={`notes-${se.exerciseId}`}
-                      />
-                    </View>
-                  );
-                })}
+                {w.session.map((se, i) => (
+                  <SessionCard
+                    key={se.exerciseId}
+                    se={se}
+                    prev={i > 0 ? w.session![i - 1] : null}
+                    history={w.history}
+                    unit={w.unit}
+                    goal={goal}
+                    styles={styles}
+                    T={T}
+                    w={w}
+                    onToggleDone={onToggleDone}
+                  />
+                ))}
                 <A11yControl
                   label="Add exercise"
                   onPress={() => selectSeg("exercises")}
                   style={styles.addExBtn}
                   testID="add-exercise"
                 >
+                  <LiquidSheen tone="neutral" />
                   <Ionicons name="add-circle-outline" size={18} color={T.accent} />
                   <Text style={styles.addExText}>Add Exercise</Text>
                 </A11yControl>
@@ -368,6 +319,7 @@ export default function WorkoutScreen() {
                   style={styles.cancelBtn}
                   testID="cancel-workout"
                 >
+                  <LiquidSheen tone="neutral" />
                   <Text style={styles.cancelText}>Cancel</Text>
                 </A11yControl>
                 <A11yControl
@@ -378,6 +330,7 @@ export default function WorkoutScreen() {
                   style={styles.finishBtn}
                   testID="finish-workout"
                 >
+                  <LiquidSheen tone="accent" />
                   <Ionicons name="flag" size={16} color={T.bg} />
                   <Text style={styles.finishText}>{finishing ? "Saving…" : "Finish Workout"}</Text>
                 </A11yControl>
@@ -402,6 +355,268 @@ export default function WorkoutScreen() {
   );
 }
 
+/**
+ * One exercise in the live session.
+ *
+ * Extracted from the render loop so it can derive its own history-backed values
+ * (the next-target prompt and the records a set has to beat) with memoised hooks
+ * instead of recomputing the whole history for every exercise on every keystroke.
+ */
+function SessionCard({
+  se,
+  prev,
+  history,
+  unit,
+  goal,
+  styles,
+  T,
+  w,
+  onToggleDone,
+}: {
+  se: SessionExercise;
+  prev: SessionExercise | null;
+  history: Workout[];
+  unit: WeightUnit;
+  goal: Goal | undefined;
+  styles: any;
+  T: LegacyPalette;
+  w: ReturnType<typeof useWorkout>;
+  onToggleDone: (exId: string, setId: string, willBeDone: boolean) => void;
+}) {
+  const ex = getExercise(se.exerciseId);
+  const bodyweight = isBodyweightEquipment(ex?.equipment);
+
+  // Completed working sets for THIS exercise, from finished workouts only.
+  const perfs = useMemo(
+    () => exercisePerformances(history, se.exerciseId, se.idSpace ?? "anatomy"),
+    [history, se.exerciseId, se.idSpace],
+  );
+  const suggestion = useMemo(
+    () => suggestNext({ performances: perfs, unit, goal, bodyweight }),
+    [perfs, unit, goal, bodyweight],
+  );
+  const records = useMemo(() => recordsFrom(perfs), [perfs]);
+  // Which completed sets beat the stored bests, resolved once per render.
+  const setPRs = useMemo(
+    () => se.sets.map((s) => (s.done && !s.warmup ? prForSet(s, records) : null)),
+    [se.sets, records],
+  );
+  const firstPR = setPRs.find((p) => p !== null) ?? null;
+
+  const inSuperset = !!se.supersetId;
+  const linkedAbove = inSuperset && !!prev && prev.supersetId === se.supersetId;
+
+  return (
+    <View style={[styles.exCard, inSuperset && styles.exCardSuper]}>
+      <LiquidSheen tone={inSuperset ? "accent" : "neutral"} />
+      {linkedAbove && (
+        <View style={styles.superTag}>
+          <Ionicons name="link" size={11} color={T.secondary} />
+          <Text style={styles.superTagText}>SUPERSET — alternate with the exercise above</Text>
+        </View>
+      )}
+      <View style={styles.exCardHead}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+          <Text style={styles.exCardName}>{ex?.name}</Text>
+          {bodyweight && (
+            <View style={styles.bwBadge}>
+              <Text style={styles.bwBadgeText}>BW</Text>
+            </View>
+          )}
+        </View>
+        {/* Pairing is only meaningful when there is an exercise above to pair with. */}
+        {prev && (
+          <A11yControl
+            role="checkbox"
+            checked={linkedAbove}
+            label={linkedAbove ? `Unlink ${ex?.name} from the superset above` : `Superset ${ex?.name} with the exercise above`}
+            onPress={() => w.toggleSuperset(se.exerciseId)}
+            style={styles.headBtn}
+            testID={`superset-${se.exerciseId}`}
+          >
+            <LiquidSheen tone={linkedAbove ? "accent" : "neutral"} />
+            <Ionicons name={linkedAbove ? "link" : "link-outline"} size={18} color={linkedAbove ? T.secondary : T.textFaint} />
+          </A11yControl>
+        )}
+        <A11yControl
+          label={`Remove ${ex?.name} from this workout`}
+          onPress={() => w.removeExercise(se.exerciseId)}
+          style={styles.headBtn}
+          testID={`rm-${se.exerciseId}`}
+        >
+          <LiquidSheen tone="danger" />
+          <Ionicons name="trash-outline" size={18} color={T.textFaint} />
+        </A11yControl>
+      </View>
+
+      {/* Form demo with play/pause + replay controls (paused poster by default) */}
+      <ExerciseAnimation exerciseId={se.exerciseId} exerciseName={ex?.name} variant="workout" />
+
+      {/* Next target, derived from this exercise's own completed sets. Offered
+          only once there is a performance to build on — never invented. */}
+      {suggestion && (
+        <View style={styles.suggestCard} testID={`suggest-${se.exerciseId}`}>
+          <Ionicons name="trending-up" size={15} color={T.accent} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.suggestHeadline}>{suggestion.headline}</Text>
+            <Text style={styles.suggestBasis}>{suggestion.basis}</Text>
+          </View>
+          {/* Fills the empty rows only — never overwrites something already logged. */}
+          <TouchableOpacity
+            style={styles.suggestApply}
+            onPress={() => {
+              for (const s of se.sets) {
+                if (s.done || s.reps > 0 || s.weight > 0) continue;
+                w.updateSet(se.exerciseId, s.id, {
+                  weight: suggestion.targetWeight,
+                  reps: suggestion.targetReps,
+                });
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Fill empty sets with ${suggestion.headline}`}
+            testID={`suggest-apply-${se.exerciseId}`}
+          >
+            <LiquidSheen tone="accent" />
+            <Text style={styles.suggestApplyText}>Use</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={styles.setHeadRow}>
+        <Text style={[styles.setHead, { width: 44, textAlign: "center" }]}>SET</Text>
+        <Text style={[styles.setHead, { flex: 1 }]}>{loadColumnLabel(unit, bodyweight)}</Text>
+        <Text style={[styles.setHead, { flex: 1 }]}>REPS</Text>
+        <Text style={[styles.setHead, { width: 132, textAlign: "center" }]}>DONE</Text>
+      </View>
+
+      {se.sets.map((s, idx) => {
+        const ready = canMarkDone(s);
+        const pr = setPRs[idx];
+        return (
+          <View key={s.id} style={[styles.setRow, s.done && styles.setRowDone]}>
+            {/* The set number doubles as the warm-up toggle: a warm-up is logged
+                with the session but stays out of volume and records. */}
+            <A11yControl
+              role="checkbox"
+              checked={!!s.warmup}
+              label={
+                s.warmup
+                  ? `Set ${idx + 1} is a warm-up. Tap to make it a working set.`
+                  : `Set ${idx + 1} is a working set. Tap to mark it a warm-up.`
+              }
+              onPress={() => w.toggleWarmup(se.exerciseId, s.id)}
+              style={styles.setIdxBtn}
+              testID={`warmup-${se.exerciseId}-${idx}`}
+            >
+              {s.warmup ? (
+                <View style={styles.warmPill}>
+                  <Text style={styles.warmPillText}>W</Text>
+                </View>
+              ) : (
+                <Text style={styles.setIdx}>{idx + 1}</Text>
+              )}
+            </A11yControl>
+            <TextInput
+              style={styles.setInput}
+              keyboardType="numeric"
+              value={s.weight ? String(s.weight) : ""}
+              placeholder={loadPlaceholder(bodyweight)}
+              placeholderTextColor={T.textFaint}
+              onChangeText={(t) => w.updateSet(se.exerciseId, s.id, { weight: Number(t) || 0 })}
+              accessibilityLabel={`Set ${idx + 1} load, ${formatSetLoad(s.weight, unit, bodyweight)}`}
+              testID={`w-${se.exerciseId}-${idx}`}
+            />
+            <TextInput
+              style={styles.setInput}
+              keyboardType="numeric"
+              value={s.reps ? String(s.reps) : ""}
+              placeholder="0"
+              placeholderTextColor={T.textFaint}
+              onChangeText={(t) => w.updateSet(se.exerciseId, s.id, { reps: Number(t) || 0 })}
+              accessibilityLabel={`Set ${idx + 1} reps, ${s.reps || 0}`}
+              testID={`r-${se.exerciseId}-${idx}`}
+            />
+            <View style={styles.setActions}>
+              {pr ? (
+                <View style={styles.prFlag} testID={`pr-${se.exerciseId}-${idx}`}>
+                  <Ionicons name="trophy" size={13} color={T.secondary} />
+                </View>
+              ) : (
+                <A11yControl
+                  label={`Duplicate set ${idx + 1}`}
+                  onPress={() => w.duplicateSet(se.exerciseId, s.id)}
+                  style={styles.setActionBtn}
+                  testID={`dup-${se.exerciseId}-${idx}`}
+                >
+                  <LiquidSheen tone="neutral" />
+                  <Ionicons name="copy-outline" size={18} color={T.textDim} />
+                </A11yControl>
+              )}
+              <A11yControl
+                label={`Delete set ${idx + 1}`}
+                onPress={() => w.deleteSet(se.exerciseId, s.id)}
+                style={styles.setActionBtn}
+                testID={`del-${se.exerciseId}-${idx}`}
+              >
+                <LiquidSheen tone="neutral" />
+                <Ionicons name="remove-circle-outline" size={18} color={T.textDim} />
+              </A11yControl>
+              {/* A set with no reps records no work, so it cannot be ticked. */}
+              <A11yControl
+                role="checkbox"
+                checked={s.done}
+                disabled={!s.done && !ready}
+                label={s.done ? `Set ${idx + 1} complete` : ready ? `Mark set ${idx + 1} complete` : ZERO_REP_HINT}
+                onPress={() => onToggleDone(se.exerciseId, s.id, !s.done)}
+                style={styles.setActionBtn}
+                testID={`done-${se.exerciseId}-${idx}`}
+              >
+                <LiquidSheen tone={s.done ? "accent" : "neutral"} />
+                <Ionicons
+                  name={s.done ? "checkmark-circle" : "ellipse-outline"}
+                  size={24}
+                  color={s.done ? "#3DDC97" : ready ? T.textFaint : T.border}
+                />
+              </A11yControl>
+            </View>
+          </View>
+        );
+      })}
+
+      {/* Named once per card rather than on every row, so the log stays readable. */}
+      {firstPR && (
+        <View style={styles.prNote} testID={`pr-note-${se.exerciseId}`}>
+          <Ionicons name="trophy" size={13} color={T.secondary} />
+          <Text style={styles.prNoteText}>{PR_LABEL[firstPR]} — a new best on this exercise.</Text>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={styles.addSet}
+        onPress={() => w.addSet(se.exerciseId)}
+        accessibilityRole="button"
+        accessibilityLabel={`Add a set to ${ex?.name}`}
+        testID={`addset-${se.exerciseId}`}
+      >
+        <LiquidSheen tone="neutral" />
+        <Ionicons name="add" size={16} color={T.accent} />
+        <Text style={styles.addSetText}>Add Set</Text>
+      </TouchableOpacity>
+      <TextInput
+        style={styles.notes}
+        placeholder="Notes…"
+        placeholderTextColor={T.textFaint}
+        value={se.notes}
+        onChangeText={(t) => w.setNotes(se.exerciseId, t)}
+        accessibilityLabel={`Notes for ${ex?.name}`}
+        testID={`notes-${se.exerciseId}`}
+      />
+      {suggestion && <Text style={styles.overloadNote}>{OVERLOAD_NOTE}</Text>}
+    </View>
+  );
+}
+
 function SBStat({ label, value, styles }: { label: string; value: string; styles: any }) {
   return (
     <View style={styles.sbStat}>
@@ -415,17 +630,25 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   full: { ...StyleSheet.absoluteFillObject, backgroundColor: T.bg },
   segWrap: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 16, zIndex: 10 },
-  seg: { flexDirection: "row", backgroundColor: T.surface, borderRadius: 12, padding: 4, gap: 4, borderWidth: 1, borderColor: T.border },
-  segBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 5 },
-  segActive: { backgroundColor: T.accent },
+  seg: { flexDirection: "row", backgroundColor: "transparent", padding: 0, gap: 3 },
+  segBtn: { flex: 1, minHeight: 44, paddingHorizontal: 4, borderRadius: 11, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 5, overflow: "hidden", borderWidth: 1, borderColor: T.border },
+  segActive: { backgroundColor: T.accent + "14", borderBottomWidth: 2, borderBottomColor: T.accent },
   segText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
-  segTextActive: { color: T.bg },
+  segTextActive: { color: T.accent },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#3DDC97" },
 
-  cat: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border },
+  cat: {
+    paddingHorizontal: 16, height: 40, minWidth: 56, borderRadius: 999,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, overflow: "hidden",
+  },
   catActive: { backgroundColor: T.accent, borderColor: T.accent },
+  mgLegend: { flexDirection: "row", flexWrap: "wrap", gap: 14, marginBottom: 10 },
+  mgLegendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  mgDot: { width: 10, height: 10, borderRadius: 5 },
+  mgLegendText: { color: T.textDim, fontSize: 11.5, fontWeight: "600" },
   catText: { color: T.text, fontSize: 13, fontWeight: "700" },
-  exItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 14, padding: 12, marginBottom: 8 },
+  exItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 14, padding: 12, marginBottom: 8, overflow: "hidden" },
   exIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   exItemName: { color: T.text, fontSize: 15, fontWeight: "700" },
   exItemMeta: { color: T.textFaint, fontSize: 12, marginTop: 2 },
@@ -433,7 +656,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   empty: { flex: 1, justifyContent: "center", padding: 16 },
   unitBtn: {
     minWidth: 44, height: 44, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1,
-    borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center",
+    borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center", overflow: "hidden",
   },
   unitText: { color: T.text, fontSize: 13, fontWeight: "800" },
   bwBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: T.accent + "22" },
@@ -446,32 +669,65 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   ghostBtn: { paddingVertical: 10 },
   ghostText: { color: T.textDim, fontSize: 14, fontWeight: "600" },
 
-  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, paddingVertical: 12 },
+  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, paddingVertical: 12, overflow: "hidden" },
   sbStat: { flex: 1, alignItems: "center" },
   sbValue: { color: T.accent, fontSize: 17, fontWeight: "800" },
   sbLabel: { color: T.textFaint, fontSize: 11, marginTop: 2 },
 
-  exCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 14, marginBottom: 12 },
+  exCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 14, marginBottom: 12, overflow: "hidden" },
+  exCardSuper: { borderColor: T.secondary + "66" },
   exCardHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   exCardName: { color: T.text, fontSize: 16, fontWeight: "800" },
+  headBtn: {
+    width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center",
+    overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi,
+  },
+  superTag: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 8 },
+  superTagText: { color: T.secondary, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
+
+  suggestCard: {
+    flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10,
+    backgroundColor: T.accent + "14", borderWidth: 1, borderColor: T.accent + "44",
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+  },
+  suggestHeadline: { color: T.text, fontSize: 14, fontWeight: "800" },
+  suggestBasis: { color: T.textDim, fontSize: 11.5, marginTop: 2 },
+  suggestApply: {
+    paddingHorizontal: 14, minHeight: 36, borderRadius: 999, overflow: "hidden",
+    alignItems: "center", justifyContent: "center", backgroundColor: T.accent,
+  },
+  suggestApplyText: { color: T.bg, fontSize: 12.5, fontWeight: "800" },
+  overloadNote: { color: T.textFaint, fontSize: 10.5, lineHeight: 15, marginTop: 8 },
+
+  prFlag: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  prNote: {
+    flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8,
+    backgroundColor: "rgba(255,176,32,0.12)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7,
+  },
+  prNoteText: { color: T.secondary, fontSize: 11.5, fontWeight: "700", flex: 1 },
+
   setHeadRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
   setHead: { color: T.textFaint, fontSize: 11, fontWeight: "700" },
   setRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 5 },
   setRowDone: { opacity: 0.85 },
+  setIdxBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   setIdx: { color: T.text, fontSize: 14, fontWeight: "700" },
-  setInput: { flex: 1, minWidth: 0, backgroundColor: T.surfaceHi, borderRadius: 8, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600" },
+  warmPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: T.secondary + "26" },
+  warmPillText: { color: T.secondary, fontSize: 11, fontWeight: "800" },
+  setInput: { flex: 1, minWidth: 0, backgroundColor: T.surfaceHi, borderRadius: 10, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600", borderWidth: 1, borderColor: T.border },
   // Each control keeps its 18-24px glyph but owns a full 44x44 target.
   setActions: { width: 132, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  setActionBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 10, backgroundColor: T.surfaceHi },
+  setActionBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi },
+  removeBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi },
+  addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 10, backgroundColor: T.surfaceHi, overflow: "hidden", borderWidth: 1, borderColor: T.border },
   addSetText: { color: T.accent, fontSize: 13, fontWeight: "700" },
   notes: { backgroundColor: T.bg2, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: T.text, fontSize: 14, marginTop: 8, borderWidth: 1, borderColor: T.border },
-  addExBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: T.borderHi, borderStyle: "dashed" },
+  addExBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: T.borderHi, borderStyle: "dashed", overflow: "hidden", backgroundColor: T.surfaceHi },
   addExText: { color: T.accent, fontSize: 14, fontWeight: "700" },
   finishBar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 10, backgroundColor: T.bg2, borderTopWidth: 1, borderTopColor: T.border },
-  cancelBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 12, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center" },
+  cancelBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 12, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border },
   cancelText: { color: T.textDim, fontSize: 14, fontWeight: "700" },
-  finishBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.accent, borderRadius: 12, paddingVertical: 14 },
+  finishBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.accent, borderRadius: 12, paddingVertical: 14, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   finishText: { color: T.bg, fontSize: 15, fontWeight: "800" },
 
   histCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 16, marginBottom: 12 },
@@ -482,7 +738,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   histStats: { flexDirection: "row", gap: 14 },
   histStat: { color: T.textFaint, fontSize: 12, fontWeight: "600" },
 
-  addPill: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: T.accent, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  addPill: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: T.accent, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   addPillText: { color: T.bg, fontSize: 13, fontWeight: "800" },
   addedPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: T.border },
   addedText: { color: "#3DDC97", fontSize: 12, fontWeight: "700" },

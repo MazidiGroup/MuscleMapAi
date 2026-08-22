@@ -11,6 +11,7 @@ import { StyleProp, Text, View, ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 export type LocalAssetFallbackProps = {
   /** What the person can still rely on, e.g. "Your logged sets are unaffected." */
@@ -47,10 +48,12 @@ export function LocalAssetFallback({
           justifyContent: "center",
           gap: t.space.sm - 1,
           padding: t.space.md,
+          overflow: "hidden",
         },
         style,
       ]}
     >
+      <LiquidSheen tone="subtle" />
       <Ionicons name="image-outline" size={24} color={t.color.textFaint} />
       <Text style={{ ...t.type.caption, fontWeight: "700", color: t.color.textSecondary }}>{TITLE}</Text>
       <Text style={{ ...t.type.caption, color: t.color.textMuted, textAlign: "center", maxWidth: 250 }}>
