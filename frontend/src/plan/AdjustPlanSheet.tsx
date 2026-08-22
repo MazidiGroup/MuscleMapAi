@@ -11,6 +11,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 
 import { useSemanticTokens } from "@/src/theme/semantic";
 import { ActionButton, InfoBanner, RetryPanel, StatusAnnouncement, WarningBanner } from "@/src/ui/state";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 import type { AdjustOutcome, AdjustSummary } from "./adjustPlan";
 import { usePlanStore } from "./planStore";
@@ -83,6 +84,7 @@ export function AdjustPlanSheet({
         ]}
         testID="adjust-plan-sheet"
       >
+        <LiquidSheen tone="neutral" />
         <Text style={[t.type.heading, { color: t.color.text }]}>Adjust plan</Text>
 
         <ScrollView style={{ maxHeight: 380 }} contentContainerStyle={{ gap: t.space.md }}>
@@ -183,6 +185,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
+    overflow: "hidden",
   },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
 });

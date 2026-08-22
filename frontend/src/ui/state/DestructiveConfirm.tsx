@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useRef } from "react";
 import { Modal, Text, View } from "react-native";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 import { ActionButton } from "./ActionButton";
 import { focusAccessibility } from "./a11yFocus";
@@ -72,8 +73,10 @@ export function DestructiveConfirm({
             padding: t.space.xl - 4,
             paddingBottom: t.space.xxl - 4,
             gap: t.space.md,
+            overflow: "hidden",
           }}
         >
+          <LiquidSheen tone="neutral" />
           <View
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"

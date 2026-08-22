@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
 import { ActionButton, LayoutSkeleton, RetryPanel, StatusAnnouncement } from "@/src/ui/state";
+import { ThemeSwitcher } from "@/src/ui/ThemeSwitcher";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 import { usePlanStore } from "./planStore";
 import {
@@ -64,6 +66,7 @@ export function Welcome({ onStart, onSignIn }: { onStart: () => void; onSignIn: 
   return (
     <View style={[styles.root, { backgroundColor: t.color.bg, paddingTop: insets.top }]} testID="welcome">
       <View style={styles.welcomeTop}>
+        <ThemeSwitcher compact />
       </View>
 
       <View style={styles.center}>
@@ -82,9 +85,10 @@ export function Welcome({ onStart, onSignIn }: { onStart: () => void; onSignIn: 
           onPress={onSignIn}
           accessibilityRole="button"
           accessibilityLabel="Already have an account?"
-          style={[styles.secondaryLink, { minHeight: t.target.min }]}
+          style={[styles.secondaryLink, { minHeight: t.target.min, backgroundColor: t.color.surface, borderColor: t.color.border }]}
           testID="cta-sign-in"
         >
+          <LiquidSheen tone="neutral" />
           <Text style={[t.type.bodyStrong, { color: t.color.textSecondary, textDecorationLine: "underline" }]}>
             Already have an account?
           </Text>
@@ -125,6 +129,7 @@ function Shell({
           testID="onb-back"
           style={[styles.iconBtn, { borderColor: t.color.border, width: t.target.min, height: t.target.min }]}
         >
+          <LiquidSheen tone="neutral" />
           <Ionicons name="chevron-back" size={20} color={t.color.textSecondary} />
         </Pressable>
         <View style={styles.progressWrap}>
@@ -195,6 +200,7 @@ function OptionCard({
         },
       ]}
     >
+      <LiquidSheen tone={selected ? "accent" : "neutral"} />
       <View style={[styles.radio, { borderColor: selected ? t.color.accent : t.color.border }]}>
         {selected && <View style={[styles.radioDot, { backgroundColor: t.color.accent }]} />}
       </View>
@@ -258,8 +264,19 @@ export function AdvancedLifterToggle({
           accessibilityLabel={tipOpen ? "Hide what Advanced Lifter Mode does" : "What is Advanced Lifter Mode?"}
           accessibilityState={{ expanded: tipOpen }}
           testID="advanced-lifter-info"
-          style={{ width: t.target.min, height: t.target.min, alignItems: "center", justifyContent: "center" }}
+          style={{
+            width: t.target.min,
+            height: t.target.min,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: t.radius.md,
+            borderWidth: 1,
+            borderColor: t.color.border,
+            backgroundColor: t.color.surfaceAlt,
+            overflow: "hidden",
+          }}
         >
+          <LiquidSheen tone="neutral" />
           <Ionicons name="information-circle-outline" size={20} color={t.color.textSecondary} />
         </Pressable>
       </View>
@@ -296,8 +313,10 @@ function Pill({ label, on, onPress, testID }: { label: string; on: boolean; onPr
         borderWidth: 1,
         borderColor: on ? t.color.accent : t.color.border,
         backgroundColor: on ? t.color.accent + "22" : t.color.surfaceAlt,
+        overflow: "hidden",
       }}
     >
+      <LiquidSheen tone={on ? "accent" : "neutral"} />
       <Text style={[t.type.label, { color: on ? t.color.accent : t.color.textSecondary }]}>{label}</Text>
     </Pressable>
   );
@@ -370,8 +389,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                   borderWidth: 1,
                   borderColor: on ? t.color.accent : t.color.border,
                   backgroundColor: on ? t.color.accent + "22" : t.color.surfaceAlt,
+                  overflow: "hidden",
                 }}
               >
+                <LiquidSheen tone={on ? "accent" : "neutral"} />
                 <Text style={[t.type.label, { color: on ? t.color.accent : t.color.textSecondary }]}>{d.short}</Text>
               </Pressable>
             );
@@ -501,13 +522,13 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
   welcomeTop: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 24, paddingTop: 8 },
   welcomeActions: { paddingHorizontal: 24, gap: 12 },
-  secondaryLink: { alignItems: "center", justifyContent: "center" },
+  secondaryLink: { alignItems: "center", justifyContent: "center", borderRadius: 16, borderWidth: 1, overflow: "hidden" },
   brandMark: { width: 132, height: 132 },
   shellHeader: { paddingTop: 8, paddingBottom: 12, flexDirection: "row", alignItems: "center", gap: 12 },
-  iconBtn: { borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  iconBtn: { borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   progressWrap: { flex: 1, flexDirection: "row", gap: 4 },
   progressBar: { flex: 1, height: 4, borderRadius: 2 },
-  optCard: { flexDirection: "row", alignItems: "center", borderWidth: 1.5 },
+  optCard: { flexDirection: "row", alignItems: "center", borderWidth: 1.5, overflow: "hidden" },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, marginRight: 12, alignItems: "center", justifyContent: "center" },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
 });

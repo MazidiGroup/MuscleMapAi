@@ -82,9 +82,15 @@ const NIGHT_STATUS: Record<StatusRole, StatusColors> = {
   error: { fg: "#EF4444", text: "#fca5a5", bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.42)" },
 };
 
+const DAY_STATUS: Record<StatusRole, StatusColors> = {
+  info: { fg: "#175cbf", text: "#293750", bg: "rgba(40,120,232,0.08)", border: "rgba(40,120,232,0.24)" },
+  success: { fg: "#087a50", text: "#225846", bg: "rgba(8,122,80,0.08)", border: "rgba(8,122,80,0.24)" },
+  warning: { fg: "#9a5a00", text: "#68471c", bg: "rgba(154,90,0,0.08)", border: "rgba(154,90,0,0.24)" },
+  error: { fg: "#c73535", text: "#6f3030", bg: "rgba(199,53,53,0.08)", border: "rgba(199,53,53,0.24)" },
+};
+
 
 export function semanticTokens(palette: Palette): SemanticTokens {
-  // One theme (night): there is no light status set or light scrim to choose.
   return {
     mode: palette.mode,
     palette,
@@ -102,11 +108,11 @@ export function semanticTokens(palette: Palette): SemanticTokens {
       accentSoft: palette.accentText,
       onAccent: palette.ctaText,
       focusRing: palette.accent,
-      scrim: "rgba(2,5,11,0.62)",
-      skeletonBase: "#0f1930",
-      skeletonHighlight: "#16233c",
+      scrim: palette.mode === "day" ? "rgba(35,42,54,0.35)" : "rgba(2,5,11,0.62)",
+      skeletonBase: palette.mode === "day" ? "#e3e7ee" : palette.card,
+      skeletonHighlight: palette.mode === "day" ? "#f7f9fc" : palette.cardAlt,
     },
-    status: NIGHT_STATUS,
+    status: palette.mode === "day" ? DAY_STATUS : NIGHT_STATUS,
     space: S,
     radius: { sm: R.sm, md: R.md, lg: R.lg, xl: 20, xxl: 24, pill: R.pill },
     type: {

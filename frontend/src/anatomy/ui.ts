@@ -1,10 +1,8 @@
 // Anatomy-trainer theme tokens.
 //
-// This file exports the dark palette `T` plus `legacyPalette()`, which the
-// screens call (via useMemo) so their existing `T.*` references keep working.
-// There is no day variant: light mode is not part of the approved design.
-
-import type { ThemeMode } from "@/src/theme/tokens";
+// Existing anatomy-shaped tokens are projected from the same live palette as
+// the rest of the app, keeping older screens visually connected.
+import { DEFAULT_MODE, PALETTES, type ThemeMode } from "@/src/theme/tokens";
 
 export type LegacyPalette = {
   bg: string;
@@ -24,36 +22,28 @@ export type LegacyPalette = {
   secondary: string;
 };
 
-const NIGHT_T: LegacyPalette = {
-  bg: "#070A0F",
-  bg2: "#0C111A",
-  surface: "#121826",
-  surfaceHi: "#18202F",
-  border: "rgba(120,160,220,0.16)",
-  borderHi: "rgba(120,160,220,0.30)",
-  text: "#EAF1FB",
-  textDim: "#9AA7BD",
-  textFaint: "#5E6B82",
-  accent: "#34C7FF",
-  accentDim: "#1E9BFF",
-  bone: "#E8E1CE",
-  muscle: "#C0584F",
-  primary: "#FF4438",
-  secondary: "#FFB020",
-};
-
-
-/**
- * The legacy-shaped palette. The app ships one theme (night); the parameter is
- * kept so the existing `legacyPalette(mode)` call sites stay untouched, and
- * there is no light variant to return.
- */
-export function legacyPalette(_mode?: ThemeMode): LegacyPalette {
-  return NIGHT_T;
+export function legacyPalette(mode: ThemeMode = DEFAULT_MODE): LegacyPalette {
+  const p = PALETTES[mode];
+  return {
+    bg: p.bg,
+    bg2: p.cardAlt,
+    surface: p.card,
+    surfaceHi: p.cardAlt,
+    border: p.border,
+    borderHi: mode === "day" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.18)",
+    text: p.text,
+    textDim: p.textMuted,
+    textFaint: p.textFaint,
+    accent: p.accent,
+    accentDim: p.accentText,
+    bone: "#E8E1CE",
+    muscle: "#C0584F",
+    primary: "#FF4438",
+    secondary: "#FFB020",
+  };
 }
 
-// Backward-compatible default (night) for screens not yet theme-aware.
-export const T: LegacyPalette = NIGHT_T;
+export const T: LegacyPalette = legacyPalette(DEFAULT_MODE);
 
 export const GROUP_COLORS: Record<string, string> = {
   chest: "#FF6B5E",

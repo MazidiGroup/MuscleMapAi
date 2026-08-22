@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -25,6 +25,7 @@ import { legacyPalette, LegacyPalette } from "./ui";
 import { FLAGS } from "@/src/config/featureFlags";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { A11yControl } from "@/src/ui/A11yControl";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 
 type Period = "week" | "month";
 

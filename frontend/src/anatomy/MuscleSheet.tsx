@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   LayoutAnimation,
   Platform,
   UIManager,
@@ -23,6 +22,7 @@ import { addRecent, isBookmarked, toggleBookmark } from "./storageLists";
 import { askCoach } from "./coachApi";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);

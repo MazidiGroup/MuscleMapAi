@@ -55,6 +55,13 @@ export class AnatomyEngine {
    */
   private pending = 2;
 
+  setTheme(mode: "day" | "night" | "dim") {
+    const bg = mode === "day" ? "#eef2f7" : mode === "dim" ? "#17191f" : "#08090c";
+    this.renderer.setClearColor(bg, 1);
+    this.scene.background = new THREE.Color(bg);
+    this.markDirty();
+  }
+
   // orbit state
   private target = new THREE.Vector3(0, 0, 0);
   private radius = 4;

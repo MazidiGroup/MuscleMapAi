@@ -146,10 +146,10 @@ export function gate(surface: Surface, resolution: PremiumResolution): GateDecis
 // ---------------------------------------------------------------------------
 
 export const PREMIUM_VALUE_ITEMS: { icon: string; label: string; desc: string }[] = [
-  { icon: "cube", label: "3D anatomy explorer", desc: "Rotate, isolate and inspect the full body model" },
-  { icon: "sparkles", label: "AI Coach", desc: "Ask training questions and get sourced answers" },
-  { icon: "body", label: "Library Muscles", desc: "Muscle-by-muscle reference with 3D highlighting" },
-  { icon: "school", label: "Library Learn", desc: "Guided anatomy lessons with quizzes" },
+  { icon: "sparkles", label: "A coach that knows your plan", desc: "Ask why, what to change, and how to progress" },
+  { icon: "cube", label: "See what every exercise trains", desc: "Rotate, isolate and inspect muscles in interactive 3D" },
+  { icon: "body", label: "Understand every muscle", desc: "Explore function, movement and 3D highlighting" },
+  { icon: "school", label: "Learn workout anatomy", desc: "Build lasting knowledge with lessons and quizzes" },
 ];
 
 /** Copy that must never appear in the Premium value list (these areas are Free). */
@@ -266,12 +266,13 @@ export function classifyRestore(input: { threw?: boolean; entitlementActive?: bo
  * or raw error text may appear here, and no copy may promise an automatic retry.
  */
 export const PAYWALL_COPY = {
-  title: "Unlock Premium",
-  subtitle: "Premium adds the 3D anatomy areas and the AI Coach. Your Plan, workouts, History and the exercise library stay free.",
-  freeReassurance: "Your Plan, workouts, History, Insights and the full exercise library stay free.",
+  title: "Understand every workout",
+  subtitle: "Turn your plan into guidance you can question, adapt and see on the body.",
+  freeReassurance: "Premium is optional. Your current Plan, workouts, History, Insights and exercise library stay available.",
   selectPrompt: "Choose an option to continue",
   ctaUnselected: "Select an option",
-  cta: (label: string) => `Continue with ${label}`,
+  cta: (_label: string) => "Unlock Premium",
+  ctaTrial: "Start free trial",
   loadingProducts: "Checking the current options with the App Store",
   noOffering: {
     title: "Options aren’t available right now",
@@ -313,4 +314,24 @@ export const PREMIUM_AREA_NAMES: Record<"explore" | "coach" | "library.muscles" 
   coach: "AI Coach",
   "library.muscles": "The Muscle library",
   "library.learn": "Guided lessons",
+};
+
+/** Outcome-led entry copy for each locked surface. */
+export const PREMIUM_ENTRY_COPY: Record<keyof typeof PREMIUM_AREA_NAMES, { title: string; body: string }> = {
+  coach: {
+    title: "Train with a coach that knows your plan",
+    body: "Ask why an exercise is included, what to change when equipment is busy, and how to progress next week.",
+  },
+  explore: {
+    title: "See exactly what every exercise trains",
+    body: "Rotate, isolate and inspect the muscles behind your workouts in interactive 3D.",
+  },
+  "library.muscles": {
+    title: "Understand the muscles behind your plan",
+    body: "Explore muscle function, movement and 3D highlighting whenever you need it.",
+  },
+  "library.learn": {
+    title: "Learn the anatomy that makes training click",
+    body: "Build practical knowledge with guided lessons and short quizzes.",
+  },
 };

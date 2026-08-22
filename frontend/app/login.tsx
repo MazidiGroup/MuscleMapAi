@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   TextInput,
   Image,
   Platform,
@@ -16,14 +15,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { useAuth } from "@/src/auth/AuthContext";
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { InfoBanner } from "@/src/ui/state";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 type Step = "buttons" | "email" | "code";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   const { loginWithGoogle, loginWithApple, requestMagicLink, verifyMagicCode } = useAuth();
 
   const [step, setStep] = useState<Step>("buttons");
@@ -78,6 +83,7 @@ export default function LoginScreen() {
         {/* Brand */}
         <View style={styles.brand}>
           <View style={styles.logoWrap}>
+            <LiquidSheen tone="neutral" />
             <Image source={require("../assets/images/icon.png")} style={styles.logo} />
           </View>
           <Text style={styles.appName}>Muscle Map Ai</Text>
@@ -86,6 +92,7 @@ export default function LoginScreen() {
 
         {error && (
           <View style={styles.errorBox} testID="login-error">
+            <LiquidSheen tone="danger" />
             <Ionicons name="alert-circle" size={16} color="#EF4444" />
             <Text style={styles.errorText}>{error}</Text>
           </View>
@@ -197,6 +204,7 @@ export default function LoginScreen() {
             </Text>
             {devCode && (
               <View style={styles.devCodeBox} testID="login-dev-code">
+                <LiquidSheen tone="subtle" />
                 <Text style={styles.devCodeText}>Dev mode (email not configured) — your code: {devCode}</Text>
               </View>
             )}
@@ -248,7 +256,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   scroll: { flexGrow: 1, paddingHorizontal: 28, justifyContent: "space-between" },
   brand: { alignItems: "center", marginTop: 24 },
@@ -275,6 +283,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
     marginTop: 20,
+    overflow: "hidden",
   },
   errorText: { flex: 1, color: "#FCA5A5", fontSize: 13, lineHeight: 18 },
   buttons: { gap: 12, marginVertical: 32 },
@@ -313,11 +322,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(10,132,255,0.35)",
     borderRadius: 12,
     padding: 12,
+    overflow: "hidden",
   },
   devCodeText: { color: "#7CB8FF", fontSize: 13, textAlign: "center" },
-  backLink: { alignItems: "center", paddingVertical: 6 },
+  backLink: { alignItems: "center", justifyContent: "center", minHeight: 44, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
   backLinkText: { color: T.textDim, fontSize: 14, fontWeight: "600" },
-  guestLink: { alignItems: "center", paddingVertical: 12, minHeight: 44, justifyContent: "center" },
+  guestLink: { alignItems: "center", paddingVertical: 12, paddingHorizontal: 16, minHeight: 44, justifyContent: "center", borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
   guestLinkText: { color: T.textDim, fontSize: 15, fontWeight: "600", textDecorationLine: "underline" },
   terms: { color: T.textFaint, fontSize: 12, textAlign: "center", lineHeight: 18 },
   termsLink: { color: T.textDim, textDecorationLine: "underline" },

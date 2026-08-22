@@ -1,12 +1,14 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { LESSONS } from "@/src/anatomy/lessons";
-import { T } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { PremiumGate } from "@/src/premium/PremiumGate";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 export default function LearnScreen() {
   return (
@@ -19,6 +21,9 @@ export default function LearnScreen() {
 function LearnContent() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { mode } = useTheme();
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
 
   return (
     <View style={styles.root}>
@@ -55,7 +60,7 @@ function LearnContent() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   h1: { color: T.text, fontSize: 26, fontWeight: "800" },
   sub: { color: T.textDim, fontSize: 13, marginTop: 2, marginBottom: 18 },

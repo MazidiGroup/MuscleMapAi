@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
 import { ActionButton, InfoBanner, StatusAnnouncement, WarningBanner } from "@/src/ui/state";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 import { useWorkout } from "@/src/anatomy/workoutStore";
 import { usePlanStore } from "@/src/plan/planStore";
 
@@ -74,6 +75,7 @@ export function AddToWorkoutSheet({
         style={[styles.sheet, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.xl, gap: t.space.md }]}
         testID="add-to-workout-sheet"
       >
+        <LiquidSheen tone="neutral" />
         <Text style={[t.type.heading, { color: t.color.text }]}>{exerciseName}</Text>
 
         {phase === "already" && (
@@ -153,5 +155,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
+    overflow: "hidden",
   },
 });

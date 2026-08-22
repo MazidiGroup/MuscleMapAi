@@ -8,6 +8,7 @@ import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 import { ActionButton } from "./ActionButton";
 import { focusAccessibility } from "./a11yFocus";
@@ -60,8 +61,10 @@ export function RetryPanel({
         borderColor: t.status.error.border,
         padding: t.space.lg,
         gap: t.space.md - 1,
+        overflow: "hidden",
       }}
     >
+      <LiquidSheen tone="danger" />
       <View style={{ flexDirection: "row", gap: t.space.sm + 1, alignItems: "flex-start" }}>
         <Ionicons name="alert-circle" size={19} color={t.status.error.fg} style={{ marginTop: 1 }} />
         <View style={{ flex: 1 }}>

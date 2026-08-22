@@ -21,14 +21,19 @@ const root = path.resolve(here, "..");
 
 function findTsc() {
   const candidates = [
-    process.env.TSC,
-    path.join(root, "node_modules/.bin/tsc"),
+    process.env.TSC ? { command: process.env.TSC, args: [] } : null,
+    // Calling the compiler's JS entry through Node works on Windows too; a
+    // shell-less spawn cannot execute Yarn's extensionless .bin shim there.
+    { command: process.execPath, args: [path.join(root, "node_modules/typescript/bin/tsc")] },
     // The clean redesign worktree intentionally has no node_modules; fall back
     // to the TypeScript 5.9.3 already installed in the app checkout.
-    "/app/frontend/node_modules/.bin/tsc",
+    { command: process.execPath, args: ["/app/frontend/node_modules/typescript/bin/tsc"] },
   ].filter(Boolean);
-  for (const c of candidates) if (fs.existsSync(c)) return c;
-  throw new Error(`TypeScript compiler not found. Tried:\n  ${candidates.join("\n  ")}`);
+  for (const c of candidates) {
+    const executable = c.args[0] || c.command;
+    if (fs.existsSync(executable)) return c;
+  }
+  throw new Error(`TypeScript compiler not found. Tried:\n  ${candidates.map((c) => c.args[0] || c.command).join("\n  ")}`);
 }
 
 function findTypeRoots() {
@@ -83,7 +88,7 @@ fs.writeFileSync(
   ),
 );
 
-execFileSync(tsc, ["-p", tsconfigPath], { cwd: root, stdio: "inherit" });
+execFileSync(tsc.command, [...tsc.args, "-p", tsconfigPath], { cwd: root, stdio: "inherit" });
 
 // The app uses the `@/` path alias. tsc keeps the specifier verbatim, so rewrite
 // it to a relative require in the emitted CommonJS. The emitted tree mirrors the
@@ -122,7 +127,13 @@ const esmTests = fs
   .sort()
   .map((f) => path.join(root, "__tests__", f));
 
-const res = spawnSync(process.execPath, ["--test", path.join(out, "__tests__"), ...esmTests], {
+const emittedTests = fs
+  .readdirSync(path.join(out, "__tests__"))
+  .filter((f) => f.endsWith(".test.js"))
+  .sort()
+  .map((f) => path.join(out, "__tests__", f));
+
+const res = spawnSync(process.execPath, ["--test", ...emittedTests, ...esmTests], {
   cwd: root,
   stdio: "inherit",
   env: {

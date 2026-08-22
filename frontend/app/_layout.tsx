@@ -88,11 +88,10 @@ function OwnerGate({ children }: { children: React.ReactNode }) {
 }
 
 function ThemedStack() {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
   return (
     <>
-      {/* One theme (night): the status bar is always light-on-dark. */}
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={mode === "day" ? "dark-content" : "light-content"} backgroundColor={T.bg} />
       <AuthGate>
         <OwnerGate>
         <Stack
@@ -114,7 +113,7 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#070A0F" }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         {/* A render failure anywhere below must never leave a blank screen. */}
         <RootErrorBoundary>

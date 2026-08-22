@@ -8,12 +8,13 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { legacyPalette, LegacyPalette } from "./ui";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 import {
   RestClock,
   extendClock,
@@ -195,6 +196,7 @@ export function RestTimer({
         testID="rest-backdrop"
       >
         <Pressable style={styles.card} testID="rest-timer" onPress={() => {}}>
+          <LiquidSheen tone="neutral" />
           <Text style={styles.label}>REST</Text>
           <Text
             style={styles.time}
@@ -270,7 +272,7 @@ export function RestTimer({
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 24 },
-  card: { width: "100%", backgroundColor: T.surface, borderRadius: 24, borderWidth: 1, borderColor: T.border, padding: 24, alignItems: "center" },
+  card: { width: "100%", backgroundColor: T.surface, borderRadius: 24, borderWidth: 1, borderColor: T.border, padding: 24, alignItems: "center", overflow: "hidden" },
   label: { color: T.accent, fontSize: 13, fontWeight: "800", letterSpacing: 2 },
   time: { color: T.text, fontSize: 64, fontWeight: "900", marginVertical: 8 },
   barTrack: { width: "100%", height: 8, borderRadius: 4, backgroundColor: T.surfaceHi, overflow: "hidden", marginBottom: 12 },
