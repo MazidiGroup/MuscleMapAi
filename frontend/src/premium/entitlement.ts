@@ -146,9 +146,9 @@ export function gate(surface: Surface, resolution: PremiumResolution): GateDecis
 // ---------------------------------------------------------------------------
 
 export const PREMIUM_VALUE_ITEMS: { icon: string; label: string; desc: string }[] = [
-  { icon: "sparkles", label: "A coach that knows your plan", desc: "Ask why, what to change, and how to progress" },
-  { icon: "cube", label: "See what every exercise trains", desc: "Rotate, isolate and inspect muscles in interactive 3D" },
-  { icon: "body", label: "Understand every muscle", desc: "Explore function, movement and 3D highlighting" },
+  { icon: "sparkles", label: "A coach that knows your training", desc: "Ask why, what to change, and how to progress" },
+  { icon: "cube", label: "See what every movement trains", desc: "Rotate, isolate and inspect the body in interactive 3D anatomy" },
+  { icon: "body", label: "Understand every muscle", desc: "Explore how muscles function and move, highlighted in 3D" },
   { icon: "school", label: "Learn workout anatomy", desc: "Build lasting knowledge with lessons and quizzes" },
 ];
 

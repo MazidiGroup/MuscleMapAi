@@ -417,7 +417,9 @@ export default function LibraryScreen() {
           <View style={styles.about}>
             <Text style={styles.aboutTitle}>Appearance</Text>
             <ThemeSwitcher />
-            {!resolution.access ? (
+            {/* Held back until entitlement resolves, so a subscriber never sees
+                a Premium pitch on their own Account screen. */}
+            {!resolution.access && resolution.state === "ready" ? (
               <View style={{ marginTop: 18 }}>
                 <PremiumDiscoveryCard
                   compact

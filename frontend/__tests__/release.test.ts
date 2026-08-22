@@ -79,7 +79,15 @@ test("the paywall composes shared State-System components for its non-happy path
 
 test("there is exactly one Premium provider, one gate and one resolver", () => {
   const files = fs.readdirSync(path.join(ROOT, "src/premium")).sort();
-  assert.deepEqual(files, ["Paywall.tsx", "PremiumContext.tsx", "PremiumGate.tsx", "entitlement.ts"]);
+  // PremiumDiscovery holds the pre-paywall conversion surfaces only. It owns no
+  // provider, no gate and no resolver — it reads the single context like any
+  // other consumer.
+  assert.deepEqual(files, ["Paywall.tsx", "PremiumContext.tsx", "PremiumDiscovery.tsx", "PremiumGate.tsx", "entitlement.ts"]);
+  const discovery = read("src/premium/PremiumDiscovery.tsx");
+  assert.ok(
+    !/createContext|resolvePremium|usePremium|designatedEntitlementActive/.test(discovery),
+    "discovery is presentational: it never provides, reads or re-derives entitlement",
+  );
 });
 
 test("Premium screens gate through PremiumGate and never re-derive entitlement", () => {

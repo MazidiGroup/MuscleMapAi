@@ -1,7 +1,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { StatusBar, Platform } from "react-native";
+import { StatusBar, Platform, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { enableScreens } from "react-native-screens";
@@ -90,7 +90,10 @@ function OwnerGate({ children }: { children: React.ReactNode }) {
 function ThemedStack() {
   const { T, mode } = useTheme();
   return (
-    <>
+    /* The window ground is painted from the active appearance rather than a
+       fixed colour, so Day never flashes dark and Night never flashes white
+       between screens. */
+    <View style={{ flex: 1, backgroundColor: T.bg }}>
       <StatusBar barStyle={mode === "day" ? "dark-content" : "light-content"} backgroundColor={T.bg} />
       <AuthGate>
         <OwnerGate>
@@ -103,7 +106,7 @@ function ThemedStack() {
         />
         </OwnerGate>
       </AuthGate>
-    </>
+    </View>
   );
 }
 

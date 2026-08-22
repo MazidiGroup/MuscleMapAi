@@ -131,7 +131,9 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
         )}
       </View>
 
-      {!resolution.access ? (
+      {/* Discovery only appears once entitlement is actually resolved: a
+          subscriber must never see a Premium pitch while RevenueCat loads. */}
+      {!resolution.access && resolution.state === "ready" ? (
         <View style={{ marginTop: 14 }}>
           <PremiumDiscoveryCard
             contextTitle={todayDay && !todayDay.rest ? todayDay.typeName : "your weekly plan"}
@@ -161,7 +163,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
 
       <AdjustPlanSheet visible={adjusting} hasActiveWorkout={hasActiveWorkout} onDismiss={() => setAdjusting(false)} />
       <PremiumValueMoment
-        enabled={!resolution.access}
+        enabled={!resolution.access && resolution.state === "ready"}
         planName={todayDay && !todayDay.rest ? todayDay.typeName : splitLabel}
         onPreview={previewPremium}
       />
