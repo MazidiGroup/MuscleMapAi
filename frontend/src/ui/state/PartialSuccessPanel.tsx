@@ -7,6 +7,7 @@ import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 import { ActionButton } from "./ActionButton";
 
@@ -42,8 +43,10 @@ export function PartialSuccessPanel({
         borderColor: t.status.warning.border,
         padding: t.space.lg,
         gap: t.space.md - 2,
+        overflow: "hidden",
       }}
     >
+      <LiquidSheen tone="subtle" />
       <View style={{ flexDirection: "row", gap: t.space.sm + 1, alignItems: "flex-start" }}>
         <Ionicons name="alert-circle-outline" size={19} color={t.status.warning.fg} style={{ marginTop: 1 }} />
         <View style={{ flex: 1 }}>

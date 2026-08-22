@@ -26,6 +26,7 @@ import type { Goal } from "@/src/plan/exercises";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { EmptyState, ErrorBanner } from "@/src/ui/state";
 import { A11yControl } from "@/src/ui/A11yControl";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 type Seg = "session" | "history" | "insights" | "exercises";
 const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower", "Mobility"];
@@ -46,7 +47,6 @@ export default function WorkoutScreen() {
   const [seg, setSeg] = useState<Seg>("session");
   const [cat, setCat] = useState("All");
   const [restVisible, setRestVisible] = useState(false);
-  const [now, setNow] = useState(Date.now());
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
   // The segmented header floats above the content, so its REAL height (it wraps to
@@ -66,13 +66,6 @@ export default function WorkoutScreen() {
     if (params.ex) w.addExercise(String(params.ex));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.ex]);
-
-  // live duration tick
-  useEffect(() => {
-    if (!w.startedAt) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [w.startedAt]);
 
   // The rest timer belongs to a live session on the Session segment. Finishing or
   // cancelling the workout, moving to another segment, or leaving the tab closes it
@@ -149,6 +142,7 @@ export default function WorkoutScreen() {
           <View style={[styles.seg, { flex: 1 }]}>
             {(["session", "history", "insights", "exercises"] as Seg[]).map((s) => (
               <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => selectSeg(s)} testID={`seg-${s}`}>
+                <LiquidSheen tone={seg === s ? "accent" : "subtle"} />
                 <Text style={[styles.segText, seg === s && styles.segTextActive]}>
                   {s === "session" ? "Session" : s === "history" ? "History" : s === "insights" ? "Insights" : "Muscle Groups"}
                 </Text>
@@ -163,6 +157,7 @@ export default function WorkoutScreen() {
             accessibilityLabel={`Weight unit, ${w.unit}. Tap to switch.`}
             testID="unit-toggle"
           >
+            <LiquidSheen tone="neutral" />
             <Text style={styles.unitText}>{w.unit.toUpperCase()}</Text>
           </TouchableOpacity>
         </View>
@@ -210,6 +205,7 @@ export default function WorkoutScreen() {
                   accessibilityLabel={`${c} exercises`}
                   testID={`cat-${c}`}
                 >
+                  <LiquidSheen tone={cat === c ? "accent" : "neutral"} />
                   <Text numberOfLines={1} style={[styles.catText, cat === c && { color: T.bg }]}>
                     {c}
                   </Text>
@@ -221,6 +217,7 @@ export default function WorkoutScreen() {
                 const meta = getExerciseMeta(e.id);
                 return (
                   <TouchableOpacity key={e.id} style={styles.exItem} onPress={() => router.push(`/exercise/${e.id}`)} testID={`ex-${e.id}`}>
+                    <LiquidSheen tone="subtle" />
                     <ExerciseAnimation
                       exerciseId={e.id}
                       variant="thumb"
@@ -245,6 +242,7 @@ export default function WorkoutScreen() {
                         </View>
                       ) : (
                         <TouchableOpacity style={styles.addPill} onPress={() => w.addExercise(e.id)} testID={`add-ex-${e.id}`}>
+                          <LiquidSheen tone="accent" />
                           <Ionicons name="add" size={16} color={T.bg} />
                           <Text style={styles.addPillText}>Add</Text>
                         </TouchableOpacity>
@@ -278,6 +276,7 @@ export default function WorkoutScreen() {
           ) : (
             <>
               <View style={styles.statsBar}>
+                <LiquidSheen tone="neutral" />
                 <SBStat label="Exercises" value={`${w.session.length}`} styles={styles} />
                 <SBStat label="Sets" value={`${stats.completed}/${stats.sets}`} styles={styles} />
                 <SBStat label="Volume" value={`${stats.volume} ${w.unit}`} styles={styles} />
@@ -303,6 +302,7 @@ export default function WorkoutScreen() {
                   style={styles.addExBtn}
                   testID="add-exercise"
                 >
+                  <LiquidSheen tone="neutral" />
                   <Ionicons name="add-circle-outline" size={18} color={T.accent} />
                   <Text style={styles.addExText}>Add Exercise</Text>
                 </A11yControl>
@@ -319,6 +319,7 @@ export default function WorkoutScreen() {
                   style={styles.cancelBtn}
                   testID="cancel-workout"
                 >
+                  <LiquidSheen tone="neutral" />
                   <Text style={styles.cancelText}>Cancel</Text>
                 </A11yControl>
                 <A11yControl
@@ -329,6 +330,7 @@ export default function WorkoutScreen() {
                   style={styles.finishBtn}
                   testID="finish-workout"
                 >
+                  <LiquidSheen tone="accent" />
                   <Ionicons name="flag" size={16} color={T.bg} />
                   <Text style={styles.finishText}>{finishing ? "Saving…" : "Finish Workout"}</Text>
                 </A11yControl>
@@ -406,6 +408,7 @@ function SessionCard({
 
   return (
     <View style={[styles.exCard, inSuperset && styles.exCardSuper]}>
+      <LiquidSheen tone={inSuperset ? "accent" : "neutral"} />
       {linkedAbove && (
         <View style={styles.superTag}>
           <Ionicons name="link" size={11} color={T.secondary} />
@@ -431,6 +434,7 @@ function SessionCard({
             style={styles.headBtn}
             testID={`superset-${se.exerciseId}`}
           >
+            <LiquidSheen tone={linkedAbove ? "accent" : "neutral"} />
             <Ionicons name={linkedAbove ? "link" : "link-outline"} size={18} color={linkedAbove ? T.secondary : T.textFaint} />
           </A11yControl>
         )}
@@ -440,6 +444,7 @@ function SessionCard({
           style={styles.headBtn}
           testID={`rm-${se.exerciseId}`}
         >
+          <LiquidSheen tone="danger" />
           <Ionicons name="trash-outline" size={18} color={T.textFaint} />
         </A11yControl>
       </View>
@@ -472,6 +477,7 @@ function SessionCard({
             accessibilityLabel={`Fill empty sets with ${suggestion.headline}`}
             testID={`suggest-apply-${se.exerciseId}`}
           >
+            <LiquidSheen tone="accent" />
             <Text style={styles.suggestApplyText}>Use</Text>
           </TouchableOpacity>
         </View>
@@ -543,6 +549,7 @@ function SessionCard({
                   style={styles.setActionBtn}
                   testID={`dup-${se.exerciseId}-${idx}`}
                 >
+                  <LiquidSheen tone="neutral" />
                   <Ionicons name="copy-outline" size={18} color={T.textDim} />
                 </A11yControl>
               )}
@@ -552,6 +559,7 @@ function SessionCard({
                 style={styles.setActionBtn}
                 testID={`del-${se.exerciseId}-${idx}`}
               >
+                <LiquidSheen tone="neutral" />
                 <Ionicons name="remove-circle-outline" size={18} color={T.textDim} />
               </A11yControl>
               {/* A set with no reps records no work, so it cannot be ticked. */}
@@ -564,6 +572,7 @@ function SessionCard({
                 style={styles.setActionBtn}
                 testID={`done-${se.exerciseId}-${idx}`}
               >
+                <LiquidSheen tone={s.done ? "accent" : "neutral"} />
                 <Ionicons
                   name={s.done ? "checkmark-circle" : "ellipse-outline"}
                   size={24}
@@ -590,6 +599,7 @@ function SessionCard({
         accessibilityLabel={`Add a set to ${ex?.name}`}
         testID={`addset-${se.exerciseId}`}
       >
+        <LiquidSheen tone="neutral" />
         <Ionicons name="add" size={16} color={T.accent} />
         <Text style={styles.addSetText}>Add Set</Text>
       </TouchableOpacity>
@@ -620,17 +630,17 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   full: { ...StyleSheet.absoluteFillObject, backgroundColor: T.bg },
   segWrap: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 16, zIndex: 10 },
-  seg: { flexDirection: "row", backgroundColor: T.surface, borderRadius: 12, padding: 4, gap: 4, borderWidth: 1, borderColor: T.border },
-  segBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 5 },
-  segActive: { backgroundColor: T.accent },
+  seg: { flexDirection: "row", backgroundColor: "transparent", padding: 0, gap: 3 },
+  segBtn: { flex: 1, minHeight: 44, paddingHorizontal: 4, borderRadius: 11, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 5, overflow: "hidden", borderWidth: 1, borderColor: T.border },
+  segActive: { backgroundColor: T.accent + "14", borderBottomWidth: 2, borderBottomColor: T.accent },
   segText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
-  segTextActive: { color: T.bg },
+  segTextActive: { color: T.accent },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#3DDC97" },
 
   cat: {
     paddingHorizontal: 16, height: 40, minWidth: 56, borderRadius: 999,
     alignItems: "center", justifyContent: "center",
-    backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border,
+    backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, overflow: "hidden",
   },
   catActive: { backgroundColor: T.accent, borderColor: T.accent },
   mgLegend: { flexDirection: "row", flexWrap: "wrap", gap: 14, marginBottom: 10 },
@@ -638,7 +648,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   mgDot: { width: 10, height: 10, borderRadius: 5 },
   mgLegendText: { color: T.textDim, fontSize: 11.5, fontWeight: "600" },
   catText: { color: T.text, fontSize: 13, fontWeight: "700" },
-  exItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 14, padding: 12, marginBottom: 8 },
+  exItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 14, padding: 12, marginBottom: 8, overflow: "hidden" },
   exIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   exItemName: { color: T.text, fontSize: 15, fontWeight: "700" },
   exItemMeta: { color: T.textFaint, fontSize: 12, marginTop: 2 },
@@ -646,7 +656,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   empty: { flex: 1, justifyContent: "center", padding: 16 },
   unitBtn: {
     minWidth: 44, height: 44, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1,
-    borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center",
+    borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center", overflow: "hidden",
   },
   unitText: { color: T.text, fontSize: 13, fontWeight: "800" },
   bwBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: T.accent + "22" },
@@ -659,16 +669,19 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   ghostBtn: { paddingVertical: 10 },
   ghostText: { color: T.textDim, fontSize: 14, fontWeight: "600" },
 
-  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, paddingVertical: 12 },
+  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, paddingVertical: 12, overflow: "hidden" },
   sbStat: { flex: 1, alignItems: "center" },
   sbValue: { color: T.accent, fontSize: 17, fontWeight: "800" },
   sbLabel: { color: T.textFaint, fontSize: 11, marginTop: 2 },
 
-  exCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 14, marginBottom: 12 },
+  exCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 14, marginBottom: 12, overflow: "hidden" },
   exCardSuper: { borderColor: T.secondary + "66" },
   exCardHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   exCardName: { color: T.text, fontSize: 16, fontWeight: "800" },
-  headBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  headBtn: {
+    width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center",
+    overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi,
+  },
   superTag: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 8 },
   superTagText: { color: T.secondary, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
 
@@ -680,7 +693,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   suggestHeadline: { color: T.text, fontSize: 14, fontWeight: "800" },
   suggestBasis: { color: T.textDim, fontSize: 11.5, marginTop: 2 },
   suggestApply: {
-    paddingHorizontal: 14, minHeight: 36, borderRadius: 999,
+    paddingHorizontal: 14, minHeight: 36, borderRadius: 999, overflow: "hidden",
     alignItems: "center", justifyContent: "center", backgroundColor: T.accent,
   },
   suggestApplyText: { color: T.bg, fontSize: 12.5, fontWeight: "800" },
@@ -701,19 +714,20 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   setIdx: { color: T.text, fontSize: 14, fontWeight: "700" },
   warmPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: T.secondary + "26" },
   warmPillText: { color: T.secondary, fontSize: 11, fontWeight: "800" },
-  setInput: { flex: 1, minWidth: 0, backgroundColor: T.surfaceHi, borderRadius: 8, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600" },
+  setInput: { flex: 1, minWidth: 0, backgroundColor: T.surfaceHi, borderRadius: 10, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600", borderWidth: 1, borderColor: T.border },
   // Each control keeps its 18-24px glyph but owns a full 44x44 target.
   setActions: { width: 132, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  setActionBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 10, backgroundColor: T.surfaceHi },
+  setActionBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi },
+  removeBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi },
+  addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 10, backgroundColor: T.surfaceHi, overflow: "hidden", borderWidth: 1, borderColor: T.border },
   addSetText: { color: T.accent, fontSize: 13, fontWeight: "700" },
   notes: { backgroundColor: T.bg2, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: T.text, fontSize: 14, marginTop: 8, borderWidth: 1, borderColor: T.border },
-  addExBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: T.borderHi, borderStyle: "dashed" },
+  addExBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: T.borderHi, borderStyle: "dashed", overflow: "hidden", backgroundColor: T.surfaceHi },
   addExText: { color: T.accent, fontSize: 14, fontWeight: "700" },
   finishBar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 10, backgroundColor: T.bg2, borderTopWidth: 1, borderTopColor: T.border },
-  cancelBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 12, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center" },
+  cancelBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 12, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border },
   cancelText: { color: T.textDim, fontSize: 14, fontWeight: "700" },
-  finishBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.accent, borderRadius: 12, paddingVertical: 14 },
+  finishBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.accent, borderRadius: 12, paddingVertical: 14, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   finishText: { color: T.bg, fontSize: 15, fontWeight: "800" },
 
   histCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 16, marginBottom: 12 },
@@ -724,7 +738,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   histStats: { flexDirection: "row", gap: 14 },
   histStat: { color: T.textFaint, fontSize: 12, fontWeight: "600" },
 
-  addPill: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: T.accent, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  addPill: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: T.accent, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   addPillText: { color: T.bg, fontSize: 13, fontWeight: "800" },
   addedPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: T.border },
   addedText: { color: "#3DDC97", fontSize: 12, fontWeight: "700" },

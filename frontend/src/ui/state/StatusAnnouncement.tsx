@@ -7,6 +7,7 @@ import { AccessibilityInfo, StyleProp, Text, View, ViewStyle } from "react-nativ
 import { Ionicons } from "@expo/vector-icons";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 export type StatusAnnouncementProps = {
   /** Same wording as the visible UI. */
@@ -67,10 +68,12 @@ export function StatusAnnouncement({
           backgroundColor: t.color.surfaceAlt,
           borderWidth: 1,
           borderColor: t.color.border,
+          overflow: "hidden",
         },
         style,
       ]}
     >
+      <LiquidSheen tone={assertive ? "danger" : "subtle"} />
       <Ionicons
         name={assertive ? "alert-circle" : "information-circle-outline"}
         size={15}

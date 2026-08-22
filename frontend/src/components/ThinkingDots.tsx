@@ -9,9 +9,10 @@ import Animated, {
   withDelay,
 } from "react-native-reanimated";
 
-import { COLORS } from "@/src/theme";
+import { useTheme } from "@/src/theme/ThemeContext";
 
 export function ThinkingDots() {
+  const { T } = useTheme();
   const d1 = useSharedValue(0.4);
   const d2 = useSharedValue(0.4);
   const d3 = useSharedValue(0.4);
@@ -29,14 +30,14 @@ export function ThinkingDots() {
 
   return (
     <View style={styles.row} testID="thinking-dots">
-      <Animated.View style={[styles.dot, s1]} />
-      <Animated.View style={[styles.dot, s2]} />
-      <Animated.View style={[styles.dot, s3]} />
+      <Animated.View style={[styles.dot, { backgroundColor: T.accent }, s1]} />
+      <Animated.View style={[styles.dot, { backgroundColor: T.accent }, s2]} />
+      <Animated.View style={[styles.dot, { backgroundColor: T.accent }, s3]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 6, alignItems: "center", paddingVertical: 6 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.primary },
+  dot: { width: 8, height: 8, borderRadius: 4 },
 });

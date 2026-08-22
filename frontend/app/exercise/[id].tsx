@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -16,6 +16,7 @@ import { getCatalogExercise } from "@/src/anatomy/exerciseCatalog";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { AddToWorkoutSheet } from "@/src/library/AddToWorkoutSheet";
 import { EmptyState, InfoBanner } from "@/src/ui/state";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 import {
   MATCHES_BEST_COPY,
   SINGLE_SESSION_COPY,

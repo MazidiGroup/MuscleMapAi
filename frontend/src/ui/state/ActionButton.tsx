@@ -6,6 +6,7 @@ import React, { useCallback, useRef } from "react";
 import { ActivityIndicator, Pressable, StyleProp, Text, View, ViewStyle } from "react-native";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
+import { LiquidSheen, liquidShadow } from "@/src/ui/GlassSurface";
 
 export type ActionButtonProps = {
   label: string;
@@ -70,12 +71,17 @@ export function ActionButton({
           flexDirection: "row",
           gap: t.space.sm,
           paddingHorizontal: t.space.lg,
-          borderWidth: variant === "primary" ? 0 : 1,
-          borderColor: variant === "destructive" ? t.status.error.border : t.color.border,
+          borderWidth: 1,
+          borderColor: variant === "primary"
+            ? "rgba(255,255,255,0.28)"
+            : variant === "destructive" ? t.status.error.border : t.color.border,
+          overflow: "hidden",
+          ...liquidShadow(t.mode),
         },
         style,
       ]}
     >
+      <LiquidSheen tone={variant === "primary" ? "accent" : variant === "destructive" ? "danger" : "neutral"} />
       {busy ? <ActivityIndicator size="small" color={fg} /> : null}
       <View style={{ flexShrink: 1 }}>
         <Text style={{ ...t.type.subheading, color: fg, textAlign: "center" }}>

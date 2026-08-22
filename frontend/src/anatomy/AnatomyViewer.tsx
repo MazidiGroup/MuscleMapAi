@@ -12,7 +12,6 @@ import {
   PanResponder,
   ActivityIndicator,
   Text,
-  TouchableOpacity,
   LayoutChangeEvent,
   Platform,
 } from "react-native";
@@ -24,6 +23,8 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import { AnatomyEngine } from "./engine";
 import { getAnatomyModel } from "./modelCache";
+import { useTheme } from "@/src/theme/ThemeContext";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 
 // Model bundled into the app so production (TestFlight) builds never depend on a
 // remote asset at runtime. Requires glb in metro assetExts.
@@ -113,6 +114,7 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
   ref,
 ) {
   const engineRef = useRef<AnatomyEngine | null>(null);
+  const { T, mode: themeMode } = useTheme();
   const [ready, setReady] = useState(false);
   const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +132,9 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
   useEffect(() => {
     if (ready) engineRef.current?.setMode(mode);
   }, [mode, ready]);
+  useEffect(() => {
+    if (ready) engineRef.current?.setTheme(themeMode);
+  }, [themeMode, ready]);
   useEffect(() => {
     if (ready) engineRef.current?.setHighlight(primary, secondary);
   }, [JSON.stringify(primary), JSON.stringify(secondary), ready]);
@@ -164,6 +169,7 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
       onReady: () => {
         setReady(true);
         // apply initial state
+        engine.setTheme(themeMode);
         engine.setMode(mode);
         engine.setHighlight(primary, secondary);
         engine.setRecovery(recovery);
@@ -259,38 +265,38 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
 
       {/* control buttons */}
       <View style={[styles.controls, { top: insets.top + 64, pointerEvents: "box-none" }]}>
-        <TouchableOpacity style={styles.ctrlBtn} onPress={() => engineRef.current?.zoom(0.82)} testID="zoom-in-btn">
-          <Ionicons name="add" size={22} color="#E6F0FF" />
+        <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: T.card, borderColor: T.border }]} onPress={() => engineRef.current?.zoom(0.82)} testID="zoom-in-btn">
+          <Ionicons name="add" size={22} color={T.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.ctrlBtn} onPress={() => engineRef.current?.zoom(1.22)} testID="zoom-out-btn">
-          <Ionicons name="remove" size={22} color="#E6F0FF" />
+        <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: T.card, borderColor: T.border }]} onPress={() => engineRef.current?.zoom(1.22)} testID="zoom-out-btn">
+          <Ionicons name="remove" size={22} color={T.text} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.ctrlBtn}
+          style={[styles.ctrlBtn, { backgroundColor: T.card, borderColor: T.border }]}
           onPress={() => {
             engineRef.current?.resetView();
             onSelect?.(null);
           }}
           testID="reset-view-btn"
         >
-          <Ionicons name="refresh" size={20} color="#E6F0FF" />
+          <Ionicons name="refresh" size={20} color={T.text} />
         </TouchableOpacity>
       </View>
 
       {!ready && !error && (
-        <View style={[styles.overlay, { pointerEvents: "none" }]}>
-          <ActivityIndicator color="#34C7FF" size="large" />
-          <Text style={styles.overlayText}>Loading anatomy model…</Text>
+        <View style={[styles.overlay, { pointerEvents: "none", backgroundColor: themeMode === "day" ? "rgba(244,246,250,0.56)" : "rgba(8,9,12,0.42)" }]}>
+          <ActivityIndicator color={T.accent} size="large" />
+          <Text style={[styles.overlayText, { color: T.text2 }]}>Loading anatomy model…</Text>
         </View>
       )}
       {error && (
-        <View style={styles.overlay}>
+        <View style={[styles.overlay, { backgroundColor: themeMode === "day" ? "rgba(244,246,250,0.82)" : "rgba(8,9,12,0.72)" }]}>
           <Ionicons name="warning-outline" size={28} color="#FFB020" />
-          <Text style={styles.overlayText}>Could not load model</Text>
-          <Text style={styles.errText}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={loadModelIntoEngine} testID="model-retry">
-            <Ionicons name="refresh" size={16} color="#070A0F" />
-            <Text style={styles.retryText}>Retry</Text>
+          <Text style={[styles.overlayText, { color: T.text }]}>Could not load model</Text>
+          <Text style={[styles.errText, { color: T.textMuted }]}>{error}</Text>
+          <TouchableOpacity style={[styles.retryBtn, { backgroundColor: T.accent }]} onPress={loadModelIntoEngine} testID="model-retry">
+            <Ionicons name="refresh" size={16} color={T.ctaText} />
+            <Text style={[styles.retryText, { color: T.ctaText }]}>Retry</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -305,9 +311,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(18,24,34,0.82)",
     borderWidth: 1,
-    borderColor: "rgba(120,160,220,0.25)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -316,19 +320,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    backgroundColor: "rgba(7,10,15,0.4)",
   },
-  overlayText: { color: "#C7D4E6", fontSize: 14, fontWeight: "600" },
-  errText: { color: "#8A93A3", fontSize: 11, paddingHorizontal: 32, textAlign: "center" },
+  overlayText: { fontSize: 14, fontWeight: "600" },
+  errText: { fontSize: 11, paddingHorizontal: 32, textAlign: "center" },
   retryBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginTop: 8,
-    backgroundColor: "#34C7FF",
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 999,
   },
-  retryText: { color: "#070A0F", fontSize: 14, fontWeight: "800" },
+  retryText: { fontSize: 14, fontWeight: "800" },
 });

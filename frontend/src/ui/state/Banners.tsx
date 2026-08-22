@@ -7,6 +7,7 @@ import { StyleProp, Text, View, ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { StatusRole, useSemanticTokens } from "@/src/theme/semantic";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 type BannerProps = {
   /** Short title carrying severity in words as well as colour. */
@@ -53,10 +54,12 @@ function Banner({
           borderWidth: 1,
           borderColor: c.border,
           alignItems: "flex-start",
+          overflow: "hidden",
         },
         style,
       ]}
     >
+      <LiquidSheen tone={role === "error" ? "danger" : "subtle"} />
       <Ionicons name={icon} size={16} color={c.fg} style={{ marginTop: 1 }} />
       <View style={{ flex: 1 }}>
         {title ? (

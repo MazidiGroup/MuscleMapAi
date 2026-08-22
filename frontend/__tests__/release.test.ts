@@ -52,11 +52,13 @@ test("the paywall never hardcodes a currency, price, period or discount", () => 
   assert.ok(src.includes("productTerms("), "prices come from productTerms");
 });
 
-test("the paywall preselects nothing and only enables the CTA after a choice", () => {
+test("the paywall recommends annual access only after real store packages load", () => {
   const src = read("src/premium/Paywall.tsx");
-  assert.ok(/useState<string \| null>\(null\)/.test(src), "selection starts empty");
-  assert.ok(!/find\(\(p\) => p\.packageType === "MONTHLY"\)/.test(src), "no default selection effect");
-  assert.ok(src.includes("disabled={!chosen}"), "the CTA is disabled until a product is chosen");
+  assert.ok(/useState<string \| null>\(null\)/.test(src), "selection stays empty before store data arrives");
+  assert.ok(src.includes('offeringState !== "ready"'), "nothing is selected while products are unresolved");
+  assert.ok(src.includes('p.packageType === "ANNUAL"'), "annual is the explicit recommendation when offered");
+  assert.ok(src.includes("?? sorted[0]"), "unknown store configurations still choose a visible real product");
+  assert.ok(src.includes("disabled={!chosen}"), "the CTA remains safe if no real product exists");
 });
 
 test("the paywall keeps Restore, Terms and Privacy reachable", () => {

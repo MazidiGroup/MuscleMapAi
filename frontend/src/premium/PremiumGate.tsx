@@ -16,7 +16,7 @@ import { LayoutSkeleton, StatusAnnouncement } from "@/src/ui/state";
 
 import { Paywall } from "./Paywall";
 import { usePremium } from "./PremiumContext";
-import { PAYWALL_COPY, PREMIUM_AREA_NAMES, Surface, gate, isPremiumSurface } from "./entitlement";
+import { PREMIUM_ENTRY_COPY, Surface, gate, isPremiumSurface } from "./entitlement";
 
 export function PremiumGate({
   surface,
@@ -48,12 +48,12 @@ export function PremiumGate({
     );
   }
 
-  const area = PREMIUM_AREA_NAMES[surface];
+  const entry = PREMIUM_ENTRY_COPY[surface];
   return (
     <View style={{ flex: 1, backgroundColor: t.color.bg }} testID={`locked-${surface}`}>
       <Paywall
-        title={PAYWALL_COPY.lockedTitle(area)}
-        body={PAYWALL_COPY.lockedBody}
+        title={entry.title}
+        body={entry.body}
         headerOffset={headerOffset}
       />
     </View>

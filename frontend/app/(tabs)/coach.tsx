@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Linking,
@@ -21,6 +20,8 @@ import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { PremiumGate } from "@/src/premium/PremiumGate";
 import { FLAGS } from "@/src/config/featureFlags";
+import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { LiquidSheen } from "@/src/ui/GlassSurface";
 
 const DEFAULT_SUGGESTIONS = [
   "What muscles should I train for a bigger bench press?",
@@ -182,6 +183,7 @@ function CoachContent() {
           <View style={{ flex: 1 }} />
         </View>
         <View style={styles.disclaimer}>
+          <LiquidSheen tone="subtle" />
           <Ionicons name="information-circle-outline" size={14} color={T.textFaint} />
           <Text style={styles.disclaimerText} numberOfLines={3}>
             Educational information only, not medical advice. Consult a qualified professional before
@@ -209,6 +211,7 @@ function CoachContent() {
           messages.map((m, i) => (
             <View key={i} style={[styles.bubbleRow, m.role === "user" ? styles.rowRight : styles.rowLeft]}>
               <View style={[styles.bubble, m.role === "user" ? styles.userBubble : styles.aiBubble]}>
+                <LiquidSheen tone={m.role === "user" ? "accent" : "neutral"} />
                 {m.content === "" && busy ? (
                   <ThinkingDots />
                 ) : m.role === "assistant" ? (
@@ -269,6 +272,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     borderWidth: 1,
     borderColor: T.border,
     borderRadius: 10,
+    overflow: "hidden",
   },
   disclaimerText: { flex: 1, color: T.textFaint, fontSize: 11, lineHeight: 15 },
   disclaimerLink: { color: T.accent, fontSize: 11, fontWeight: "800", marginLeft: 6 },
@@ -291,7 +295,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   bubbleRow: { marginBottom: 10, flexDirection: "row" },
   rowRight: { justifyContent: "flex-end" },
   rowLeft: { justifyContent: "flex-start" },
-  bubble: { maxWidth: "84%", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
+  bubble: { maxWidth: "84%", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, overflow: "hidden" },
   userBubble: { backgroundColor: T.accent, borderBottomRightRadius: 4 },
   aiBubble: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderBottomLeftRadius: 4 },
   bubbleText: { color: T.text, fontSize: 15, lineHeight: 21 },
