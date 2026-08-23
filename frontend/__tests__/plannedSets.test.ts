@@ -51,8 +51,11 @@ test("the plan-linked add path passes the planned count through", () => {
   // The seam moved when opening sets became pre-filled from history, but the
   // guarantee did not: the planned count is still what reaches the session, and
   // `openingSets` treats a plan count as authoritative over history.
+  // The seam gained a display-unit argument when loads started converting
+  // between kg and lb. The guarantee is unchanged: the planned COUNT and the
+  // plan's rep target are still what reach the session.
   assert.ok(
-    store.includes('openingSetRows(history, id, "plan", plannedSetCount(plannedSets), plannedRepsFrom(repsOrTime))'),
+    /openingSetRows\(history, id, "plan", plannedSetCount\(plannedSets\), plannedRepsFrom\(repsOrTime\)(, [A-Za-z]+)?\)/.test(store),
     "the session is seeded with the planned number of rows",
   );
   const progression = fs.readFileSync(path.join(root, "src/anatomy/progression.ts"), "utf8");

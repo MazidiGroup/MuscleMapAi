@@ -15,6 +15,8 @@
 
 import type { LoggedSet, SessionExercise, Workout } from "@/src/anatomy/workoutScope";
 import { isCountableSet, isWorkingSet, setVolume } from "@/src/anatomy/setRules";
+import { WeightUnit } from "@/src/units/unitPreference";
+import { convertWeight } from "@/src/units/weight";
 import type { ExerciseIdSpace } from "@/src/session/activeSession";
 
 export const DAY_MS = 24 * 3.6e6;
@@ -315,6 +317,16 @@ export function exercisePerformances(
   workouts: Workout[],
   exerciseId: string,
   idSpace: ExerciseIdSpace = "anatomy",
+  /**
+   * Unit the caller wants the loads in. Each workout is converted from the unit
+   * it was LOGGED in, so a suggestion or a pre-filled row is never a number
+   * from the other scale. Omitted, loads are returned exactly as stored.
+   *
+   * A workout with no stored unit predates loads carrying one, so it is read in
+   * `displayUnit` and left alone. Guessing at it would silently restate
+   * somebody's training log.
+   */
+  displayUnit?: WeightUnit,
 ): Performance[] {
   const out: Performance[] = [];
   for (const w of workouts) {
@@ -322,8 +334,17 @@ export function exercisePerformances(
       if (e.exerciseId !== exerciseId) continue;
       if ((e.idSpace ?? "anatomy") !== idSpace) continue;
       // Working sets only — a performance is what the records compare.
-      const completedSets = (e.sets || []).filter(isWorkingSet);
+      let completedSets = (e.sets || []).filter(isWorkingSet);
       if (completedSets.length === 0) continue;
+      if (displayUnit) {
+        const from = w.unit ?? displayUnit;
+        if (from !== displayUnit) {
+          completedSets = completedSets.map((st) => ({
+            ...st,
+            weight: convertWeight(st.weight, from, displayUnit),
+          }));
+        }
+      }
       out.push({
         workoutId: w.id,
         date: w.date,

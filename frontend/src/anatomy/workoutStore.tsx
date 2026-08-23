@@ -1,6 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useOwner } from "@/src/owner/OwnerContext";
 import { WeightUnit, setUnitPreference } from "@/src/units/unitPreference";
+import { convertWeight } from "@/src/units/weight";
 import {
   EMPTY_PRS,
   buildActiveSession,
@@ -43,7 +44,15 @@ export type SessionExercise = {
   /** v1.2.0. Exercises sharing an id are alternated as a superset. */
   supersetId?: string;
 };
-export type Workout = { id: string; date: number; durationSec: number; exercises: SessionExercise[] };
+/** Mirrors workoutScope.Workout. `unit` records which unit the loads were
+ *  entered in, so switching the preference converts them instead of relabelling. */
+export type Workout = {
+  id: string;
+  date: number;
+  durationSec: number;
+  exercises: SessionExercise[];
+  unit?: WeightUnit;
+};
 export type PRs = { byExercise: Record<string, { maxWeight: number; maxVolume: number }>; longestSec: number };
 
 // Persistence is owner-scoped and lives in ./workoutScope. The legacy `anat.*`
@@ -66,9 +75,10 @@ const openingSetRows = (
   idSpace: ExerciseIdSpace,
   plannedCount = 0,
   plannedReps = 0,
+  displayUnit: WeightUnit = "kg",
 ) => {
   const { count, weight, reps } = openingSets(
-    exercisePerformances(history, exerciseId, idSpace),
+    exercisePerformances(history, exerciseId, idSpace, displayUnit),
     plannedCount,
     plannedReps,
   );
@@ -305,14 +315,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         {
           exerciseId: id,
           idSpace: "anatomy" as ExerciseIdSpace,
-          sets: openingSetRows(history, id, "anatomy"),
+          sets: openingSetRows(history, id, "anatomy", 0, 0, unit),
           notes: "",
         },
       ];
     });
     setStartedAt((s) => s ?? Date.now());
     stampPlanSeed();
-  }, [stampPlanSeed, history]);
+  }, [stampPlanSeed, history, unit]);
 
   const addExerciseFromPlan = useCallback((id: string, planDate: string, plannedSets = 1, planName?: string, repsOrTime?: string) => {
     setSession((prev) => {
@@ -334,7 +344,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           // The Plan day promises N sets at a rep target for this goal, so the
           // session opens with N rows at that target, loaded from the last time
           // this exercise was logged.
-          sets: openingSetRows(history, id, "plan", plannedSetCount(plannedSets), plannedRepsFrom(repsOrTime)),
+          sets: openingSetRows(history, id, "plan", plannedSetCount(plannedSets), plannedRepsFrom(repsOrTime), unit),
           notes: "",
           planLink: { planDate, planName },
         },
@@ -342,7 +352,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     });
     setStartedAt((s) => s ?? Date.now());
     stampPlanSeed();
-  }, [stampPlanSeed, history]);
+  }, [stampPlanSeed, history, unit]);
 
   const hasExercise = useCallback((id: string) => !!session?.some((e) => e.exerciseId === id), [session]);
 
@@ -452,7 +462,24 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const setUnit = useCallback(
     (u: WeightUnit) => {
-      setUnitState(u);
+      setUnitState((prev) => {
+        if (prev === u) return prev;
+        // Switching the unit CONVERTS the loads on screen. Relabelling them
+        // would restate 40 kg as 40 lb — a different lift. Only the live
+        // session is rewritten; finished history keeps its own numbers and
+        // carries the unit it was logged in.
+        setSession((cur) =>
+          cur
+            ? cur.map((e) => ({
+                ...e,
+                sets: e.sets.map((st) =>
+                  st.weight ? { ...st, weight: convertWeight(st.weight, prev, u) } : st,
+                ),
+              }))
+            : cur,
+        );
+        return u;
+      });
       setUnitPreference(store, token, u).catch(() => {});
     },
     [store, token],
@@ -463,7 +490,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     if (!token || !owner) return { ok: false, reason: "unresolved_owner" };
 
     const durationSec = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
-    const workout: Workout = { id: uid(), date: Date.now(), durationSec, exercises: session };
+    const workout: Workout = { id: uid(), date: Date.now(), durationSec, exercises: session, unit };
     const { prs: nextPRs, newPRs } = computePRUpdate(prs, session, {
       unit,
       durationSec,
@@ -507,45 +534,51 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session]);
 
-  return (
-    <WorkoutContext.Provider
-      value={{
-        session,
-        startedAt,
-        sessionPlanSeed,
-        restPref,
-        history,
-        prs,
-        startWorkout,
-        addExercise,
-        addExerciseFromPlan,
-        hasExercise,
-        addSet,
-        updateSet,
-        deleteSet,
-        duplicateSet,
-        toggleDone,
-        toggleWarmup,
-        toggleSuperset,
-        removeExercise,
-        setNotes,
-        setRestPref,
-        finish,
-        cancel,
-        unit,
-        setUnit,
-        hydrated: hydratedFor === ownerKey,
-        readFailed,
-        retryRead: () => {
-          setReadFailed(false);
-          setHydratedFor(null);
-          setReloadNonce((n) => n + 1);
-        },
-      }}
-    >
-      {children}
-    </WorkoutContext.Provider>
+  const retryRead = useCallback(() => {
+    setReadFailed(false);
+    setHydratedFor(null);
+    setReloadNonce((n) => n + 1);
+  }, []);
+
+  // Memoised deliberately. As an inline object this was a NEW value on every
+  // render of the provider, so EVERY useWorkout() consumer in the app — each
+  // session card, the plan, history — re-rendered on every keystroke into a
+  // weight field. The callbacks are already stable via useCallback, so only
+  // real state changes propagate now.
+  const value = useMemo(
+    () => ({
+      session,
+      startedAt,
+      sessionPlanSeed,
+      restPref,
+      history,
+      prs,
+      startWorkout,
+      addExercise,
+      addExerciseFromPlan,
+      hasExercise,
+      addSet,
+      updateSet,
+      deleteSet,
+      duplicateSet,
+      toggleDone,
+      toggleWarmup,
+      toggleSuperset,
+      removeExercise,
+      setNotes,
+      setRestPref,
+      finish,
+      cancel,
+      unit,
+      setUnit,
+      hydrated: hydratedFor === ownerKey,
+      readFailed,
+      retryRead,
+    }),
+    [addExercise, addExerciseFromPlan, addSet, cancel, deleteSet, duplicateSet, finish, hasExercise, history, hydratedFor, ownerKey, prs, readFailed, removeExercise, restPref, retryRead, session, sessionPlanSeed, setNotes, setRestPref, setUnit, startWorkout, startedAt, toggleDone, toggleSuperset, toggleWarmup, unit, updateSet],
   );
+
+  return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>;
 }
 
 export function useWorkout() {

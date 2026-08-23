@@ -320,7 +320,10 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     overflow: "hidden",
     marginTop: 12,
   },
-  largeWorkout: { marginTop: 0, marginBottom: 10 },
+  // No margins of its own. The demo card's own 12 pt padding is the gap on all
+  // four sides; a marginBottom here made the bottom gap 22 against 12 at the
+  // sides, which is the uneven inset in the screenshots.
+  largeWorkout: { marginTop: 0, marginBottom: 0 },
   controls: { position: "absolute", right: 8, bottom: 8, flexDirection: "row", gap: 8 },
   failed: { alignItems: "center", justifyContent: "center", gap: 8, padding: 16 },
   failedText: { color: T.textDim, fontSize: 12.5, lineHeight: 18, textAlign: "center" },

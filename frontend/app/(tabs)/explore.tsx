@@ -144,9 +144,13 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   segment: { flexDirection: "row", backgroundColor: T.bg2, borderRadius: 22, padding: 4, marginBottom: 12, gap: 4 },
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   sectionTitle: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
-  eyeBtn: { padding: 4 },
+  // No fill of its own, and a full 44 pt target rather than a 4 pt pad.
+  eyeBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", backgroundColor: "transparent" },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: T.surfaceHi, borderWidth: 1.5, borderColor: "transparent", paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999 },
+  // Rest border is the button's OWN fill, not "transparent". A transparent
+  // border over a filled, rounded view leaves an alpha seam at the curve — the
+  // "radius cut". Same geometry in both states, so selecting only recolours.
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: T.surfaceHi, borderWidth: 1.5, borderColor: T.surfaceHi, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999 },
   chipActive: { borderColor: T.accent },
   chipHidden: { opacity: 0.5 },
   chipText: { color: T.text, fontSize: 13, fontWeight: "600" },
@@ -156,8 +160,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   shrinkTitle: { color: T.text, fontSize: 16, fontWeight: "700" },
   shrinkPct: { color: T.accent, fontSize: 16, fontWeight: "800" },
   shrinkBtns: { flexDirection: "row", gap: 8, marginTop: 10 },
-  smallBtn: { flex: 1, backgroundColor: T.surfaceHi, paddingVertical: 10, borderRadius: 22, alignItems: "center" },
+  smallBtn: { flex: 1, backgroundColor: T.surfaceHi, borderWidth: 1.5, borderColor: T.surfaceHi, paddingVertical: 10, borderRadius: 22, alignItems: "center" },
   smallBtnText: { color: T.text, fontSize: 13, fontWeight: "600" },
-  showAll: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.bg2, paddingVertical: 12, borderRadius: 22, marginTop: 12 },
+  showAll: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.bg2, borderWidth: 1.5, borderColor: T.bg2, paddingVertical: 12, borderRadius: 22, marginTop: 12 },
   showAllText: { color: T.text, fontSize: 14, fontWeight: "700" },
 });

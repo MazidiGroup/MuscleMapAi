@@ -39,7 +39,22 @@ export type SessionExercise = {
   /** v1.2.0. Exercises sharing an id are alternated as a superset. */
   supersetId?: string;
 };
-export type Workout = { id: string; date: number; durationSec: number; exercises: SessionExercise[] };
+/**
+ * A finished workout.
+ *
+ * `unit` records which unit its loads were entered in. A load is meaningless
+ * without it: before this was stored, switching the preference relabelled every
+ * past record rather than converting it. Records written before v1.2.1 have no
+ * unit and are read in the preference captured at upgrade — the unit they were
+ * actually typed under. Nothing is ever re-rounded or rewritten in place.
+ */
+export type Workout = {
+  id: string;
+  date: number;
+  durationSec: number;
+  exercises: SessionExercise[];
+  unit?: WeightUnit;
+};
 export type PRs = { byExercise: Record<string, { maxWeight: number; maxVolume: number }>; longestSec: number };
 
 export const EMPTY_PRS: PRs = { byExercise: {}, longestSec: 0 };

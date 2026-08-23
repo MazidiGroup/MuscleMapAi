@@ -276,8 +276,8 @@ function SessionCard({
 
   // Completed working sets for THIS exercise, from finished workouts only.
   const perfs = useMemo(
-    () => exercisePerformances(history, se.exerciseId, se.idSpace ?? "anatomy"),
-    [history, se.exerciseId, se.idSpace],
+    () => exercisePerformances(history, se.exerciseId, se.idSpace ?? "anatomy", unit),
+    [history, se.exerciseId, se.idSpace, unit],
   );
   const suggestion = useMemo(
     () => suggestNext({ performances: perfs, unit, goal, bodyweight }),
@@ -523,7 +523,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   stackCount: { color: T.textDim, fontSize: 12.5, fontWeight: "700", minWidth: 56, textAlign: "center" },
   demoCard: { backgroundColor: T.surfaceSolid, borderRadius: 22, padding: 12, marginBottom: 14, overflow: "hidden" },
   demoTitle: { color: T.textFaint, fontSize: 11, fontWeight: "800", letterSpacing: 0.9 },
-  demoName: { color: T.text, fontSize: 15, fontWeight: "800", marginTop: 2, marginBottom: 10 },
+  demoName: { color: T.text, fontSize: 15, fontWeight: "800", marginTop: 2, marginBottom: 12 },
   exCardHead: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
   exCardName: { color: T.text, fontSize: 16, fontWeight: "800" },
   headBtn: {

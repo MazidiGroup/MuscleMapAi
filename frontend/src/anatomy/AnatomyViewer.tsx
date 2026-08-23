@@ -265,14 +265,14 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
 
       {/* control buttons */}
       <View style={[styles.controls, { top: insets.top + 64, pointerEvents: "box-none" }]}>
-        <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: T.card, }]} onPress={() => engineRef.current?.zoom(0.82)} testID="zoom-in-btn">
+        <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: T.cardSolid }]} onPress={() => engineRef.current?.zoom(0.82)} testID="zoom-in-btn">
           <Ionicons name="add" size={22} color={T.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: T.card, }]} onPress={() => engineRef.current?.zoom(1.22)} testID="zoom-out-btn">
+        <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: T.cardSolid }]} onPress={() => engineRef.current?.zoom(1.22)} testID="zoom-out-btn">
           <Ionicons name="remove" size={22} color={T.text} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.ctrlBtn, { backgroundColor: T.card, }]}
+          style={[styles.ctrlBtn, { backgroundColor: T.cardSolid }]}
           onPress={() => {
             engineRef.current?.resetView();
             onSelect?.(null);

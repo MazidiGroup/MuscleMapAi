@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { AnatomyViewer } from "@/src/anatomy/AnatomyViewer";
 import { formatSetLoad, isBodyweightEquipment } from "@/src/anatomy/bodyweight";
+import { displayWeight } from "@/src/units/weight";
 import { getExercise } from "@/src/anatomy/exercises";
 import { useWorkout, getWorkoutById, muscleActivation } from "@/src/anatomy/workoutStore";
 import {
@@ -130,7 +131,11 @@ export default function SummaryScreen() {
                         {`Set ${i + 1}: ${
                           // "BW" belongs to bodyweight exercises only. A loaded exercise with
                           // no weight entered has no weight — it is not bodyweight.
-                          bodyweight ? formatSetLoad(set.weight, unit, true) : set.weight > 0 ? `${set.weight} ${unit}` : "—"
+                          bodyweight
+                            ? formatSetLoad(displayWeight(set.weight, workout?.unit, unit, unit), unit, true)
+                            : set.weight > 0
+                              ? `${displayWeight(set.weight, workout?.unit, unit, unit)} ${unit}`
+                              : "—"
                         } × ${set.reps}`}
                         {set.warmup ? " · warm-up" : ""}
                         {isCountableSet(set) ? "" : " · not completed"}
