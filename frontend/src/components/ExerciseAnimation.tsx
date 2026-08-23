@@ -107,7 +107,7 @@ export function ExerciseAnimation({
         key={attempt}
         source={src}
         style={[styles.thumb, { width: size, height: size }]}
-        contentFit="contain"
+        contentFit="cover"
         transition={100}
         onError={() => setFailed(true)}
         accessibilityLabel={alt}
@@ -126,10 +126,10 @@ export function ExerciseAnimation({
       >
         <View style={[styles.thumb, { width: size, height: size, overflow: "hidden" }]}>
           {media.hasPoster && (
-            <Image source={{ uri: posterUrl(exerciseId) }} style={StyleSheet.absoluteFill} contentFit="contain" transition={100} />
+            <Image source={{ uri: posterUrl(exerciseId) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={100} />
           )}
           {media.hasAnimation && (
-            <AnimationPlayer exerciseId={exerciseId} playing={shouldPlay} contentFit="contain" />
+            <AnimationPlayer exerciseId={exerciseId} playing={shouldPlay} contentFit="cover" />
           )}
           {!shouldPlay && media.hasAnimation && (
             <View style={styles.playBadge}>
@@ -290,6 +290,9 @@ const AnimationPlayer = React.memo(function AnimationPlayer({ exerciseId, playin
 });
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
+  // A circular icon must be FILLED by its poster. `contain` letterboxes a 16:9
+  // frame into the circle and reads as two hard horizontal bands, so the square
+  // variants crop to fill; only the wide box above contains.
   thumb: { borderRadius: 22, backgroundColor: T.surfaceHi },
   playBadge: {
     position: "absolute",
@@ -304,10 +307,13 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  // The exercise pack ships 720x402 posters and 1936x1072 clips — both ~16:9.
-  // The box matches that, so `contain` fills it edge to edge with no crop and
-  // no letterbox.
+  // The exercise pack ships 720x402 posters and 1936x1072 clips — both ~16:9,
+  // so this box matches the source and `contain` fills it edge to edge with
+  // neither crop nor letterbox. The explicit width is required: with only an
+  // aspectRatio the box was sized from its height and left a wider gap on the
+  // right than the card's own padding on the left.
   large: {
+    width: "100%",
     aspectRatio: 16 / 9,
     borderRadius: 22,
     backgroundColor: T.bg2,

@@ -135,7 +135,7 @@ export default function WorkoutScreen() {
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ padding: 16, paddingBottom: 140 }}
+                contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 96 }}
               >
                 {/* One exercise at a time. The stack shows the exercise in hand
                     with its neighbours peeking out behind it; a horizontal swipe
@@ -314,15 +314,29 @@ function SessionCard({
         </A11yControl>
       </View>
 
-      {/* Next target, derived from this exercise's own completed sets. Offered
-          only once there is a performance to build on — never invented. */}
-      {suggestion && (
-        <View style={styles.suggestCard} testID={`suggest-${se.exerciseId}`}>
-          <Ionicons name="trending-up" size={15} color={T.accent} />
+      {/* Next target, derived from this exercise's own completed sets. The row
+          is ALWAYS rendered: when it only appeared for exercises with history,
+          cards in the stack were different heights and the deck looked ragged.
+          With no history it states that plainly instead of inventing a target —
+          same shape, no claim. */}
+      <View
+        style={[styles.suggestCard, !suggestion && styles.suggestCardEmpty]}
+        testID={suggestion ? `suggest-${se.exerciseId}` : `suggest-empty-${se.exerciseId}`}
+      >
+        <Ionicons name="trending-up" size={15} color={suggestion ? T.accent : T.textFaint} />
+        {suggestion ? (
           <View style={{ flex: 1 }}>
             <Text style={styles.suggestHeadline}>{suggestion.headline}</Text>
             <Text style={styles.suggestBasis}>{suggestion.basis}</Text>
           </View>
+        ) : (
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.suggestHeadline, { color: T.textDim }]}>No target yet</Text>
+            <Text style={styles.suggestBasis}>Complete a set and your next one appears here.</Text>
+          </View>
+        )}
+        {suggestion && (
+          <>
           {/* Fills the empty rows only — never overwrites something already logged. */}
           <TouchableOpacity
             style={styles.suggestApply}
@@ -342,8 +356,9 @@ function SessionCard({
             <LiquidSheen tone="accent" />
             <Text style={styles.suggestApplyText}>Use</Text>
           </TouchableOpacity>
-        </View>
-      )}
+          </>
+        )}
+      </View>
 
       <View style={styles.setHeadRow}>
         <Text style={[styles.setHead, { width: 44, textAlign: "center" }]}>SET</Text>
@@ -465,7 +480,7 @@ function SessionCard({
         accessibilityLabel={`Notes for ${ex?.name}`}
         testID={`notes-${se.exerciseId}`}
       />
-      {suggestion && <Text style={styles.overloadNote}>{OVERLOAD_NOTE}</Text>}
+      <Text style={styles.overloadNote}>{OVERLOAD_NOTE}</Text>
     </View>
   );
 }
@@ -494,7 +509,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   bwBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: T.accent + "22" },
   bwBadgeText: { color: T.accent, fontSize: 10.5, fontWeight: "800" },
   finishErrorWrap: { position: "absolute", left: 16, right: 16 },
-  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surfaceSolid, borderRadius: 22, paddingVertical: 12, overflow: "hidden" },
+  statsBar: { flexDirection: "row", marginHorizontal: 16, marginBottom: 14, backgroundColor: T.surfaceSolid, borderRadius: 22, paddingVertical: 12, overflow: "hidden" },
   sbStat: { flex: 1, alignItems: "center" },
   sbValue: { color: T.accent, fontSize: 17, fontWeight: "800" },
   sbLabel: { color: T.textFaint, fontSize: 11, marginTop: 2 },
@@ -503,10 +518,10 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   // Opaque, not translucent: stack cards sit ON one another, so any alpha
   // shows the card behind through the one in front.
   exCard: { backgroundColor: T.surfaceSolid, borderRadius: 22, padding: 12, overflow: "hidden" },
-  stackNav: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, marginTop: 12, marginBottom: 12 },
+  stackNav: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, marginTop: 14, marginBottom: 14 },
   stackNavBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: T.surfaceHi },
   stackCount: { color: T.textDim, fontSize: 12.5, fontWeight: "700", minWidth: 56, textAlign: "center" },
-  demoCard: { backgroundColor: T.surfaceSolid, borderRadius: 22, padding: 12, marginBottom: 12, overflow: "hidden" },
+  demoCard: { backgroundColor: T.surfaceSolid, borderRadius: 22, padding: 12, marginBottom: 14, overflow: "hidden" },
   demoTitle: { color: T.textFaint, fontSize: 11, fontWeight: "800", letterSpacing: 0.9 },
   demoName: { color: T.text, fontSize: 15, fontWeight: "800", marginTop: 2, marginBottom: 10 },
   exCardHead: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
@@ -516,7 +531,9 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     overflow: "hidden", backgroundColor: T.surfaceHi,
   },
   suggestCard: {
-    flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10,
+    // Needs a bottom gap of its own: without one its rounded edge sat directly
+    // on the SET / KG / REPS / DONE header row.
+    flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10, marginBottom: 12,
     backgroundColor: T.accent + "14", borderWidth: 1, borderColor: T.accent + "44",
     borderRadius: 22, paddingHorizontal: 12, paddingVertical: 10,
   },
@@ -527,6 +544,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     alignItems: "center", justifyContent: "center", backgroundColor: T.accent,
   },
   suggestApplyText: { color: T.bg, fontSize: 12.5, fontWeight: "800" },
+  suggestCardEmpty: { backgroundColor: T.surfaceHi, borderColor: T.border },
   overloadNote: { color: T.textFaint, fontSize: 10.5, lineHeight: 15, marginTop: 8 },
 
   prFlag: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
@@ -553,7 +571,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   notes: { backgroundColor: T.bg2, borderRadius: 22, paddingHorizontal: 12, paddingVertical: 8, color: T.text, fontSize: 14, marginTop: 8, },
   addExBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 22, overflow: "hidden", backgroundColor: T.surfaceHi },
   addExText: { color: T.accent, fontSize: 14, fontWeight: "700" },
-  finishBar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 10, backgroundColor: T.bg2, borderTopWidth: 1, borderTopColor: T.border },
+  finishBar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 12, backgroundColor: T.bg },
   cancelBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 22, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center", overflow: "hidden", },
   cancelText: { color: T.textDim, fontSize: 14, fontWeight: "700" },
   finishBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.accent, borderRadius: 22, paddingVertical: 14, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },

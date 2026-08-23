@@ -41,22 +41,37 @@ export function liquidShadow(mode: ThemeMode, raised = false): ViewStyle {
  */
 export function LiquidSheen({ tone = "neutral" }: { tone?: GlassTone }) {
   const { mode } = useTheme();
-  const colors: [string, string, ...string[]] = tone === "accent"
-    ? mode === "day"
-      ? ["rgba(255,255,255,0.52)", "rgba(255,255,255,0.08)", "rgba(14,75,178,0.16)"]
-      : ["rgba(255,255,255,0.34)", "rgba(255,255,255,0.04)", "rgba(10,53,130,0.18)"]
+  // Every stop is WHITE, fading to fully transparent. Two earlier bugs came
+  // from this gradient and both were colour, not geometry:
+  //
+  //  - the final stop used to be blue (rgba(14,75,178) / rgba(78,159,255)),
+  //    left over from the pre-copper palette. It landed on the bottom-right
+  //    corner of every copper control, so the fill turned muddy exactly where
+  //    the curve is — reading as a dark line tracing the radius.
+  //  - the opening stop was far too strong (0.76 white in Day), which put a
+  //    bright patch behind whatever sat in the top-left corner.
+  //
+  // Fading to transparent white means the sheen can never tint a surface or
+  // fight its edge: at the boundary it IS the surface colour.
+  const peak = tone === "accent"
+    ? mode === "day" ? 0.26 : 0.20
     : tone === "danger"
-      ? ["rgba(255,255,255,0.24)", "rgba(255,255,255,0.025)", "rgba(160,20,35,0.13)"]
-      : mode === "day"
-        ? ["rgba(255,255,255,0.76)", "rgba(255,255,255,0.14)", "rgba(68,130,220,0.055)"]
-        : ["rgba(255,255,255,0.14)", "rgba(255,255,255,0.018)", "rgba(78,159,255,0.055)"];
+      ? 0.16
+      : mode === "day" ? 0.30 : 0.085;
+  const colors: [string, string, ...string[]] = [
+    `rgba(255,255,255,${peak})`,
+    `rgba(255,255,255,${(peak * 0.22).toFixed(4)})`,
+    "rgba(255,255,255,0)",
+  ];
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <LinearGradient
         colors={colors}
-        locations={[0, 0.48, 1]}
-        start={{ x: 0.08, y: 0 }}
-        end={{ x: 0.92, y: 1 }}
+        // Weighted early so the highlight is a soft falloff off the top-left
+        // rather than a band with a visible edge mid-surface.
+        locations={[0, 0.35, 0.85]}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
     </View>

@@ -135,7 +135,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
       </View>
 
       {/* Resuming an active session and starting a new workout are separate actions. */}
-      <View style={{ marginTop: 20 }}>
+      <View style={{ marginTop: BLOCK_GAP }}>
         {hasActiveWorkout ? (
           <InterruptedSessionCard
             title={staleSession ? "Workout from your previous plan" : "Workout in progress"}
@@ -180,7 +180,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
       {/* Discovery only appears once entitlement is actually resolved: a
           subscriber must never see a Premium pitch while RevenueCat loads. */}
       {!resolution.access && resolution.state === "ready" ? (
-        <View style={{ marginTop: 14 }}>
+        <View style={{ marginTop: BLOCK_GAP }}>
           <PremiumDiscoveryCard
             contextTitle={todayDay && !todayDay.rest ? todayDay.typeName : "your weekly plan"}
             onPress={previewPremium}
@@ -610,12 +610,17 @@ function SwapSheet({ visible, currentId, excludeIds, onDismiss, onPick }: {
 }
 
 // ---- Styles --------------------------------------------------------------
+/** One vertical rhythm for Today: every block is BLOCK_GAP apart, and a new
+ *  section heading gets SECTION_GAP so the page reads in groups. */
+const BLOCK_GAP = 16;
+const SECTION_GAP = 24;
+
 const styles = StyleSheet.create({
   wpScroll: { padding: 20, paddingTop: 56, paddingBottom: 40 },
   wpEyebrow: { fontSize: 11, fontWeight: "800", letterSpacing: 0.9 },
-  sectionHead: { fontSize: 11, fontWeight: "800", letterSpacing: 0.9, marginTop: 22, marginBottom: 10 },
+  sectionHead: { fontSize: 11, fontWeight: "800", letterSpacing: 0.9, marginTop: SECTION_GAP, marginBottom: 12 },
   summaryRow: {
-    flexDirection: "row", alignItems: "center", marginTop: 14,
+    flexDirection: "row", alignItems: "center", marginTop: BLOCK_GAP,
     borderRadius: 22, overflow: "hidden", paddingVertical: 14,
     borderWidth: StyleSheet.hairlineWidth, borderColor: "transparent",
   },
@@ -623,7 +628,7 @@ const styles = StyleSheet.create({
   summaryValue: { fontSize: 19, fontWeight: "800" },
   summaryLabel: { fontSize: 11, fontWeight: "600" },
   summaryDivider: { width: StyleSheet.hairlineWidth, height: 26 },
-  progressRow: { flexDirection: "row", gap: 10, marginTop: 18 },
+  progressRow: { flexDirection: "row", gap: 10, marginTop: BLOCK_GAP },
   progressLink: {
     flex: 1, flexDirection: "row", alignItems: "center", gap: 8,
     minHeight: 52, paddingHorizontal: 14, borderRadius: 22,
@@ -650,7 +655,7 @@ const styles = StyleSheet.create({
   },
   adjustText: { fontSize: 12.5, fontWeight: "800" },
 
-  chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: BLOCK_GAP },
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: R.pill, borderWidth: 1, overflow: "hidden" },
   chipText: { fontSize: 11, fontWeight: "700" },
   dayCard: { borderRadius: R.xl, padding: 14, overflow: "hidden" },
