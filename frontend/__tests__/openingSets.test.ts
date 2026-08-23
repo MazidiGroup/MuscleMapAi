@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { openingSets } from "../src/anatomy/progression";
+import { openingSets, plannedRepsFrom } from "../src/anatomy/progression";
 import type { Performance } from "../src/history/metrics";
 
 const perf = (sets: { weight: number; reps: number }[], date = 1): Performance => ({
@@ -70,4 +70,38 @@ test("nothing is pre-marked done — the user still ticks every set", () => {
   // contract that it carries no completion state to copy.
   const o = openingSets([perf([{ weight: 60, reps: 8 }])]);
   assert.deepEqual(Object.keys(o).sort(), ["count", "reps", "weight"]);
+});
+
+// --- reps from the plan's goal target ----------------------------------------
+
+test("a plan rep target wins over history reps, while the load still comes from history", () => {
+  const history = [perf([{ weight: 60, reps: 12 }])];
+  const o = openingSets(history, 3, 8);
+  assert.equal(o.reps, 8, "the plan's target for this goal is what the user agreed to");
+  assert.equal(o.weight, 60, "load is never invented — it comes from what was actually lifted");
+  assert.equal(o.count, 3);
+});
+
+test("with no history a plan rep target still pre-fills reps, and the load stays empty", () => {
+  const o = openingSets([], 4, 10);
+  assert.equal(o.reps, 10);
+  assert.equal(o.weight, 0, "no history means no honest load to suggest");
+  assert.equal(o.count, 4);
+});
+
+test("without a plan target, reps fall back to the last performance", () => {
+  const o = openingSets([perf([{ weight: 40, reps: 15 }])], 0, 0);
+  assert.equal(o.reps, 15);
+});
+
+test("plan rep text resolves to the lower bound of a range and to nothing for timed work", () => {
+  assert.equal(plannedRepsFrom("8–12"), 8, "a range pre-fills its floor");
+  assert.equal(plannedRepsFrom("8-12"), 8);
+  assert.equal(plannedRepsFrom("12"), 12);
+  assert.equal(plannedRepsFrom("30–45 sec"), 0, "seconds are not reps");
+  assert.equal(plannedRepsFrom("45s"), 0);
+  assert.equal(plannedRepsFrom("2 min"), 0);
+  assert.equal(plannedRepsFrom("AMRAP"), 0);
+  assert.equal(plannedRepsFrom(""), 0);
+  assert.equal(plannedRepsFrom(undefined), 0);
 });

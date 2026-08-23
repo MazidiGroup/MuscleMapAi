@@ -42,8 +42,8 @@ export function EmptyState({ icon, title, body, note, primary, secondary, testID
           height: 64,
           borderRadius: t.radius.xl,
           backgroundColor: t.color.surface,
-          borderWidth: 1,
-          borderColor: t.color.border,
+          
+          
           alignItems: "center",
           justifyContent: "center",
         }}

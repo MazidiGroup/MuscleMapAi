@@ -354,8 +354,8 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
       paddingHorizontal: 6,
       paddingVertical: 10,
       backgroundColor: t.color.surface,
-      borderWidth: 1,
-      borderColor: t.color.border,
+      
+      
       borderRadius: t.radius.lg,
     },
     outcomeText: { color: t.color.text, fontSize: 10.5, lineHeight: 14, fontWeight: "700", textAlign: "center" },
@@ -365,8 +365,8 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
       alignItems: "center",
       gap: t.space.md,
       backgroundColor: t.color.surface,
-      borderWidth: 1,
-      borderColor: t.color.border,
+      
+      
       borderRadius: t.radius.lg,
       padding: t.space.md,
     },
@@ -388,8 +388,11 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
       paddingHorizontal: t.space.md,
       paddingVertical: t.space.md,
       minHeight: t.target.comfortable,
+      borderWidth: 1.5,
+      borderColor: "transparent",
     },
-    optionActive: { borderColor: t.color.accent, borderWidth: 1.5, backgroundColor: t.mode === "day" ? "rgba(40,120,232,0.075)" : "rgba(76,156,255,0.10)" },
+    // Selected is an accent outline; the fill stays exactly as it was.
+    optionActive: { borderColor: t.color.accent },
     radio: { width: 22, height: 22, borderRadius: 22, borderWidth: 1.5, borderColor: t.color.textFaint, alignItems: "center", justifyContent: "center" },
     radioActive: { backgroundColor: t.color.accent, borderColor: t.color.accent },
     optionTitleRow: { flexDirection: "row", alignItems: "center", gap: 7 },
@@ -399,8 +402,8 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
     disclosure: {
       width: "100%",
       backgroundColor: t.color.surface,
-      borderWidth: 1,
-      borderColor: t.color.border,
+      
+      
       borderRadius: t.radius.md,
       padding: t.space.md,
     },

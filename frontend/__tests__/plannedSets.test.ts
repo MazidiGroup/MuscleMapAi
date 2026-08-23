@@ -33,21 +33,26 @@ test("the plan-linked add path passes the planned count through", () => {
   const plan = fs.readFileSync(path.join(root, "src/plan/PlanViews.tsx"), "utf8");
   const store = fs.readFileSync(path.join(root, "src/anatomy/workoutStore.tsx"), "utf8");
   const calls = plan.match(/addExerciseFromPlan\([^)]*\)/g) ?? [];
-  assert.ok(calls.length >= 2, "both Plan call sites exist");
+  // Today's own start button is a third plan-linked call site.
+  assert.ok(calls.length >= 3, "every Plan call site exists");
   for (const call of calls) {
-    // The planned count is followed by the plan day name, which the title helper stores.
-    assert.ok(/,\s*(it|ex)\.sets\s*(,\s*day\.typeName\s*)?\)/.test(call), `planned sets must be passed: ${call}`);
-    assert.ok(/,\s*day\.typeName\s*\)/.test(call), `the plan day name must be passed: ${call}`);
+    // The planned count is followed by the plan day name, which the title
+    // helper stores, and then by the plan's rep text, which pre-fills the rows.
+    assert.ok(
+      /,\s*(it|ex)\.sets\s*,\s*(day|todayDay)\.typeName\s*(,\s*(it|ex)\.repsOrTime\s*)?\)/.test(call),
+      `planned sets must be passed: ${call}`,
+    );
+    assert.ok(/,\s*(day|todayDay)\.typeName\s*(,\s*(it|ex)\.repsOrTime\s*)?\)/.test(call), `the plan day name must be passed: ${call}`);
   }
   assert.ok(
-    /addExerciseFromPlan = useCallback\(\(id: string, planDate: string, plannedSets = 1, planName\?: string\)/.test(store),
+    /addExerciseFromPlan = useCallback\(\(id: string, planDate: string, plannedSets = 1, planName\?: string, repsOrTime\?: string\)/.test(store),
     "the store accepts the planned set count",
   );
   // The seam moved when opening sets became pre-filled from history, but the
   // guarantee did not: the planned count is still what reaches the session, and
   // `openingSets` treats a plan count as authoritative over history.
   assert.ok(
-    store.includes('openingSetRows(history, id, "plan", plannedSetCount(plannedSets))'),
+    store.includes('openingSetRows(history, id, "plan", plannedSetCount(plannedSets), plannedRepsFrom(repsOrTime))'),
     "the session is seeded with the planned number of rows",
   );
   const progression = fs.readFileSync(path.join(root, "src/anatomy/progression.ts"), "utf8");

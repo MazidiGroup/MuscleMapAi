@@ -299,8 +299,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     height: 18,
     borderRadius: 22,
     backgroundColor: "rgba(7,10,15,0.85)",
-    borderWidth: 1,
-    borderColor: T.borderHi,
+    
+    
     alignItems: "center",
     justifyContent: "center",
   },
@@ -308,8 +308,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     aspectRatio: 16 / 10,
     borderRadius: 22,
     backgroundColor: T.bg2,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     overflow: "hidden",
     marginTop: 12,
   },
@@ -319,7 +319,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   failedText: { color: T.textDim, fontSize: 12.5, lineHeight: 18, textAlign: "center" },
   retryBtn: {
     minHeight: 44, justifyContent: "center", paddingHorizontal: 16, borderRadius: 999,
-    borderWidth: 1, borderColor: T.border, backgroundColor: T.surface,
+    backgroundColor: T.surface,
   },
   retryText: { color: T.text, fontSize: 13, fontWeight: "700" },
   ctrlBtn: {
@@ -327,8 +327,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: "rgba(7,10,15,0.72)",
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     alignItems: "center",
     justifyContent: "center",
   },

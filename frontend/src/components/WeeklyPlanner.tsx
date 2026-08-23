@@ -93,7 +93,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 6,
     borderRadius: RADIUS.lg,
-    borderWidth: 1,
     alignItems: "center",
     flexShrink: 0,
     overflow: "hidden",

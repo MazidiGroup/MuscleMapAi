@@ -28,8 +28,16 @@ export function liquidShadow(mode: ThemeMode, raised = false): ViewStyle {
 }
 
 /**
- * Specular highlight and inner rim for dense controls. It uses gradients but
- * no blur, so exercise lists can contain many glass buttons without lag.
+ * Specular highlight for dense controls. It uses a gradient but no blur, so
+ * exercise lists can contain many glass buttons without lag.
+ *
+ * It is ONLY a gradient. An earlier version also drew an inner hairline rim
+ * and a 1 px specular band, both as absolutely-filled rectangles with no
+ * corner radius. Inside a rounded, clipped container those rectangles showed
+ * as straight lines along the flat edges that vanished at the corners — the
+ * "thick and thin connected lines" effect — and stacked with the container's
+ * own border to give three outlines of different weights. The parent alone
+ * decides whether it has an outline.
  */
 export function LiquidSheen({ tone = "neutral" }: { tone?: GlassTone }) {
   const { mode } = useTheme();
@@ -42,10 +50,6 @@ export function LiquidSheen({ tone = "neutral" }: { tone?: GlassTone }) {
       : mode === "day"
         ? ["rgba(255,255,255,0.76)", "rgba(255,255,255,0.14)", "rgba(68,130,220,0.055)"]
         : ["rgba(255,255,255,0.14)", "rgba(255,255,255,0.018)", "rgba(78,159,255,0.055)"];
-  const rim = tone === "accent"
-    ? "rgba(255,255,255,0.30)"
-    : mode === "day" ? "rgba(255,255,255,0.76)" : "rgba(225,238,255,0.14)";
-
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <LinearGradient
@@ -54,13 +58,6 @@ export function LiquidSheen({ tone = "neutral" }: { tone?: GlassTone }) {
         start={{ x: 0.08, y: 0 }}
         end={{ x: 0.92, y: 1 }}
         style={StyleSheet.absoluteFill}
-      />
-      <View style={[StyleSheet.absoluteFill, styles.innerRim, { borderColor: rim }]} />
-      <LinearGradient
-        colors={["rgba(255,255,255,0.24)", "rgba(255,255,255,0)"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0.6 }}
-        style={styles.specularBand}
       />
     </View>
   );
@@ -89,12 +86,10 @@ export function GlassSurface({
     : tone === "danger"
       ? T.focusRedBg
       : tone === "subtle" ? T.cardAlt : T.card;
-  const border = tone === "accent"
-    ? "rgba(255,255,255,0.26)"
-    : tone === "danger" ? T.focusRed + "66" : T.border;
-
+  // No outline by default: a panel is its fill, its blur and its shadow.
+  // Callers add a border only for a selected or dangerous state.
   return (
-    <View testID={testID} style={[styles.shell, { borderColor: border, backgroundColor: fill }, liquidShadow(mode), style]}>
+    <View testID={testID} style={[styles.shell, { backgroundColor: fill }, liquidShadow(mode), style]}>
       <BlurView
         intensity={intensity}
         tint={mode === "day" ? "light" : "dark"}
@@ -108,16 +103,5 @@ export function GlassSurface({
 }
 
 const styles = StyleSheet.create({
-  shell: {
-    overflow: "hidden",
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  innerRim: { borderWidth: StyleSheet.hairlineWidth },
-  specularBand: {
-    position: "absolute",
-    top: 0,
-    left: "8%",
-    right: "28%",
-    height: 1,
-  },
+  shell: { overflow: "hidden" },
 });

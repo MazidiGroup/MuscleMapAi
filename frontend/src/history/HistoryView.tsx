@@ -118,7 +118,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
       ) : (
         <>
           {/* Monday–Sunday calendar week, explicitly labelled. */}
-          <View style={[styles.card, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.lg }]} testID="history-week">
+          <View style={[styles.card, { backgroundColor: t.color.surface, padding: t.space.lg }]} testID="history-week">
             <LiquidSheen tone="neutral" />
             <Text style={[t.type.label, { color: t.color.textMuted }]}>{week.rangeLabel}</Text>
             <Text style={[t.type.title, { color: t.color.text, marginTop: 2 }]}>{week.copy}</Text>
@@ -140,7 +140,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
                     accessibilityRole="button"
                     accessibilityLabel={`${workoutTitle(item)}, ${totals.completedSets} completed sets, ${totals.volume} ${w.unit}`}
                     testID={`hist-${item.id}`}
-                    style={[styles.card, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.lg }]}
+                    style={[styles.card, { backgroundColor: t.color.surface, padding: t.space.lg }]}
                   >
                     <LiquidSheen tone="neutral" />
                     <View style={styles.row}>
@@ -170,7 +170,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
           ))}
 
           {/* Month grid. Every action here has a list equivalent above. */}
-          <View style={[styles.card, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.lg, gap: t.space.md }]} testID="history-calendar">
+          <View style={[styles.card, { backgroundColor: t.color.surface, padding: t.space.lg, gap: t.space.md }]} testID="history-calendar">
             <LiquidSheen tone="neutral" />
             <View style={styles.row}>
               <Pressable
@@ -178,7 +178,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
                 accessibilityRole="button"
                 accessibilityLabel={`Previous month, ${monthLabel(prevMonth.getFullYear(), prevMonth.getMonth())}`}
                 testID="cal-prev"
-                style={[styles.iconBtn, { borderColor: t.color.border }]}
+                style={[styles.iconBtn]}
               >
                 <LiquidSheen tone="neutral" />
                 <Ionicons name="chevron-back" size={18} color={t.color.textSecondary} />
@@ -195,7 +195,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
                 accessibilityRole="button"
                 accessibilityLabel={`Next month, ${monthLabel(nextMonth.getFullYear(), nextMonth.getMonth())}`}
                 testID="cal-next"
-                style={[styles.iconBtn, { borderColor: t.color.border }]}
+                style={[styles.iconBtn]}
               >
                 <LiquidSheen tone="neutral" />
                 <Ionicons name="chevron-forward" size={18} color={t.color.textSecondary} />
@@ -232,7 +232,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
                       onPress={() => router.push({ pathname: "/summary", params: { id: item.id } })}
                       accessibilityRole="button"
                       testID={`cal-workout-${item.id}`}
-                      style={[styles.card, { backgroundColor: t.color.surfaceAlt, borderColor: t.color.border, padding: t.space.md }]}
+                      style={[styles.card, { backgroundColor: t.color.surfaceAlt, padding: t.space.md }]}
                     >
                       <LiquidSheen tone="subtle" />
                       <Text style={[t.type.bodyStrong, { color: t.color.text }]}>{workoutTitle(item)}</Text>
@@ -251,7 +251,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
           accessibilityRole="button"
           accessibilityLabel={`${hiddenCount} earlier ${hiddenCount === 1 ? "workout is" : "workouts are"} part of Premium. Opens Premium.`}
           testID="history-cap-notice"
-          style={[styles.storageRow, { borderColor: t.color.border, backgroundColor: t.color.surface, minHeight: t.target.min }]}
+          style={[styles.storageRow, { backgroundColor: t.color.surface, minHeight: t.target.min }]}
         >
           <LiquidSheen tone="accent" />
           <Ionicons name="time-outline" size={16} color={t.color.accent} />
@@ -267,7 +267,7 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
         accessibilityRole="button"
         accessibilityLabel={HISTORY_COPY.storageEntry}
         testID="history-storage-entry"
-        style={[styles.storageRow, { borderColor: t.color.border, backgroundColor: t.color.surface, minHeight: t.target.min }]}
+        style={[styles.storageRow, { backgroundColor: t.color.surface, minHeight: t.target.min }]}
       >
         <LiquidSheen tone="neutral" />
         <Ionicons name="phone-portrait-outline" size={16} color={t.color.textSecondary} />
@@ -324,7 +324,7 @@ function StorageDialog({ visible, onClose }: { visible: boolean; onClose: () => 
       />
       <View style={[styles.dialogWrap, { pointerEvents: "box-none" }]}>
         <View
-          style={[styles.card, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.xl, gap: t.space.md }]}
+          style={[styles.card, { backgroundColor: t.color.surface, padding: t.space.xl, gap: t.space.md }]}
           accessibilityViewIsModal
           accessibilityRole="alert"
           accessibilityLabel={HISTORY_COPY.storageEntry}
@@ -353,13 +353,13 @@ function StorageDialog({ visible, onClose }: { visible: boolean; onClose: () => 
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 22, borderWidth: 1, overflow: "hidden" },
+  card: { borderRadius: 22, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  iconBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   cell: { width: `${100 / 7}%`, height: 44, alignItems: "center", justifyContent: "center" },
   dayCell: { marginVertical: 2, overflow: "hidden" },
-  storageRow: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 22, paddingHorizontal: 14, overflow: "hidden" },
+  storageRow: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 22, paddingHorizontal: 14, overflow: "hidden" },
   dialogWrap: { flex: 1, justifyContent: "center", padding: 24 },
   closeBtn: { borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
 });

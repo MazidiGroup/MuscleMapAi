@@ -82,7 +82,7 @@ export default function StateSystemReview() {
         <ErrorBanner title="Set not saved" message="The last set is still on screen. Tap Save set to store it again." />
       </Section>
       <Section n="05" name="Full-page empty state">
-        <View style={{ height: 320, borderRadius: t.radius.lg, borderWidth: 1, borderColor: t.color.border }}>
+        <View style={{ height: 320, borderRadius: t.radius.lg, }}>
           <EmptyState
             icon="calendar-outline"
             title="No plan yet"
@@ -92,7 +92,7 @@ export default function StateSystemReview() {
         </View>
       </Section>
       <Section n="06" name="Full-page blocking error">
-        <View style={{ height: 320, borderRadius: t.radius.lg, borderWidth: 1, borderColor: t.color.border }}>
+        <View style={{ height: 320, borderRadius: t.radius.lg, }}>
           <BlockingError
             title="This device storage is unavailable"
             body="Nothing was lost. Your saved workouts are still on this device and will appear once storage responds."
@@ -160,7 +160,7 @@ export default function StateSystemReview() {
         />
       </Section>
       <Section n="14" name="Owner-namespace empty state">
-        <View style={{ height: 320, borderRadius: t.radius.lg, borderWidth: 1, borderColor: t.color.border }}>
+        <View style={{ height: 320, borderRadius: t.radius.lg, }}>
           <OwnerEmptyState
             title="No workouts on this profile yet"
             body="Finish a workout and it will appear here."

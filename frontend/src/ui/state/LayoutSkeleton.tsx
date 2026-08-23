@@ -41,8 +41,8 @@ export function SkeletonCard() {
         padding: t.space.lg - 2,
         borderRadius: t.radius.lg,
         backgroundColor: t.color.surface,
-        borderWidth: 1,
-        borderColor: t.color.border,
+        
+        
         gap: t.space.sm + 1,
       }}
     >

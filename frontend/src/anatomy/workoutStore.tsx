@@ -19,7 +19,7 @@ import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS, GYM_GROUP_ORDER } from "./groups";
 import { usePlanStore } from "@/src/plan/planStore";
 import { canMarkDone, isCountableSet, isWorkingSet, setVolume } from "./setRules";
-import { openingSets } from "./progression";
+import { openingSets, plannedRepsFrom } from "./progression";
 import { exercisePerformances } from "@/src/history/metrics";
 
 export type LoggedSet = {
@@ -65,10 +65,12 @@ const openingSetRows = (
   exerciseId: string,
   idSpace: ExerciseIdSpace,
   plannedCount = 0,
+  plannedReps = 0,
 ) => {
   const { count, weight, reps } = openingSets(
     exercisePerformances(history, exerciseId, idSpace),
     plannedCount,
+    plannedReps,
   );
   return Array.from({ length: count }, () => ({ id: uid(), weight, reps, done: false }));
 };
@@ -146,7 +148,7 @@ type Ctx = {
    * Add an exercise from a Plan day, carrying the planned set count into the
    * session. Auto-ticks the Plan when all sets complete.
    */
-  addExerciseFromPlan: (id: string, planDate: string, plannedSets?: number, planName?: string) => void;
+  addExerciseFromPlan: (id: string, planDate: string, plannedSets?: number, planName?: string, repsOrTime?: string) => void;
   hasExercise: (id: string) => boolean;
   addSet: (exId: string) => void;
   updateSet: (exId: string, setId: string, patch: Partial<LoggedSet>) => void;
@@ -312,7 +314,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     stampPlanSeed();
   }, [stampPlanSeed, history]);
 
-  const addExerciseFromPlan = useCallback((id: string, planDate: string, plannedSets = 1, planName?: string) => {
+  const addExerciseFromPlan = useCallback((id: string, planDate: string, plannedSets = 1, planName?: string, repsOrTime?: string) => {
     setSession((prev) => {
       const base = prev || [];
       if (base.some((e) => e.exerciseId === id)) {
@@ -329,9 +331,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         {
           exerciseId: id,
           idSpace: "plan" as ExerciseIdSpace,
-          // The Plan day promises N sets, so the session starts with N rows —
-          // pre-filled from the last time this exercise was logged.
-          sets: openingSetRows(history, id, "plan", plannedSetCount(plannedSets)),
+          // The Plan day promises N sets at a rep target for this goal, so the
+          // session opens with N rows at that target, loaded from the last time
+          // this exercise was logged.
+          sets: openingSetRows(history, id, "plan", plannedSetCount(plannedSets), plannedRepsFrom(repsOrTime)),
           notes: "",
           planLink: { planDate, planName },
         },

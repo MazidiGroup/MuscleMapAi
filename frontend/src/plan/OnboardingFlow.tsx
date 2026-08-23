@@ -85,7 +85,7 @@ export function Welcome({ onStart, onSignIn }: { onStart: () => void; onSignIn: 
           onPress={onSignIn}
           accessibilityRole="button"
           accessibilityLabel="Already have an account?"
-          style={[styles.secondaryLink, { minHeight: t.target.min, backgroundColor: t.color.surface, borderColor: t.color.border }]}
+          style={[styles.secondaryLink, { minHeight: t.target.min, backgroundColor: t.color.surface, }]}
           testID="cta-sign-in"
         >
           <LiquidSheen tone="neutral" />
@@ -127,7 +127,7 @@ function Shell({
           accessibilityRole="button"
           accessibilityLabel="Back"
           testID="onb-back"
-          style={[styles.iconBtn, { borderColor: t.color.border, width: t.target.min, height: t.target.min }]}
+          style={[styles.iconBtn, { width: t.target.min, height: t.target.min }]}
         >
           <LiquidSheen tone="neutral" />
           <Ionicons name="chevron-back" size={20} color={t.color.textSecondary} />
@@ -193,15 +193,16 @@ function OptionCard({
         styles.optCard,
         {
           borderRadius: t.radius.lg,
-          borderColor: selected ? t.color.accent : t.color.border,
-          backgroundColor: selected ? t.color.accent + "22" : t.color.surfaceAlt,
+          // Selection is the outline (and the radio); the fill never changes.
+          borderColor: selected ? t.color.accent : "transparent",
+          backgroundColor: t.color.surfaceAlt,
           minHeight: t.target.comfortable,
           padding: t.space.lg,
         },
       ]}
     >
       <LiquidSheen tone={selected ? "accent" : "neutral"} />
-      <View style={[styles.radio, { borderColor: selected ? t.color.accent : t.color.border }]}>
+      <View style={[styles.radio, { borderColor: selected ? t.color.accent : "transparent" }]}>
         {selected && <View style={[styles.radioDot, { backgroundColor: t.color.accent }]} />}
       </View>
       <View style={{ flex: 1 }}>
@@ -248,7 +249,7 @@ export function AdvancedLifterToggle({
               height: 24,
               borderRadius: t.radius.sm,
               borderWidth: 2,
-              borderColor: on ? t.color.accent : t.color.border,
+              borderColor: on ? t.color.accent : "transparent",
               backgroundColor: on ? t.color.accent : "transparent",
               alignItems: "center",
               justifyContent: "center",
@@ -270,8 +271,8 @@ export function AdvancedLifterToggle({
             alignItems: "center",
             justifyContent: "center",
             borderRadius: t.radius.md,
-            borderWidth: 1,
-            borderColor: t.color.border,
+            
+            
             backgroundColor: t.color.surfaceAlt,
             overflow: "hidden",
           }}
@@ -311,7 +312,7 @@ function Pill({ label, on, onPress, testID }: { label: string; on: boolean; onPr
         justifyContent: "center",
         borderRadius: t.radius.pill,
         borderWidth: 1,
-        borderColor: on ? t.color.accent : t.color.border,
+        borderColor: on ? t.color.accent : "transparent",
         backgroundColor: on ? t.color.accent + "22" : t.color.surfaceAlt,
         overflow: "hidden",
       }}
@@ -387,7 +388,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                   justifyContent: "center",
                   borderRadius: t.radius.md,
                   borderWidth: 1,
-                  borderColor: on ? t.color.accent : t.color.border,
+                  borderColor: on ? t.color.accent : "transparent",
                   backgroundColor: on ? t.color.accent + "22" : t.color.surfaceAlt,
                   overflow: "hidden",
                 }}
@@ -522,10 +523,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
   welcomeTop: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 24, paddingTop: 8 },
   welcomeActions: { paddingHorizontal: 24, gap: 12 },
-  secondaryLink: { alignItems: "center", justifyContent: "center", borderRadius: 22, borderWidth: 1, overflow: "hidden" },
+  secondaryLink: { alignItems: "center", justifyContent: "center", borderRadius: 22, overflow: "hidden" },
   brandMark: { width: 132, height: 132 },
   shellHeader: { paddingTop: 8, paddingBottom: 12, flexDirection: "row", alignItems: "center", gap: 12 },
-  iconBtn: { borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  iconBtn: { borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   progressWrap: { flex: 1, flexDirection: "row", gap: 4 },
   progressBar: { flex: 1, height: 4, borderRadius: 2 },
   optCard: { flexDirection: "row", alignItems: "center", borderWidth: 1.5, overflow: "hidden" },

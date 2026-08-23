@@ -269,8 +269,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: T.surface,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     borderRadius: 22,
     overflow: "hidden",
   },
@@ -284,8 +284,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
     backgroundColor: T.surface,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     borderRadius: 22,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -297,11 +297,11 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   rowLeft: { justifyContent: "flex-start" },
   bubble: { maxWidth: "84%", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 22, overflow: "hidden" },
   userBubble: { backgroundColor: T.accent, borderBottomRightRadius: 4 },
-  aiBubble: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderBottomLeftRadius: 4 },
+  aiBubble: { backgroundColor: T.surface, borderBottomLeftRadius: 4 },
   bubbleText: { color: T.text, fontSize: 15, lineHeight: 21 },
   linkText: { color: T.accent, textDecorationLine: "underline", fontSize: 15, lineHeight: 21 },
   inputBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingTop: 8, borderTopWidth: 1, borderTopColor: T.border, backgroundColor: T.bg2 },
-  input: { flex: 1, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, color: T.text, fontSize: 15, maxHeight: 100 },
+  input: { flex: 1, backgroundColor: T.surface, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, color: T.text, fontSize: 15, maxHeight: 100 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" },
-  stopBtn: { backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.borderHi },
+  stopBtn: { backgroundColor: T.surfaceHi, },
 });

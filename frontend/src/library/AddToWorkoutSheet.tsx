@@ -72,7 +72,7 @@ export function AddToWorkoutSheet({
         accessibilityLabel="Close"
       />
       <View
-        style={[styles.sheet, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.xl, gap: t.space.md }]}
+        style={[styles.sheet, { backgroundColor: t.color.surface, padding: t.space.xl, gap: t.space.md }]}
         testID="add-to-workout-sheet"
       >
         <LiquidSheen tone="neutral" />
@@ -154,7 +154,6 @@ const styles = StyleSheet.create({
     right: 0,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    borderWidth: 1,
     overflow: "hidden",
   },
 });

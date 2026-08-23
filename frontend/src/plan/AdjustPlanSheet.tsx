@@ -80,7 +80,7 @@ export function AdjustPlanSheet({
       <View
         style={[
           styles.sheet,
-          { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.xl, gap: t.space.md },
+          { backgroundColor: t.color.surface, padding: t.space.xl, gap: t.space.md },
         ]}
         testID="adjust-plan-sheet"
       >
@@ -184,7 +184,6 @@ const styles = StyleSheet.create({
     right: 0,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    borderWidth: 1,
     overflow: "hidden",
   },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },

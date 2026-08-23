@@ -100,8 +100,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     height: 42,
     borderRadius: 22,
     backgroundColor: "rgba(18,24,34,0.82)",
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     alignItems: "center",
     justifyContent: "center",
   },
@@ -110,8 +110,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     backgroundColor: T.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     marginTop: -24,
     paddingHorizontal: 20,
     paddingTop: 10,
@@ -148,8 +148,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 22,
     backgroundColor: T.bg2,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
   },
   srcText: { flex: 1, color: T.textFaint, fontSize: 11, lineHeight: 15 },
   srcCta: { color: T.accent, fontSize: 11, fontWeight: "800" },

@@ -240,8 +240,8 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: t.color.surfaceAlt,
-      borderWidth: 1,
-      borderColor: t.color.border,
+      
+      
     },
     promptEyebrow: { color: t.color.accentSoft, fontSize: 10, fontWeight: "900", letterSpacing: 1.15 },
     promptTitle: { color: t.color.text, fontSize: 25, lineHeight: 30, fontWeight: "800" },
