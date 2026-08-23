@@ -316,8 +316,8 @@ export default function LibraryScreen() {
                 }
                 testID="lib-filters"
               >
-                <Ionicons name="options-outline" size={15} color={activeFilters > 0 ? T.bg : T.text} />
-                <Text style={[styles.filterBtnText, activeFilters > 0 && { color: T.bg }]}>
+                <Ionicons name="options-outline" size={15} color={activeFilters > 0 ? T.accent : T.text} />
+                <Text style={[styles.filterBtnText, activeFilters > 0 && { color: T.accent }]}>
                   {activeFilters > 0 ? `Filters · ${activeFilters}` : "Filters"}
                 </Text>
               </TouchableOpacity>
@@ -601,18 +601,20 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   h1: { color: T.text, fontSize: 26, fontWeight: "800" },
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
-  search: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 12, height: 44, marginTop: 14 },
+  search: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surface, borderRadius: 22, paddingHorizontal: 12, height: 44, marginTop: 14 },
   searchInput: { flex: 1, color: T.text, fontSize: 15 },
   libSeg: { flexDirection: "row", backgroundColor: "transparent", padding: 0, gap: 3, marginTop: 14 },
-  libSegBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 44, paddingHorizontal: 3, borderRadius: 22 },
-  libSegActive: { backgroundColor: T.accent + "14", borderBottomWidth: 2, borderBottomColor: T.accent },
+  // Page selection is an accent outline on an unchanged fill. Every selector
+  // keeps a transparent border at rest so selecting never shifts its content.
+  libSegBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 44, paddingHorizontal: 3, borderRadius: 22, borderWidth: 1.5, borderColor: "transparent" },
+  libSegActive: { borderColor: T.accent },
   libSegText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
   libSegTextActive: { color: T.accent },
-  gbChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border },
-  gbChipActive: { backgroundColor: T.accent, borderColor: T.accent },
+  gbChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: T.surfaceHi, borderWidth: 1.5, borderColor: "transparent" },
+  gbChipActive: { borderColor: T.accent },
   gbChipText: { color: T.text, fontSize: 13, fontWeight: "700" },
-  diffChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: "transparent", borderWidth: 1, borderColor: T.border },
-  diffChipActive: { backgroundColor: T.accent + "22", borderColor: T.accent },
+  diffChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: T.surfaceHi, borderWidth: 1.5, borderColor: "transparent" },
+  diffChipActive: { borderColor: T.accent },
   diffChipText: { color: T.textDim, fontSize: 12, fontWeight: "700" },
   diffChipTextActive: { color: T.accent },
   exIcon: { width: 36, height: 36, borderRadius: 22, alignItems: "center", justifyContent: "center", marginRight: 12 },
@@ -620,22 +622,22 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   groupHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   gdot: { width: 10, height: 10, borderRadius: 5 },
   groupTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
-  row: { flexDirection: "row", alignItems: "center", backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
+  row: { flexDirection: "row", alignItems: "center", backgroundColor: T.surface, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
   rowName: { color: T.text, fontSize: 15, fontWeight: "600" },
   rowFn: { color: T.textFaint, fontSize: 12, marginTop: 2 },
-  pill: { backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  pill: { backgroundColor: T.surfaceHi, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
   pillText: { color: T.text, fontSize: 13, fontWeight: "600" },
   filterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 12 },
   filterBtn: {
     flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 14,
-    borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface,
+    borderRadius: 999, borderWidth: 1.5, borderColor: "transparent", backgroundColor: T.surface,
   },
-  filterBtnActive: { backgroundColor: T.accent, borderColor: T.accent },
+  filterBtnActive: { borderColor: T.accent },
   filterBtnText: { color: T.text, fontSize: 13, fontWeight: "700" },
   resultCount: { color: T.textDim, fontSize: 12.5, fontWeight: "600", flexShrink: 1, textAlign: "right" },
   recentChip: {
     minHeight: 44, justifyContent: "center", paddingHorizontal: 14, borderRadius: 999,
-    borderWidth: 1, borderColor: T.border, backgroundColor: T.surface,
+    backgroundColor: T.surface,
   },
   recentChipText: { color: T.text, fontSize: 13, fontWeight: "600" },
   empty: { color: T.textDim, fontSize: 14, textAlign: "center", marginTop: 40 },
@@ -644,10 +646,10 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   aboutText: { color: T.textDim, fontSize: 14, lineHeight: 21 },
   version: { color: T.textFaint, fontSize: 12, marginTop: 12 },
   linkList: { marginTop: 16, gap: 8 },
-  linkRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 13 },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 13 },
   h1Small: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 },
   lessonCard: {
-    flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border,
+    flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, 
     borderRadius: 22, padding: 14, marginBottom: 10,
   },
   lessonIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center" },

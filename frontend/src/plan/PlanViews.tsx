@@ -39,6 +39,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
   const w = useWorkout();
   const { resolution } = usePremium();
   const [adjusting, setAdjusting] = useState(false);
+  const swaps = usePlanStore(s => s.swaps);
   if (!plan) return null;
   const { answers, splitLabel, days } = plan;
 
@@ -75,6 +76,24 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
   const openSession = () => router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
   const previewPremium = () => router.push("/(tabs)/coach");
 
+  // "Start today's workout" goes straight into the session with every
+  // exercise loaded — no intermediate day screen and no second tap. The day
+  // view, with its swap and retry controls, stays reachable from the week
+  // list below; it is also where a failed start lands, because that screen
+  // already carries the explicit retry.
+  const startToday = () => {
+    if (!todayDay || todayDay.rest) return;
+    const items = resolveDayExercises(todayDay.exercises, swaps, answers);
+    const dateKey = todayISO();
+    try {
+      for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets, todayDay.typeName, it.repsOrTime);
+    } catch {
+      onOpenDay(todayIdx);
+      return;
+    }
+    router.push("/(tabs)/workout");
+  };
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={styles.wpScroll}>
       <View style={styles.wpHeader}>
@@ -83,7 +102,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
           <Text style={[styles.wpTitle, { color: T.text }]}>Today</Text>
         </View>
         <TouchableOpacity
-          style={[styles.adjustBtn, { backgroundColor: T.cardAlt, borderWidth: 1, borderColor: T.border }]}
+          style={[styles.adjustBtn, { backgroundColor: T.cardAlt, }]}
           onPress={() => setAdjusting(true)}
           accessibilityRole="button"
           accessibilityLabel="Adjust plan"
@@ -96,7 +115,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
       </View>
 
       {/* Where the week actually stands, before anything is asked of the user. */}
-      <View style={[styles.summaryRow, { backgroundColor: T.card, borderColor: T.border }]} testID="today-summary">
+      <View style={[styles.summaryRow, { backgroundColor: T.card, }]} testID="today-summary">
         <LiquidSheen tone="neutral" />
         <SummaryStat value={String(week.count)} label={week.count === 1 ? "workout" : "workouts"} T={T} styles={styles} />
         <View style={[styles.summaryDivider, { backgroundColor: T.border }]} />
@@ -146,7 +165,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
         ) : todayDay && !todayDay.rest ? (
           <ActionButton
             label={`Start today's workout · ${todayDay.typeName}`}
-            onPress={() => onOpenDay(todayIdx)}
+            onPress={startToday}
             testID="wp-start-today"
           />
         ) : (
@@ -198,7 +217,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
 
       <View style={styles.wpFooter}>
         <TouchableOpacity
-          style={[styles.footBtn, { borderColor: T.border, backgroundColor: T.card, minHeight: t.target.min }]}
+          style={[styles.footBtn, { backgroundColor: T.card, minHeight: t.target.min }]}
           onPress={onEditAnswers}
           testID="wp-edit"
         >
@@ -232,7 +251,7 @@ function ProgressLink({
 }: { icon: any; label: string; onPress: () => void; testID: string; T: any; styles: any }) {
   return (
     <TouchableOpacity
-      style={[styles.progressLink, { backgroundColor: T.card, borderColor: T.border }]}
+      style={[styles.progressLink, { backgroundColor: T.card, }]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -256,7 +275,7 @@ function Chip({ label, tone }: { label: string; tone?: "focus" | "posture" }) {
     tone === "posture" ? T.accentText : T.text2;
   const border =
     tone === "focus" ? T.focusRed + "55" :
-    tone === "posture" ? T.accent + "55" : T.border;
+    tone === "posture" ? T.accent + "55" : "transparent";
   return (
     <View style={[styles.chip, { backgroundColor: bg, borderColor: border }]}>
       <LiquidSheen tone={tone === "focus" ? "danger" : "subtle"} />
@@ -294,7 +313,7 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
   const w = useWorkout();
   if (day.rest) {
     return (
-      <View style={[styles.restCard, { borderColor: T.borderDashed, backgroundColor: T.cardAlt }]}>
+      <View style={[styles.restCard, { backgroundColor: T.cardAlt }]}>
         <LiquidSheen tone="subtle" />
         <Text style={[styles.restCaps, { color: T.textCaps }]}>{day.dow.slice(0, 3).toUpperCase()}</Text>
         <Text style={[styles.restText, { color: T.textMuted }]}>Rest &amp; recover</Text>
@@ -326,7 +345,7 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
     <A11yControl
       label={label}
       onPress={onPress}
-      style={[styles.dayCard, { backgroundColor: T.card, borderColor: allDone ? T.accent : T.border }]}
+      style={[styles.dayCard, { backgroundColor: T.card, borderColor: allDone ? T.accent : "transparent" }]}
       testID={`day-card-${day.dow}`}
     >
       <LiquidSheen tone="neutral" />
@@ -342,24 +361,6 @@ function DayCard({ day, onPress }: { day: PlanDay; onPress: () => void }) {
         )}
       </View>
       <Text style={[styles.dayTitle, { color: T.text }]}>{day.typeName}</Text>
-      <View style={styles.posterStack}>
-        {day.exercises!.slice(0, 3).map((ex, idx) => (
-          <View
-            key={ex.id}
-            style={[
-              styles.posterThumb,
-              {
-                backgroundColor: T.posterBg,
-                borderColor: T.border,
-                marginLeft: idx === 0 ? 0 : -8,
-                zIndex: 3 - idx,
-              },
-            ]}
-          >
-            <Image source={{ uri: posterUrl(ex.id) }} style={styles.posterImg} />
-          </View>
-        ))}
-      </View>
       <Text style={[styles.dayMuscles, { color: T.text2 }]} numberOfLines={2}>
         {muscles.join(" · ")}
       </Text>
@@ -394,7 +395,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
     setStartFailed(false);
     try {
       // The planned set count travels with the exercise into the session.
-      for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets, day.typeName);
+      for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets, day.typeName, it.repsOrTime);
     } catch {
       // Nothing is half-started, and we never retry behind the user's back: the
       // retry below only runs when they ask for it.
@@ -409,7 +410,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
     <View style={{ flex: 1, backgroundColor: T.bg }}>
       <View style={styles.dayHeader}>
         <TouchableOpacity
-          style={[styles.headerBtn, { backgroundColor: T.card, borderColor: T.border }]}
+          style={[styles.headerBtn, { backgroundColor: T.card, }]}
           onPress={onBack}
           accessibilityRole="button"
           accessibilityLabel="Back to my weekly plan"
@@ -463,12 +464,9 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
           const done = sessionDone || !!completions[`${dateKey}:${ex.id}`];
           const inSession = !!sessionEx;
           return (
-            <View key={ex.id} style={[styles.exCard, { backgroundColor: T.card, borderColor: T.border }]}>
+            <View key={ex.id} style={[styles.exCard, { backgroundColor: T.card, }]}>
               <LiquidSheen tone="neutral" />
-              <View style={[styles.exPoster, { backgroundColor: T.posterBg, borderColor: T.border }]}>
-                <Image source={{ uri: posterUrl(ex.id) }} style={{ width: "100%", height: "100%" }} />
-              </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
+              <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Text style={[styles.exMuscleCap, { color: T.textCaps }]}>
                     {MUSCLE_LABEL[ex.muscle].toUpperCase()}
@@ -493,7 +491,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
                     swap restores the planned exercise; nothing logged is touched. */}
                 {swappedFrom && (
                   <TouchableOpacity
-                    style={[styles.swappedRow, { borderColor: T.border, backgroundColor: T.cardAlt }]}
+                    style={[styles.swappedRow, { backgroundColor: T.cardAlt }]}
                     onPress={() => setSwap(plannedId, plannedId)}
                     accessibilityRole="button"
                     accessibilityLabel={`Swapped from ${swappedFrom.name}. Restore ${swappedFrom.name}.`}
@@ -511,17 +509,17 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
                 {/* Read-only tick — becomes solid once every set is completed in Session. */}
                 <View style={[
                   styles.tickBtn,
-                  { borderColor: done ? T.accent : T.border, backgroundColor: done ? T.accent : "transparent" },
+                  { borderColor: done ? T.accent : "transparent", backgroundColor: done ? T.accent : "transparent" },
                 ]}>
                   <Ionicons name={done ? "checkmark" : "ellipse-outline"} size={18} color={done ? T.ctaText : T.textMuted} />
                 </View>
                 <TouchableOpacity
                   style={[
                     styles.addBtn,
-                    { borderColor: inSession ? T.accent : T.border, backgroundColor: inSession ? T.accent + "22" : "transparent" },
+                    { borderColor: inSession ? T.accent : "transparent" },
                   ]}
                   onPress={() => {
-                    if (!inSession) w.addExerciseFromPlan(ex.id, dateKey, ex.sets, day.typeName);
+                    if (!inSession) w.addExerciseFromPlan(ex.id, dateKey, ex.sets, day.typeName, ex.repsOrTime);
                   }}
                   testID={`add-${ex.id}`}
                 >
@@ -529,7 +527,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
                   <Ionicons name={inSession ? "checkmark-circle" : "add"} size={16} color={inSession ? T.accent : T.text2} />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.swapBtn, { borderColor: T.border }]}
+                  style={[styles.swapBtn]}
                   onPress={() => setSwapId(plannedId)}
                   testID={`swap-${ex.id}`}
                 >
@@ -574,7 +572,7 @@ function SwapSheet({ visible, currentId, excludeIds, onDismiss, onPick }: {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
       <Pressable style={styles.sheetBackdrop} onPress={onDismiss} />
-      <View style={[styles.sheet, { backgroundColor: T.card, borderColor: T.border }]}>
+      <View style={[styles.sheet, { backgroundColor: T.card, }]}>
         <LiquidSheen tone="neutral" />
         <Text style={[styles.sheetTitle, { color: T.text }]}>Swap this exercise</Text>
         <ScrollView style={{ maxHeight: 400 }}>
@@ -585,7 +583,7 @@ function SwapSheet({ visible, currentId, excludeIds, onDismiss, onPick }: {
             const entry = entryFor(a.id, answers as any);
             return (
               <View key={a.id} style={[styles.altRow, { borderBottomColor: T.border }]}>
-                <View style={[styles.altPoster, { backgroundColor: T.posterBg, borderColor: T.border }]}>
+                <View style={[styles.altPoster, { backgroundColor: T.posterBg, }]}>
                   <Image source={{ uri: posterUrl(a.id) }} style={{ width: "100%", height: "100%" }} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
@@ -629,7 +627,7 @@ const styles = StyleSheet.create({
   progressLink: {
     flex: 1, flexDirection: "row", alignItems: "center", gap: 8,
     minHeight: 52, paddingHorizontal: 14, borderRadius: 22,
-    borderWidth: 1, overflow: "hidden",
+    overflow: "hidden",
   },
   progressLinkText: { flex: 1, fontSize: 14, fontWeight: "700" },
   wpHeader: {
@@ -642,7 +640,7 @@ const styles = StyleSheet.create({
     paddingTop: 56, paddingHorizontal: 20, paddingBottom: 8,
   },
   headerBtn: {
-    width: 44, height: 44, borderRadius: 22, borderWidth: 1,
+    width: 44, height: 44, borderRadius: 22, 
     alignItems: "center", justifyContent: "center", overflow: "hidden",
   },
   adjustBtn: {
@@ -655,21 +653,15 @@ const styles = StyleSheet.create({
   chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: R.pill, borderWidth: 1, overflow: "hidden" },
   chipText: { fontSize: 11, fontWeight: "700" },
-
-  dayCard: { borderRadius: R.xl, borderWidth: 1, padding: 14, overflow: "hidden" },
+  dayCard: { borderRadius: R.xl, padding: 14, overflow: "hidden" },
   dayCardTop: { flexDirection: "row", justifyContent: "space-between" },
   dowCaps: { fontSize: 11, fontWeight: "800", letterSpacing: 1.4 },
   dayMin: { fontSize: 11 },
   dayTitle: { fontSize: 17.5, fontWeight: "700", marginTop: 4 },
-  posterStack: { flexDirection: "row", marginTop: 10 },
-  posterThumb: {
-    width: 36, height: 36, borderRadius: 22, borderWidth: 1, overflow: "hidden",
-  },
-  posterImg: { width: "100%", height: "100%" },
   dayMuscles: { fontSize: 12, marginTop: 8 },
 
   restCard: {
-    borderRadius: R.xl, borderWidth: 1, borderStyle: "dashed", padding: 14,
+    borderRadius: R.xl, padding: 14,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center", overflow: "hidden",
   },
   restCaps: { fontSize: 11, fontWeight: "800", letterSpacing: 1.4 },
@@ -678,7 +670,7 @@ const styles = StyleSheet.create({
   wpFooter: { flexDirection: "row", justifyContent: "center", marginTop: 20 },
   footBtn: {
     flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: R.pill, borderWidth: 1, overflow: "hidden",
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: R.pill, overflow: "hidden",
   },
   footBtnText: { fontSize: 12, fontWeight: "700" },
 
@@ -686,31 +678,30 @@ const styles = StyleSheet.create({
   dayHeaderMeta: { fontSize: 12, marginTop: 2 },
 
   exCard: {
-    flexDirection: "row", padding: 12, borderRadius: R.lg, borderWidth: 1, marginBottom: 10, alignItems: "center", overflow: "hidden",
+    flexDirection: "row", padding: 12, borderRadius: R.lg, marginBottom: 10, alignItems: "center", overflow: "hidden",
   },
-  exPoster: { width: 86, height: 60, borderRadius: 22, borderWidth: 1, overflow: "hidden" },
   exMuscleCap: { fontSize: 10.5, fontWeight: "800", letterSpacing: 1.2 },
   exBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: R.pill },
   exName: { fontSize: 14.5, fontWeight: "600", marginTop: 4 },
   exMeta: { fontSize: 12, marginTop: 4 },
   swappedRow: {
     flexDirection: "row", alignItems: "center", gap: 5, marginTop: 7,
-    paddingHorizontal: 8, minHeight: 30, borderRadius: R.pill, borderWidth: 1, alignSelf: "flex-start",
+    paddingHorizontal: 8, minHeight: 30, borderRadius: R.pill, alignSelf: "flex-start",
   },
   swappedText: { fontSize: 10.5, fontWeight: "600", flexShrink: 1 },
   swappedUndo: { fontSize: 10.5, fontWeight: "800", textDecorationLine: "underline" },
-  tickBtn: { width: 34, height: 34, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  addBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  swapBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  tickBtn: { width: 34, height: 34, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  addBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  swapBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   startAllBtn: { paddingHorizontal: 18, minHeight: 44, justifyContent: "center", borderRadius: R.pill, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
 
   sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
   sheet: {
     position: "absolute", bottom: 0, left: 0, right: 0,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 20, overflow: "hidden",
+    borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, overflow: "hidden",
   },
   sheetTitle: { fontSize: 17, fontWeight: "700", marginBottom: 14 },
   altRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1 },
-  altPoster: { width: 54, height: 40, borderRadius: 8, borderWidth: 1, overflow: "hidden" },
+  altPoster: { width: 54, height: 40, borderRadius: 8, overflow: "hidden" },
   usePill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: R.pill, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
 });

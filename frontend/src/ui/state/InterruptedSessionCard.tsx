@@ -60,7 +60,7 @@ export function InterruptedSessionCard({
           paddingVertical: t.space.sm + 2,
           borderTopWidth: 1,
           borderBottomWidth: 1,
-          borderColor: t.color.borderSubtle,
+          
         }}
       >
         {facts.map(([label, value]) => (

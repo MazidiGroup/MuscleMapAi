@@ -71,7 +71,7 @@ export function InsightsView() {
 
   if (history.length === 0) {
     return (
-      <View style={[styles.full, styles.empty, { paddingTop: insets.top + 56 }]}>
+      <View style={[styles.full, styles.empty, { paddingTop: 24 }]}>
         <Ionicons name="pulse-outline" size={40} color={T.textFaint} />
         <Text style={styles.emptyText}>No insights yet</Text>
         <Text style={styles.emptySub}>Finish a few workouts to see your training stats, records and progress charts.</Text>
@@ -299,12 +299,15 @@ export function InsightsView() {
 }
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
-  full: { ...StyleSheet.absoluteFillObject, backgroundColor: T.bg },
+  // A flex child, not an absolute fill: Insights is now its own screen and
+  // must sit UNDER that screen's header rather than painting over its back
+  // button.
+  full: { flex: 1, backgroundColor: T.bg },
   empty: { alignItems: "center", justifyContent: "center", gap: 10, padding: 30 },
   emptyText: { color: T.text, fontSize: 17, fontWeight: "700" },
   emptySub: { color: T.textDim, fontSize: 14, textAlign: "center", lineHeight: 20 },
   legendCard: {
-    backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22,
+    backgroundColor: T.bg2, borderRadius: 22,
     padding: 14, marginTop: 12,
   },
   legendTitle: {
@@ -317,12 +320,13 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   legendLabel: { color: T.text, fontSize: 13, fontWeight: "700" },
   legendHelp: { color: T.textFaint, fontSize: 11.5, marginTop: 1 },
   legendNote: { color: T.textFaint, fontSize: 10.5, lineHeight: 15, marginTop: 11 },
-
-  periodSeg: { flexDirection: "row", backgroundColor: T.bg2, borderRadius: 22, padding: 4, gap: 4, marginTop: 12, borderWidth: 1, borderColor: T.border },
-  periodBtn: { flex: 1, paddingVertical: 8, borderRadius: 22, alignItems: "center" },
-  periodBtnActive: { backgroundColor: T.accent },
+  periodSeg: { flexDirection: "row", backgroundColor: T.bg2, borderRadius: 22, padding: 4, gap: 4, marginTop: 12, },
+  // Selection is an outline in the accent; the fill never changes. The
+  // transparent border at rest keeps the geometry identical in both states.
+  periodBtn: { flex: 1, paddingVertical: 8, borderRadius: 22, alignItems: "center", borderWidth: 1.5, borderColor: "transparent" },
+  periodBtnActive: { borderColor: T.accent },
   periodText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
-  periodTextActive: { color: T.bg },
+  periodTextActive: { color: T.accent },
   streakCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,138,61,0.10)", borderWidth: 1, borderColor: "rgba(255,138,61,0.35)", borderRadius: 22, padding: 14, marginTop: 8 },
   streakIcon: { width: 40, height: 40, borderRadius: 22, backgroundColor: "rgba(255,138,61,0.16)", alignItems: "center", justifyContent: "center" },
   streakValue: { color: T.text, fontSize: 16, fontWeight: "800" },
@@ -330,21 +334,21 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   chartHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   tableToggle: {
     flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 12,
-    borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface,
+    borderRadius: 999, backgroundColor: T.surface,
   },
   tableToggleText: { color: T.text, fontSize: 12.5, fontWeight: "700" },
-  table: { borderWidth: 1, borderColor: T.border, borderRadius: 22, overflow: "hidden" },
+  table: { borderRadius: 22, overflow: "hidden" },
   tableRow: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border },
   tableRange: { color: T.textDim, fontSize: 12, fontWeight: "700" },
   tableValue: { color: T.text, fontSize: 14, fontWeight: "700", marginTop: 2 },
   streakSub: { color: T.textDim, fontSize: 12, marginTop: 2 },
-  prRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 7 },
+  prRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 7 },
   prBadge: { width: 30, height: 30, borderRadius: 22, backgroundColor: "rgba(255,176,32,0.14)", alignItems: "center", justifyContent: "center" },
   prName: { color: T.text, fontSize: 14, fontWeight: "700", flex: 1 },
   prWeight: { color: T.accent, fontSize: 15, fontWeight: "800" },
   section: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },
   weekStats: { flexDirection: "row", gap: 8, marginBottom: 14 },
-  wStat: { flex: 1, backgroundColor: T.bg2, borderRadius: 22, paddingVertical: 12, alignItems: "center", borderWidth: 1, borderColor: T.border },
+  wStat: { flex: 1, backgroundColor: T.bg2, borderRadius: 22, paddingVertical: 12, alignItems: "center", },
   wValue: { color: T.accent, fontSize: 20, fontWeight: "800" },
   wLabel: { color: T.textFaint, fontSize: 11, marginTop: 2 },
   barRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
@@ -370,8 +374,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 22,
     backgroundColor: T.bg2,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
   },
   srcText: { flex: 1, color: T.textFaint, fontSize: 11, lineHeight: 15 },
   srcCta: { color: T.accent, fontSize: 11, fontWeight: "800" },

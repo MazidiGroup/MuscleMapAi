@@ -443,21 +443,20 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
     backgroundColor: T.surface,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     paddingHorizontal: 18,
     paddingBottom: 8,
     paddingTop: 10,
   },
   handle: { alignSelf: "center", width: 42, height: 5, borderRadius: 3, backgroundColor: "rgba(120,160,220,0.25)", marginBottom: 10 },
   headerRow: { flexDirection: "row", alignItems: "flex-start" },
-  tag: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, borderWidth: 1, marginBottom: 6 },
+  tag: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, marginBottom: 6 },
   tagText: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
   title: { color: T.text, fontSize: 25, fontWeight: "800" },
   iconBtn: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
   summary: { color: T.textDim, fontSize: 15, lineHeight: 22, marginTop: 6, marginBottom: 14 },
-
-  subCard: { backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 16, marginBottom: 12 },
+  subCard: { backgroundColor: T.bg2, borderRadius: 22, padding: 16, marginBottom: 12 },
   cardHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   cardHeadLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
   cardTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
@@ -482,8 +481,7 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
 
   listRow: { flexDirection: "row", gap: 10, alignItems: "flex-start", paddingVertical: 6 },
   listText: { color: T.text, fontSize: 14, lineHeight: 20, flex: 1 },
-
-  exCard: { backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22, marginBottom: 10, overflow: "hidden" },
+  exCard: { backgroundColor: T.bg2, borderRadius: 22, marginBottom: 10, overflow: "hidden" },
   exTop: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12 },
   exIcon: { width: 46, height: 46, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   exName: { color: T.text, fontSize: 15, fontWeight: "700" },
@@ -499,16 +497,14 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
   barTag: { fontSize: 11, fontWeight: "700" },
   barTrack: { height: 8, borderRadius: 4, backgroundColor: T.surfaceHi, overflow: "hidden" },
   barFill: { height: 8, borderRadius: 4 },
-
-  aiCard: { backgroundColor: T.bg2, borderWidth: 1, borderRadius: 22, padding: 16, marginTop: 6, marginBottom: 8 },
+  aiCard: { backgroundColor: T.bg2, borderRadius: 22, padding: 16, marginTop: 6, marginBottom: 8 },
   aiHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   aiBadge: { width: 26, height: 26, borderRadius: 22, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" },
   aiSub: { color: T.textDim, fontSize: 14, lineHeight: 20, marginBottom: 12 },
   aiBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 22, paddingVertical: 12 },
   aiBtnText: { color: T.bg, fontSize: 14, fontWeight: "800" },
   aiText: { color: T.text, fontSize: 14, lineHeight: 21, flex: 1 },
-
-  askBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.borderHi, borderRadius: 22, paddingVertical: 13, marginTop: 8 },
+  askBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.surfaceHi, borderRadius: 22, paddingVertical: 13, marginTop: 8 },
   askBtnText: { color: T.text, fontSize: 14, fontWeight: "700" },
   srcRow: {
     flexDirection: "row",
@@ -519,8 +515,8 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 22,
     backgroundColor: T.bg2,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
   },
   srcText: { flex: 1, color: T.textFaint, fontSize: 11, lineHeight: 15 },
   srcCta: { color: T.accent, fontSize: 11, fontWeight: "800" },

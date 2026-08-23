@@ -66,8 +66,8 @@ export function StatusAnnouncement({
           paddingHorizontal: t.space.md,
           borderRadius: t.radius.md,
           backgroundColor: t.color.surfaceAlt,
-          borderWidth: 1,
-          borderColor: t.color.border,
+          
+          
           overflow: "hidden",
         },
         style,

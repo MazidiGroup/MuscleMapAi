@@ -199,27 +199,46 @@ export const OVERLOAD_NOTE =
 // ---------------------------------------------------------------------------
 
 /**
+ * The rep target a Plan entry carries, as a number the session can pre-fill.
+ *
+ * Plan entries describe reps as text: "8–12", "12", or a duration such as
+ * "30–45 sec" for timed work. A range pre-fills its LOWER bound — the floor the
+ * plan asks for, which the user then beats or edits. A timed entry has no rep
+ * target, so it pre-fills nothing rather than a number that means seconds.
+ */
+export function plannedRepsFrom(repsOrTime: string | null | undefined): number {
+  if (!repsOrTime) return 0;
+  const text = String(repsOrTime).trim();
+  if (/sec|min|\d\s*s\b/i.test(text)) return 0;
+  const match = /^(\d+)/.exec(text);
+  return match ? Math.max(0, parseInt(match[1], 10)) : 0;
+}
+
+/**
  * What a set row should start at when an exercise is added to a session.
  *
- * Taken from the user's own most recent completed performance of that exact
- * exercise — never invented, and never carried across exercises. With no
- * history the rows stay empty rather than guessing a load, because a wrong
- * prefilled weight is worse than a blank one: a blank asks, a wrong number
- * asserts. The values are a starting point only; every row remains editable
- * and nothing is marked done.
+ * Reps come from the Plan's own target for the user's goal and routine when
+ * the plan supplied one, otherwise from the user's most recent completed
+ * performance. Load comes from that performance only — it is the one honest
+ * source for a weight. With no history the load stays empty rather than
+ * guessing, because a wrong prefilled weight is worse than a blank one: a
+ * blank asks, a wrong number asserts. Nothing is carried across exercises,
+ * every row remains editable and nothing is marked done.
  */
 export function openingSets(
   performances: Performance[],
   plannedCount = 0,
+  plannedReps = 0,
 ): { count: number; weight: number; reps: number } {
   // A Plan day PROMISES a number of sets. That promise always wins — including
   // when it promises exactly one — or the plan and the session disagree about
   // the workout the user agreed to. History only decides the count when no plan
   // asked for one.
   const planned = plannedCount >= 1 ? Math.floor(plannedCount) : 0;
+  const targetReps = plannedReps >= 1 ? Math.floor(plannedReps) : 0;
   const last = performances.length ? performances[performances.length - 1] : null;
   if (!last || last.completedSets.length === 0) {
-    return { count: Math.max(1, planned), weight: 0, reps: 0 };
+    return { count: Math.max(1, planned), weight: 0, reps: targetReps };
   }
   // The heaviest working set of that session is the one worth repeating; ties
   // resolve to the higher rep count.
@@ -229,6 +248,6 @@ export function openingSets(
   return {
     count: planned || Math.max(1, last.completedSets.length),
     weight: best.weight,
-    reps: best.reps,
+    reps: targetReps || best.reps,
   };
 }

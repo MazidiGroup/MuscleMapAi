@@ -74,7 +74,7 @@ export function ActionButton({
           borderWidth: 1,
           borderColor: variant === "primary"
             ? "rgba(255,255,255,0.28)"
-            : variant === "destructive" ? t.status.error.border : t.color.border,
+            : variant === "destructive" ? t.status.error.border : "transparent",
           overflow: "hidden",
           ...liquidShadow(t.mode),
         },

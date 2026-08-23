@@ -92,7 +92,7 @@ function PaywallStatesHarness() {
           <TouchableOpacity
             key={s}
             onPress={() => setScenario(s)}
-            style={[styles.chip, { borderColor: scenario === s ? t.color.accent : t.color.border }]}
+            style={[styles.chip, { borderColor: scenario === s ? t.color.accent : "transparent" }]}
             testID={`fx-${s}`}
           >
             <Text style={[t.type.caption, { color: t.color.text }]}>{s}</Text>
@@ -108,5 +108,5 @@ function PaywallStatesHarness() {
 
 const styles = StyleSheet.create({
   bar: { gap: 8, paddingHorizontal: 12, paddingVertical: 8, alignItems: "center" },
-  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, height: 44, justifyContent: "center" },
+  chip: { borderRadius: 999, paddingHorizontal: 12, height: 44, justifyContent: "center" },
 });

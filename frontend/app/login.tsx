@@ -265,8 +265,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     height: 88,
     borderRadius: 22,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     backgroundColor: T.surface,
   },
   logo: { width: 88, height: 88 },
@@ -299,7 +299,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   btnAppleText: { color: "#000", fontSize: 16, fontWeight: "700" },
   btnGoogle: { backgroundColor: "#FFFFFF" },
   btnGoogleText: { color: "#000", fontSize: 16, fontWeight: "700" },
-  btnEmail: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border },
+  btnEmail: { backgroundColor: T.surface, },
   btnEmailText: { color: T.text, fontSize: 16, fontWeight: "700" },
   btnPrimary: { backgroundColor: "#0A84FF" },
   btnPrimaryText: { color: "#fff", fontSize: 16, fontWeight: "700" },
@@ -307,8 +307,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   stepLabel: { color: T.textDim, fontSize: 14, lineHeight: 21, textAlign: "center", marginBottom: 4 },
   input: {
     backgroundColor: T.surface,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     borderRadius: 22,
     height: 52,
     paddingHorizontal: 16,
@@ -325,9 +325,9 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     overflow: "hidden",
   },
   devCodeText: { color: "#7CB8FF", fontSize: 13, textAlign: "center" },
-  backLink: { alignItems: "center", justifyContent: "center", minHeight: 44, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
+  backLink: { alignItems: "center", justifyContent: "center", minHeight: 44, paddingHorizontal: 16, borderRadius: 999, backgroundColor: T.surface },
   backLinkText: { color: T.textDim, fontSize: 14, fontWeight: "600" },
-  guestLink: { alignItems: "center", paddingVertical: 12, paddingHorizontal: 16, minHeight: 44, justifyContent: "center", borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface },
+  guestLink: { alignItems: "center", paddingVertical: 12, paddingHorizontal: 16, minHeight: 44, justifyContent: "center", borderRadius: 999, backgroundColor: T.surface },
   guestLinkText: { color: T.textDim, fontSize: 15, fontWeight: "600", textDecorationLine: "underline" },
   terms: { color: T.textFaint, fontSize: 12, textAlign: "center", lineHeight: 18 },
   termsLink: { color: T.textDim, textDecorationLine: "underline" },

@@ -113,7 +113,7 @@ function ExploreContent() {
                               onLongPress={() => toggleHidden(c.container)}
                               testID={`cat-${c.key}`}
                             >
-                              <Ionicons name={c.icon as any} size={15} color={active ? T.bg : chHidden ? T.textFaint : T.accent} />
+                              <Ionicons name={c.icon as any} size={15} color={active ? T.accent : chHidden ? T.textFaint : T.accent} />
                               <Text style={[styles.chipText, active && styles.chipTextActive, chHidden && { color: T.textFaint }]}>{c.label}</Text>
                             </TouchableOpacity>
                           );
@@ -146,18 +146,18 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   sectionTitle: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   eyeBtn: { padding: 4 },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999 },
-  chipActive: { backgroundColor: T.accent, borderColor: T.accent },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: T.surfaceHi, borderWidth: 1.5, borderColor: "transparent", paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999 },
+  chipActive: { borderColor: T.accent },
   chipHidden: { opacity: 0.5 },
   chipText: { color: T.text, fontSize: 13, fontWeight: "600" },
-  chipTextActive: { color: T.bg, fontWeight: "700" },
+  chipTextActive: { color: T.accent, fontWeight: "700" },
   hint: { color: T.textFaint, fontSize: 12, marginTop: 8, marginBottom: 4 },
   shrinkHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   shrinkTitle: { color: T.text, fontSize: 16, fontWeight: "700" },
   shrinkPct: { color: T.accent, fontSize: 16, fontWeight: "800" },
   shrinkBtns: { flexDirection: "row", gap: 8, marginTop: 10 },
-  smallBtn: { flex: 1, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, paddingVertical: 10, borderRadius: 22, alignItems: "center" },
+  smallBtn: { flex: 1, backgroundColor: T.surfaceHi, paddingVertical: 10, borderRadius: 22, alignItems: "center" },
   smallBtnText: { color: T.text, fontSize: 13, fontWeight: "600" },
-  showAll: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.borderHi, paddingVertical: 12, borderRadius: 22, marginTop: 12 },
+  showAll: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.bg2, paddingVertical: 12, borderRadius: 22, marginTop: 12 },
   showAllText: { color: T.text, fontSize: 14, fontWeight: "700" },
 });

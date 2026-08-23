@@ -41,9 +41,9 @@ export function LocalAssetFallback({
           height,
           borderRadius: t.radius.md + 1,
           backgroundColor: t.color.surfaceAlt,
-          borderWidth: 1,
-          borderStyle: "dashed",
-          borderColor: t.color.border,
+          
+          
+          
           alignItems: "center",
           justifyContent: "center",
           gap: t.space.sm - 1,

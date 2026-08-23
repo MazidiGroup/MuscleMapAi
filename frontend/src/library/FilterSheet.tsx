@@ -55,7 +55,7 @@ export function FilterSheet({
         accessibilityLabel="Close filters"
       />
       <View
-        style={[styles.sheet, { backgroundColor: t.color.surface, borderColor: t.color.border, padding: t.space.xl }]}
+        style={[styles.sheet, { backgroundColor: t.color.surface, padding: t.space.xl }]}
         testID="library-filter-sheet"
       >
         <LiquidSheen tone="neutral" />
@@ -126,9 +126,9 @@ function Group({
                 minHeight: t.target.min,
                 paddingHorizontal: t.space.lg,
                 borderRadius: t.radius.pill,
-                borderWidth: on ? 2 : 1,
-                borderColor: on ? t.color.accent : t.color.border,
-                backgroundColor: on ? t.color.accent + "22" : t.color.surfaceAlt,
+                borderWidth: 1.5,
+                borderColor: on ? t.color.accent : "transparent",
+                backgroundColor: t.color.surfaceAlt,
                 overflow: "hidden",
               }}
             >
@@ -153,7 +153,6 @@ const styles = StyleSheet.create({
     right: 0,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    borderWidth: 1,
     gap: 12,
     overflow: "hidden",
   },

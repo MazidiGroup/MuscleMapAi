@@ -69,8 +69,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     alignItems: "center",
     gap: 14,
     backgroundColor: T.surface,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     borderRadius: 22,
     padding: 16,
     marginBottom: 12,

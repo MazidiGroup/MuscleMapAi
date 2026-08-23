@@ -132,8 +132,10 @@ export function semanticTokens(palette: Palette): SemanticTokens {
     },
     elevation: {
       none: {},
-      card: { borderWidth: 1, borderColor: palette.border },
-      raised: { borderWidth: 1, borderColor: palette.accent },
+      // A resting card has no outline. Only a selected or raised surface
+      // draws one, and it draws it in the accent.
+      card: { borderWidth: 0, borderColor: "transparent" },
+      raised: { borderWidth: 1.5, borderColor: palette.accent },
     },
     state: { disabledOpacity: 0.55, pressedOpacity: 0.8, focusRingWidth: 2 },
     target: { min: 44, comfortable: 52 },

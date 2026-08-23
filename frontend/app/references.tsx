@@ -142,7 +142,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.border,
   },
-  back: { width: 40, height: 40, borderRadius: 22, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" },
+  back: { width: 40, height: 40, borderRadius: 22, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" },
   backPlaceholder: { width: 40, height: 40 },
   headerTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
   notice: {
@@ -150,8 +150,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     alignItems: "flex-start",
     gap: 10,
     backgroundColor: T.surface,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     borderRadius: 22,
     padding: 14,
     marginBottom: 20,
@@ -166,8 +166,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     alignItems: "center",
     gap: 12,
     backgroundColor: T.surface,
-    borderWidth: 1,
-    borderColor: T.border,
+    
+    
     borderRadius: 22,
     paddingHorizontal: 12,
     paddingVertical: 11,

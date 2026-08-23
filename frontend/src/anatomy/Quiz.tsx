@@ -79,7 +79,7 @@ export function Quiz({ questions, onClose }: { questions: QuizQuestion[]; onClos
           const isAnswer = i === q.answer;
           const isPicked = i === picked;
           let bg = T.surfaceHi;
-          let border = T.border;
+          let border = "transparent";
           if (picked !== null) {
             if (isAnswer) {
               bg = "rgba(52,220,151,0.16)";
@@ -116,11 +116,11 @@ export function Quiz({ questions, onClose }: { questions: QuizQuestion[]; onClos
 }
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
-  card: { backgroundColor: T.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderColor: T.border, padding: 20, alignItems: "stretch", overflow: "hidden" },
+  card: { backgroundColor: T.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, alignItems: "stretch", overflow: "hidden" },
   topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   progress: { color: T.accent, fontSize: 13, fontWeight: "700" },
   question: { color: T.text, fontSize: 18, fontWeight: "700", marginBottom: 14, lineHeight: 24 },
-  option: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 8 },
+  option: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1.5, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 8 },
   optionText: { color: T.text, fontSize: 15, flex: 1 },
   explainBox: { marginTop: 6 },
   explainText: { color: T.textDim, fontSize: 14, lineHeight: 20, marginBottom: 12 },
