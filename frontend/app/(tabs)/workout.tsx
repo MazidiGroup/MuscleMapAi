@@ -24,6 +24,7 @@ import type { Workout } from "@/src/anatomy/workoutScope";
 import type { WeightUnit } from "@/src/units/unitPreference";
 import type { Goal } from "@/src/plan/exercises";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { CARD_RADIUS, R } from "@/src/theme/tokens";
 import { EmptyState, ErrorBanner } from "@/src/ui/state";
 import { A11yControl } from "@/src/ui/A11yControl";
 import { LiquidSheen } from "@/src/ui/GlassSurface";
@@ -411,7 +412,7 @@ function SessionCard({
       <LiquidSheen tone={inSuperset ? "accent" : "neutral"} />
       {linkedAbove && (
         <View style={styles.superTag}>
-          <Ionicons name="link" size={11} color={T.secondary} />
+          <Ionicons name="link" size={11} color={T.accent} />
           <Text style={styles.superTagText}>SUPERSET — alternate with the exercise above</Text>
         </View>
       )}
@@ -435,7 +436,7 @@ function SessionCard({
             testID={`superset-${se.exerciseId}`}
           >
             <LiquidSheen tone={linkedAbove ? "accent" : "neutral"} />
-            <Ionicons name={linkedAbove ? "link" : "link-outline"} size={18} color={linkedAbove ? T.secondary : T.textFaint} />
+            <Ionicons name={linkedAbove ? "link" : "link-outline"} size={18} color={linkedAbove ? T.accent : T.textFaint} />
           </A11yControl>
         )}
         <A11yControl
@@ -540,7 +541,7 @@ function SessionCard({
             <View style={styles.setActions}>
               {pr ? (
                 <View style={styles.prFlag} testID={`pr-${se.exerciseId}-${idx}`}>
-                  <Ionicons name="trophy" size={13} color={T.secondary} />
+                  <Ionicons name="trophy" size={13} color={T.pr} />
                 </View>
               ) : (
                 <A11yControl
@@ -587,7 +588,7 @@ function SessionCard({
       {/* Named once per card rather than on every row, so the log stays readable. */}
       {firstPR && (
         <View style={styles.prNote} testID={`pr-note-${se.exerciseId}`}>
-          <Ionicons name="trophy" size={13} color={T.secondary} />
+          <Ionicons name="trophy" size={13} color={T.pr} />
           <Text style={styles.prNoteText}>{PR_LABEL[firstPR]} — a new best on this exercise.</Text>
         </View>
       )}
@@ -631,7 +632,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   full: { ...StyleSheet.absoluteFillObject, backgroundColor: T.bg },
   segWrap: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 16, zIndex: 10 },
   seg: { flexDirection: "row", backgroundColor: "transparent", padding: 0, gap: 3 },
-  segBtn: { flex: 1, minHeight: 44, paddingHorizontal: 4, borderRadius: 11, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 5, overflow: "hidden", borderWidth: 1, borderColor: T.border },
+  segBtn: { flex: 1, minHeight: 44, paddingHorizontal: 4, borderRadius: 22, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 5, overflow: "hidden", borderWidth: 1, borderColor: T.border },
   segActive: { backgroundColor: T.accent + "14", borderBottomWidth: 2, borderBottomColor: T.accent },
   segText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
   segTextActive: { color: T.accent },
@@ -648,14 +649,14 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   mgDot: { width: 10, height: 10, borderRadius: 5 },
   mgLegendText: { color: T.textDim, fontSize: 11.5, fontWeight: "600" },
   catText: { color: T.text, fontSize: 13, fontWeight: "700" },
-  exItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 14, padding: 12, marginBottom: 8, overflow: "hidden" },
-  exIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  exItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 12, marginBottom: 8, overflow: "hidden" },
+  exIcon: { width: 42, height: 42, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   exItemName: { color: T.text, fontSize: 15, fontWeight: "700" },
   exItemMeta: { color: T.textFaint, fontSize: 12, marginTop: 2 },
 
   empty: { flex: 1, justifyContent: "center", padding: 16 },
   unitBtn: {
-    minWidth: 44, height: 44, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1,
+    minWidth: 44, height: 44, paddingHorizontal: 10, borderRadius: 22, borderWidth: 1,
     borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center", overflow: "hidden",
   },
   unitText: { color: T.text, fontSize: 13, fontWeight: "800" },
@@ -664,18 +665,18 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   finishErrorWrap: { position: "absolute", left: 16, right: 16 },
   emptyText: { color: T.text, fontSize: 17, fontWeight: "700" },
   emptySub: { color: T.textDim, fontSize: 14, textAlign: "center" },
-  primaryBtn: { backgroundColor: T.accent, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 12, marginTop: 8 },
+  primaryBtn: { backgroundColor: T.accent, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 22, marginTop: 8 },
   primaryBtnText: { color: T.bg, fontSize: 15, fontWeight: "800" },
   ghostBtn: { paddingVertical: 10 },
   ghostText: { color: T.textDim, fontSize: 14, fontWeight: "600" },
 
-  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, paddingVertical: 12, overflow: "hidden" },
+  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surface, borderRadius: 22, borderWidth: 1, borderColor: T.border, paddingVertical: 12, overflow: "hidden" },
   sbStat: { flex: 1, alignItems: "center" },
   sbValue: { color: T.accent, fontSize: 17, fontWeight: "800" },
   sbLabel: { color: T.textFaint, fontSize: 11, marginTop: 2 },
 
-  exCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 14, marginBottom: 12, overflow: "hidden" },
-  exCardSuper: { borderColor: T.secondary + "66" },
+  exCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 14, marginBottom: 12, overflow: "hidden" },
+  exCardSuper: { borderColor: T.accent + "66" },
   exCardHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   exCardName: { color: T.text, fontSize: 16, fontWeight: "800" },
   headBtn: {
@@ -683,12 +684,12 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi,
   },
   superTag: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 8 },
-  superTagText: { color: T.secondary, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
+  superTagText: { color: T.accent, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
 
   suggestCard: {
     flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10,
     backgroundColor: T.accent + "14", borderWidth: 1, borderColor: T.accent + "44",
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 22, paddingHorizontal: 12, paddingVertical: 10,
   },
   suggestHeadline: { color: T.text, fontSize: 14, fontWeight: "800" },
   suggestBasis: { color: T.textDim, fontSize: 11.5, marginTop: 2 },
@@ -702,9 +703,9 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   prFlag: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   prNote: {
     flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8,
-    backgroundColor: "rgba(255,176,32,0.12)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7,
+    backgroundColor: T.pr + "1F", borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 7,
   },
-  prNoteText: { color: T.secondary, fontSize: 11.5, fontWeight: "700", flex: 1 },
+  prNoteText: { color: T.pr, fontSize: 11.5, fontWeight: "700", flex: 1 },
 
   setHeadRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
   setHead: { color: T.textFaint, fontSize: 11, fontWeight: "700" },
@@ -712,25 +713,25 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   setRowDone: { opacity: 0.85 },
   setIdxBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   setIdx: { color: T.text, fontSize: 14, fontWeight: "700" },
-  warmPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: T.secondary + "26" },
-  warmPillText: { color: T.secondary, fontSize: 11, fontWeight: "800" },
-  setInput: { flex: 1, minWidth: 0, backgroundColor: T.surfaceHi, borderRadius: 10, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600", borderWidth: 1, borderColor: T.border },
+  warmPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border },
+  warmPillText: { color: T.textDim, fontSize: 11, fontWeight: "800" },
+  setInput: { flex: 1, minWidth: 0, backgroundColor: T.surfaceHi, borderRadius: 22, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600", borderWidth: 1, borderColor: T.border },
   // Each control keeps its 18-24px glyph but owns a full 44x44 target.
   setActions: { width: 132, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   setActionBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi },
   removeBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi },
-  addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 10, backgroundColor: T.surfaceHi, overflow: "hidden", borderWidth: 1, borderColor: T.border },
+  addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 22, backgroundColor: T.surfaceHi, overflow: "hidden", borderWidth: 1, borderColor: T.border },
   addSetText: { color: T.accent, fontSize: 13, fontWeight: "700" },
-  notes: { backgroundColor: T.bg2, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: T.text, fontSize: 14, marginTop: 8, borderWidth: 1, borderColor: T.border },
-  addExBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: T.borderHi, borderStyle: "dashed", overflow: "hidden", backgroundColor: T.surfaceHi },
+  notes: { backgroundColor: T.bg2, borderRadius: 22, paddingHorizontal: 12, paddingVertical: 8, color: T.text, fontSize: 14, marginTop: 8, borderWidth: 1, borderColor: T.border },
+  addExBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 22, borderWidth: 1, borderColor: T.borderHi, borderStyle: "dashed", overflow: "hidden", backgroundColor: T.surfaceHi },
   addExText: { color: T.accent, fontSize: 14, fontWeight: "700" },
   finishBar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 10, backgroundColor: T.bg2, borderTopWidth: 1, borderTopColor: T.border },
-  cancelBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 12, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border },
+  cancelBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 22, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border },
   cancelText: { color: T.textDim, fontSize: 14, fontWeight: "700" },
-  finishBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.accent, borderRadius: 12, paddingVertical: 14, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
+  finishBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.accent, borderRadius: 22, paddingVertical: 14, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   finishText: { color: T.bg, fontSize: 15, fontWeight: "800" },
 
-  histCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 16, marginBottom: 12 },
+  histCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 16, marginBottom: 12 },
   histTop: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
   histDate: { color: T.text, fontSize: 16, fontWeight: "800" },
   histDur: { color: T.accent, fontSize: 14, fontWeight: "700" },
@@ -745,12 +746,12 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
 
   histSectionTitle: { color: T.text, fontSize: 15, fontWeight: "800", marginBottom: 10 },
   histSectionEmpty: { color: T.textFaint, fontSize: 13, marginBottom: 4 },
-  calCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 12 },
+  calCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 12 },
   calWeekRow: { flexDirection: "row", marginBottom: 6 },
   calWeekday: { width: `${100 / 7}%`, textAlign: "center", color: T.textFaint, fontSize: 11, fontWeight: "700" },
   calGrid: { flexDirection: "row", flexWrap: "wrap" },
   calCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: "center", justifyContent: "center", paddingVertical: 3 },
-  calDay: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  calDay: { width: 34, height: 34, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   calDayMarked: { backgroundColor: T.accent },
   calDayToday: { borderWidth: 1, borderColor: T.borderHi },
   calDaySel: { backgroundColor: "#3DDC97", borderWidth: 2, borderColor: T.text },

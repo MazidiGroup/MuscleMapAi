@@ -16,6 +16,8 @@ export type LegacyPalette = {
   textFaint: string;
   accent: string;
   accentDim: string;
+  /** Personal record / celebration. Never the anatomy legend. */
+  pr: string;
   bone: string;
   muscle: string;
   primary: string;
@@ -30,14 +32,18 @@ export function legacyPalette(mode: ThemeMode = DEFAULT_MODE): LegacyPalette {
     surface: p.card,
     surfaceHi: p.cardAlt,
     border: p.border,
-    borderHi: mode === "day" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.18)",
+    borderHi: mode === "day" ? "rgba(45,34,27,0.20)" : "rgba(255,244,235,0.20)",
     text: p.text,
     textDim: p.textMuted,
     textFaint: p.textFaint,
     accent: p.accent,
     accentDim: p.accentText,
+    pr: p.pr,
     bone: "#E8E1CE",
     muscle: "#C0584F",
+    // ANATOMY LEGEND ONLY — prime mover / assists on the 3D model, always shown
+    // beside their key. These are not UI colours and must not be borrowed for
+    // buttons, badges or state, or they compete with the copper accent.
     primary: "#FF4438",
     secondary: "#FFB020",
   };

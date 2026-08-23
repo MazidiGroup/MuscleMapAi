@@ -64,12 +64,12 @@ export function ThemeSwitcher({
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: "row", padding: 3, borderRadius: 17, gap: 3 },
+  track: { flexDirection: "row", padding: 3, borderRadius: 22, gap: 3 },
   trackCompact: { width: 124, height: 42 },
   trackFull: { width: "100%", height: 52 },
   item: { flex: 1, zIndex: 1 },
   itemContent: { flex: 1, alignItems: "center", justifyContent: "center" },
   itemForeground: { alignItems: "center", justifyContent: "center", flexDirection: "row", zIndex: 1 },
-  active: { borderRadius: 13, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
+  active: { borderRadius: 22, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   label: { fontSize: 11.5, fontWeight: "700", marginLeft: 6 },
 });

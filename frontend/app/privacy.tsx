@@ -105,7 +105,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.border,
   },
-  back: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" },
+  back: { width: 40, height: 40, borderRadius: 22, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" },
   backPlaceholder: { width: 40, height: 40 },
   headerTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
   updated: { color: T.textFaint, fontSize: 12, marginBottom: 14 },

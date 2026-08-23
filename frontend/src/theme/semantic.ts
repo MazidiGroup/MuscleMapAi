@@ -12,7 +12,7 @@
 import { useMemo } from "react";
 
 import { useTheme } from "./ThemeContext";
-import { Palette, R, S, ThemeMode } from "./tokens";
+import { CARD_RADIUS, Palette, R, S, ThemeMode } from "./tokens";
 
 export type StatusRole = "info" | "success" | "warning" | "error";
 
@@ -43,6 +43,8 @@ export type SemanticTokens = {
     accent: string;
     accentSoft: string;
     onAccent: string;
+    /** Personal record / celebration. The only colour allowed to compete with accent. */
+    pr: string;
     focusRing: string;
     scrim: string;
     skeletonBase: string;
@@ -107,6 +109,7 @@ export function semanticTokens(palette: Palette): SemanticTokens {
       accent: palette.accent,
       accentSoft: palette.accentText,
       onAccent: palette.ctaText,
+      pr: palette.pr,
       focusRing: palette.accent,
       scrim: palette.mode === "day" ? "rgba(35,42,54,0.35)" : "rgba(2,5,11,0.62)",
       skeletonBase: palette.mode === "day" ? "#e3e7ee" : palette.card,
@@ -114,7 +117,10 @@ export function semanticTokens(palette: Palette): SemanticTokens {
     },
     status: palette.mode === "day" ? DAY_STATUS : NIGHT_STATUS,
     space: S,
-    radius: { sm: R.sm, md: R.md, lg: R.lg, xl: 20, xxl: 24, pill: R.pill },
+    // lg/xl/xxl all resolve to the 22 card curve on purpose: a panel, a prompt
+    // box and a 44 pt round control then share one radius, which is what makes
+    // the glass read as a single material.
+    radius: { sm: R.sm, md: R.md, lg: R.lg, xl: CARD_RADIUS, xxl: CARD_RADIUS, pill: R.pill },
     type: {
       title: { fontSize: 24, fontWeight: "800", lineHeight: 30 },
       heading: { fontSize: 19, fontWeight: "800", lineHeight: 24 },

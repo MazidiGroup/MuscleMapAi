@@ -175,7 +175,7 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
     brandMark: {
       width: 30,
       height: 30,
-      borderRadius: 10,
+      borderRadius: 22,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: "rgba(255,255,255,0.15)",
@@ -236,7 +236,7 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
     promptIcon: {
       width: 52,
       height: 52,
-      borderRadius: 18,
+      borderRadius: 22,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: t.color.surfaceAlt,

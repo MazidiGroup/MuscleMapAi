@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
   dayTitle: { fontSize: 17.5, fontWeight: "700", marginTop: 4 },
   posterStack: { flexDirection: "row", marginTop: 10 },
   posterThumb: {
-    width: 36, height: 36, borderRadius: 11, borderWidth: 1, overflow: "hidden",
+    width: 36, height: 36, borderRadius: 22, borderWidth: 1, overflow: "hidden",
   },
   posterImg: { width: "100%", height: "100%" },
   dayMuscles: { fontSize: 12, marginTop: 8 },
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
   exCard: {
     flexDirection: "row", padding: 12, borderRadius: R.lg, borderWidth: 1, marginBottom: 10, alignItems: "center", overflow: "hidden",
   },
-  exPoster: { width: 86, height: 60, borderRadius: 12, borderWidth: 1, overflow: "hidden" },
+  exPoster: { width: 86, height: 60, borderRadius: 22, borderWidth: 1, overflow: "hidden" },
   exMuscleCap: { fontSize: 10.5, fontWeight: "800", letterSpacing: 1.2 },
   exBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: R.pill },
   exName: { fontSize: 14.5, fontWeight: "600", marginTop: 4 },
@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
   },
   swappedText: { fontSize: 10.5, fontWeight: "600", flexShrink: 1 },
   swappedUndo: { fontSize: 10.5, fontWeight: "800", textDecorationLine: "underline" },
-  tickBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  tickBtn: { width: 34, height: 34, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   addBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   swapBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   startAllBtn: { paddingHorizontal: 18, minHeight: 44, justifyContent: "center", borderRadius: R.pill, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },

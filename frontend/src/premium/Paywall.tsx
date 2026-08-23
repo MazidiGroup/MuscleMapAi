@@ -337,7 +337,7 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
     badge: {
       width: 58,
       height: 58,
-      borderRadius: 20,
+      borderRadius: 22,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -390,7 +390,7 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
       minHeight: t.target.comfortable,
     },
     optionActive: { borderColor: t.color.accent, borderWidth: 1.5, backgroundColor: t.mode === "day" ? "rgba(40,120,232,0.075)" : "rgba(76,156,255,0.10)" },
-    radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: t.color.textFaint, alignItems: "center", justifyContent: "center" },
+    radio: { width: 22, height: 22, borderRadius: 22, borderWidth: 1.5, borderColor: t.color.textFaint, alignItems: "center", justifyContent: "center" },
     radioActive: { backgroundColor: t.color.accent, borderColor: t.color.accent },
     optionTitleRow: { flexDirection: "row", alignItems: "center", gap: 7 },
     recommended: { backgroundColor: t.mode === "day" ? "rgba(40,120,232,0.11)" : "rgba(76,156,255,0.16)", borderRadius: t.radius.pill, paddingHorizontal: 7, paddingVertical: 3 },

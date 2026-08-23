@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: 22,
     backgroundColor: "#fff",
     borderWidth: 3,
     borderColor: T.accent,
