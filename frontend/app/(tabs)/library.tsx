@@ -497,7 +497,7 @@ export default function LibraryScreen() {
             </Text>
             {/* Read from the app config rather than typed here, so the About
                 screen can never disagree with the version that shipped. */}
-            <Text style={styles.version}>v{APP_VERSION} · Plan · Workout · Coach · Explore · Library</Text>
+            <Text style={styles.version}>v{APP_VERSION} · Today · Workout · Coach · Explore · Library</Text>
 
             <View style={styles.linkList}>
               <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/references")} testID="link-references">

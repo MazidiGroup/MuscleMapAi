@@ -43,7 +43,18 @@ test("the plan-linked add path passes the planned count through", () => {
     /addExerciseFromPlan = useCallback\(\(id: string, planDate: string, plannedSets = 1, planName\?: string\)/.test(store),
     "the store accepts the planned set count",
   );
-  assert.ok(store.includes("sets: plannedSetRows(plannedSets)"), "the session is seeded with the planned rows");
+  // The seam moved when opening sets became pre-filled from history, but the
+  // guarantee did not: the planned count is still what reaches the session, and
+  // `openingSets` treats a plan count as authoritative over history.
+  assert.ok(
+    store.includes('openingSetRows(history, id, "plan", plannedSetCount(plannedSets))'),
+    "the session is seeded with the planned number of rows",
+  );
+  const progression = fs.readFileSync(path.join(root, "src/anatomy/progression.ts"), "utf8");
+  assert.ok(
+    /const planned = plannedCount >= 1 \? Math\.floor\(plannedCount\) : 0;/.test(progression),
+    "a planned count of one is still a planned count",
+  );
   assert.ok(
     !/idSpace: "plan" as ExerciseIdSpace,\s*\n\s*sets: \[\{ id: uid\(\)/.test(store),
     "the single-set hardcode is gone",

@@ -209,6 +209,7 @@ function SessionCard({
 }) {
   const ex = getExercise(se.exerciseId);
   const bodyweight = isBodyweightEquipment(ex?.equipment);
+  const router = useRouter();
 
   // Completed working sets for THIS exercise, from finished workouts only.
   const perfs = useMemo(
@@ -239,9 +240,27 @@ function SessionCard({
           <Text style={styles.superTagText}>SUPERSET — alternate with the exercise above</Text>
         </View>
       )}
+      {/* The demo is a compact box on the left, not a full-width 16:9 block per
+          exercise: at five exercises that was most of the session's height. Its
+          left, top and bottom gaps are all the card's padding, so the row reads
+          as one square with the two controls beside it. Tapping opens the full
+          form demo on the exercise screen. */}
       <View style={styles.exCardHead}>
+        <TouchableOpacity
+          onPress={() => router.push(`/exercise/${se.exerciseId}`)}
+          accessibilityRole="button"
+          accessibilityLabel={`${ex?.name} form demo`}
+          testID={`ex-thumb-${se.exerciseId}`}
+        >
+          <ExerciseAnimation
+            exerciseId={se.exerciseId}
+            exerciseName={ex?.name}
+            variant="thumb"
+            size={56}
+          />
+        </TouchableOpacity>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-          <Text style={styles.exCardName}>{ex?.name}</Text>
+          <Text style={styles.exCardName} numberOfLines={2}>{ex?.name}</Text>
           {bodyweight && (
             <View style={styles.bwBadge}>
               <Text style={styles.bwBadgeText}>BW</Text>
@@ -272,9 +291,6 @@ function SessionCard({
           <Ionicons name="trash-outline" size={18} color={T.textFaint} />
         </A11yControl>
       </View>
-
-      {/* Form demo with play/pause + replay controls (paused poster by default) */}
-      <ExerciseAnimation exerciseId={se.exerciseId} exerciseName={ex?.name} variant="workout" />
 
       {/* Next target, derived from this exercise's own completed sets. Offered
           only once there is a performance to build on — never invented. */}
@@ -502,9 +518,10 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   sbValue: { color: T.accent, fontSize: 17, fontWeight: "800" },
   sbLabel: { color: T.textFaint, fontSize: 11, marginTop: 2 },
 
-  exCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 14, marginBottom: 12, overflow: "hidden" },
+  // 12 all round, so the thumbnail's left gap matches its top and bottom gaps.
+  exCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 12, marginBottom: 10, overflow: "hidden" },
   exCardSuper: { borderColor: T.accent + "66" },
-  exCardHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  exCardHead: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
   exCardName: { color: T.text, fontSize: 16, fontWeight: "800" },
   headBtn: {
     width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center",
@@ -536,7 +553,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
 
   setHeadRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
   setHead: { color: T.textFaint, fontSize: 11, fontWeight: "700" },
-  setRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 5 },
+  setRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 3 },
   setRowDone: { opacity: 0.85 },
   setIdxBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   setIdx: { color: T.text, fontSize: 14, fontWeight: "700" },

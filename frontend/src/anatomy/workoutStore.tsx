@@ -19,6 +19,8 @@ import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS, GYM_GROUP_ORDER } from "./groups";
 import { usePlanStore } from "@/src/plan/planStore";
 import { canMarkDone, isCountableSet, isWorkingSet, setVolume } from "./setRules";
+import { openingSets } from "./progression";
+import { exercisePerformances } from "@/src/history/metrics";
 
 export type LoggedSet = {
   id: string;
@@ -52,6 +54,24 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 /** Empty set rows for a planned exercise (count decided by plannedSetCount). */
 const plannedSetRows = (planned: unknown) =>
   Array.from({ length: plannedSetCount(planned) }, () => ({ id: uid(), weight: 0, reps: 0, done: false }));
+
+/**
+ * Set rows for a newly added exercise, pre-filled from the user's own last
+ * completed performance so a workout can be started without typing. Every value
+ * is editable and none is marked done.
+ */
+const openingSetRows = (
+  history: Workout[],
+  exerciseId: string,
+  idSpace: ExerciseIdSpace,
+  plannedCount = 0,
+) => {
+  const { count, weight, reps } = openingSets(
+    exercisePerformances(history, exerciseId, idSpace),
+    plannedCount,
+  );
+  return Array.from({ length: count }, () => ({ id: uid(), weight, reps, done: false }));
+};
 
 export function workoutStats(exs: SessionExercise[]) {
   let sets = 0,
@@ -280,12 +300,17 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       if (base.some((e) => e.exerciseId === id)) return base;
       return [
         ...base,
-        { exerciseId: id, idSpace: "anatomy" as ExerciseIdSpace, sets: [{ id: uid(), weight: 0, reps: 0, done: false }], notes: "" },
+        {
+          exerciseId: id,
+          idSpace: "anatomy" as ExerciseIdSpace,
+          sets: openingSetRows(history, id, "anatomy"),
+          notes: "",
+        },
       ];
     });
     setStartedAt((s) => s ?? Date.now());
     stampPlanSeed();
-  }, [stampPlanSeed]);
+  }, [stampPlanSeed, history]);
 
   const addExerciseFromPlan = useCallback((id: string, planDate: string, plannedSets = 1, planName?: string) => {
     setSession((prev) => {
@@ -304,8 +329,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         {
           exerciseId: id,
           idSpace: "plan" as ExerciseIdSpace,
-          // The Plan day promises N sets, so the session starts with N empty sets.
-          sets: plannedSetRows(plannedSets),
+          // The Plan day promises N sets, so the session starts with N rows —
+          // pre-filled from the last time this exercise was logged.
+          sets: openingSetRows(history, id, "plan", plannedSetCount(plannedSets)),
           notes: "",
           planLink: { planDate, planName },
         },
@@ -313,7 +339,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     });
     setStartedAt((s) => s ?? Date.now());
     stampPlanSeed();
-  }, [stampPlanSeed]);
+  }, [stampPlanSeed, history]);
 
   const hasExercise = useCallback((id: string) => !!session?.some((e) => e.exerciseId === id), [session]);
 
