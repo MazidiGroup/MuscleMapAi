@@ -43,7 +43,7 @@ export type AuthResult = {
 
 /** Neutral guidance shown only when automatic Apple revocation was not verified. */
 export const MANUAL_APPLE_REVOCATION_COPY =
-  "Your account and data have been deleted. To also remove this app from Sign in with Apple, open Settings, tap your name, then Sign-In & Security, Sign in with Apple, and stop using Apple ID for Muscle Map Ai.";
+  "Your account and data have been deleted. To also remove this app from Sign in with Apple, open Settings, tap your name, then Sign-In & Security, Sign in with Apple, and stop using Apple ID for Muscle Map.";
 
 type AuthCtx = {
   user: AuthUser | null;

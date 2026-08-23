@@ -272,7 +272,7 @@ export function RestTimer({
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 24 },
-  card: { width: "100%", backgroundColor: T.surface, borderRadius: 24, borderWidth: 1, borderColor: T.border, padding: 24, alignItems: "center", overflow: "hidden" },
+  card: { width: "100%", backgroundColor: T.surface, borderRadius: 22, borderWidth: 1, borderColor: T.border, padding: 24, alignItems: "center", overflow: "hidden" },
   label: { color: T.accent, fontSize: 13, fontWeight: "800", letterSpacing: 2 },
   time: { color: T.text, fontSize: 64, fontWeight: "900", marginVertical: 8 },
   barTrack: { width: "100%", height: 8, borderRadius: 4, backgroundColor: T.surfaceHi, overflow: "hidden", marginBottom: 12 },
@@ -280,11 +280,11 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   statusLine: { minHeight: 20, marginBottom: 8, justifyContent: "center" },
   statusText: { color: T.accent, fontSize: 14, fontWeight: "700" },
   presets: { flexDirection: "row", gap: 8, marginBottom: 20, width: "100%" },
-  preset: { flex: 1, minHeight: 44, justifyContent: "center", borderRadius: 10, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, alignItems: "center" },
+  preset: { flex: 1, minHeight: 44, justifyContent: "center", borderRadius: 22, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, alignItems: "center" },
   presetActive: { backgroundColor: T.accent, borderColor: T.accent },
   presetText: { color: T.text, fontSize: 14, fontWeight: "700" },
   actions: { flexDirection: "row", gap: 12, width: "100%" },
-  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, minHeight: 48, minWidth: 44, borderRadius: 14 },
+  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, minHeight: 48, minWidth: 44, borderRadius: 22 },
   skip: { backgroundColor: T.accent, borderColor: T.accent },
   actionText: { color: T.text, fontSize: 15, fontWeight: "700" },
   // Keyboard focus must be visible without changing any existing colour value.

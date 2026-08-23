@@ -13,6 +13,8 @@ import { useRouter } from "expo-router";
 import { getExercise } from "@/src/anatomy/exercises";
 import { useWorkout } from "@/src/anatomy/workoutStore";
 import { useSemanticTokens } from "@/src/theme/semantic";
+import { usePremium } from "@/src/premium/PremiumContext";
+import { hiddenHistoryCount, visibleHistory } from "@/src/premium/freeLimits";
 import { EmptyState, InfoBanner, RetryPanel, WarningBanner } from "@/src/ui/state";
 import { LiquidSheen } from "@/src/ui/GlassSurface";
 
@@ -38,10 +40,17 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
   const t = useSemanticTokens();
   const router = useRouter();
   const w = useWorkout();
+  const { resolution } = usePremium();
 
   // Damaged records are excluded from everything, and never removed from storage.
   const { valid, damaged } = useMemo(() => partitionRecords(w.history), [w.history]);
-  const groups = useMemo(() => groupHistory(valid), [valid]);
+  // A free account reviews its recent workouts; older ones stay recorded and
+  // are never deleted, only rolled up behind Premium. The count is stated
+  // plainly rather than the list simply ending.
+  const hasPremium = resolution.access;
+  const reviewable = useMemo(() => visibleHistory(valid, hasPremium), [valid, hasPremium]);
+  const hiddenCount = hiddenHistoryCount(valid.length, hasPremium);
+  const groups = useMemo(() => groupHistory(reviewable), [reviewable]);
   const week = useMemo(() => weekSummary(valid), [valid]);
 
   const [storageOpen, setStorageOpen] = useState(false);
@@ -236,6 +245,23 @@ export function HistoryView({ scrollPadding = 24, topPadding }: { scrollPadding?
         </>
       )}
 
+      {hiddenCount > 0 ? (
+        <Pressable
+          onPress={() => router.push("/(tabs)/coach")}
+          accessibilityRole="button"
+          accessibilityLabel={`${hiddenCount} earlier ${hiddenCount === 1 ? "workout is" : "workouts are"} part of Premium. Opens Premium.`}
+          testID="history-cap-notice"
+          style={[styles.storageRow, { borderColor: t.color.border, backgroundColor: t.color.surface, minHeight: t.target.min }]}
+        >
+          <LiquidSheen tone="accent" />
+          <Ionicons name="time-outline" size={16} color={t.color.accent} />
+          <Text style={[t.type.bodyStrong, { color: t.color.text, flex: 1 }]}>
+            {hiddenCount} earlier {hiddenCount === 1 ? "workout" : "workouts"} saved — see your full history with Premium
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={t.color.accent} />
+        </Pressable>
+      ) : null}
+
       <Pressable
         onPress={() => setStorageOpen(true)}
         accessibilityRole="button"
@@ -327,13 +353,13 @@ function StorageDialog({ visible, onClose }: { visible: boolean; onClose: () => 
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+  card: { borderRadius: 22, borderWidth: 1, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  iconBtn: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   cell: { width: `${100 / 7}%`, height: 44, alignItems: "center", justifyContent: "center" },
   dayCell: { marginVertical: 2, overflow: "hidden" },
-  storageRow: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, overflow: "hidden" },
+  storageRow: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 22, paddingHorizontal: 14, overflow: "hidden" },
   dialogWrap: { flex: 1, justifyContent: "center", padding: 24 },
-  closeBtn: { borderRadius: 14, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
+  closeBtn: { borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
 });

@@ -86,7 +86,7 @@ export default function LoginScreen() {
             <LiquidSheen tone="neutral" />
             <Image source={require("../assets/images/icon.png")} style={styles.logo} />
           </View>
-          <Text style={styles.appName}>Muscle Map Ai</Text>
+          <Text style={styles.appName}>Muscle Map</Text>
           <Text style={styles.tagline}>Learn the body. Train it smarter.</Text>
         </View>
 
@@ -279,7 +279,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     backgroundColor: "rgba(239,68,68,0.12)",
     borderWidth: 1,
     borderColor: "rgba(239,68,68,0.35)",
-    borderRadius: 12,
+    borderRadius: 22,
     paddingHorizontal: 14,
     paddingVertical: 11,
     marginTop: 20,
@@ -309,7 +309,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     backgroundColor: T.surface,
     borderWidth: 1,
     borderColor: T.border,
-    borderRadius: 14,
+    borderRadius: 22,
     height: 52,
     paddingHorizontal: 16,
     color: T.text,
@@ -320,7 +320,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     backgroundColor: "rgba(10,132,255,0.12)",
     borderWidth: 1,
     borderColor: "rgba(10,132,255,0.35)",
-    borderRadius: 12,
+    borderRadius: 22,
     padding: 12,
     overflow: "hidden",
   },

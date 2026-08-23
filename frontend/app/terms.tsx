@@ -31,7 +31,7 @@ export default function TermsScreen() {
         <Text style={styles.updated}>Last updated: {UPDATED}</Text>
 
         <Section title="Acceptance">
-          By downloading, installing or using Muscle Map Ai (the app), you agree to be bound by these
+          By downloading, installing or using Muscle Map (the app), you agree to be bound by these
           Terms of Use (Terms) and by Apple&apos;s Standard End User License Agreement (EULA) which applies
           to all apps distributed through the Apple App Store.
         </Section>
@@ -47,7 +47,7 @@ export default function TermsScreen() {
         </Section>
 
         <Section title="Subscriptions and Auto-Renewal">
-          Muscle Map Ai offers auto-renewing subscriptions (Premium) that unlock the AI Coach,
+          Muscle Map offers auto-renewing subscriptions (Premium) that unlock the AI Coach,
           Learn lessons, recovery insights and other premium features. Subscription titles, lengths
           and prices are displayed on the in-app paywall before purchase and match the products
           published on the App Store.{"\n\n"}
@@ -92,7 +92,7 @@ export default function TermsScreen() {
         </Section>
 
         <Section title="Limitation of Liability">
-          To the maximum extent permitted by law, Muscle Map Ai and its publisher are not liable for
+          To the maximum extent permitted by law, Muscle Map and its publisher are not liable for
           any indirect, incidental, special, consequential or punitive damages arising out of or in
           connection with your use of the app.
         </Section>
@@ -140,7 +140,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.border,
   },
-  back: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" },
+  back: { width: 40, height: 40, borderRadius: 22, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" },
   backPlaceholder: { width: 40, height: 40 },
   headerTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
   updated: { color: T.textFaint, fontSize: 12, marginBottom: 14 },

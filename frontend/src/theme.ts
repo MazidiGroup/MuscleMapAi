@@ -1,4 +1,4 @@
-// Muscle Map Ai Design Tokens
+// Muscle Map Design Tokens
 export const COLORS = {
   bg: '#0A0A0A',
   surface: '#141414',

@@ -457,7 +457,7 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
   iconBtn: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
   summary: { color: T.textDim, fontSize: 15, lineHeight: 22, marginTop: 6, marginBottom: 14 },
 
-  subCard: { backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 16, marginBottom: 12 },
+  subCard: { backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 16, marginBottom: 12 },
   cardHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   cardHeadLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
   cardTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
@@ -471,7 +471,7 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
 
   purpose: { color: T.text, fontSize: 15, lineHeight: 21, marginTop: 10, marginBottom: 14 },
   statRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-  stat: { flex: 1, backgroundColor: T.surfaceHi, borderRadius: 12, paddingVertical: 12, alignItems: "center", gap: 4 },
+  stat: { flex: 1, backgroundColor: T.surfaceHi, borderRadius: 22, paddingVertical: 12, alignItems: "center", gap: 4 },
   statValue: { color: T.text, fontSize: 13, fontWeight: "800", textAlign: "center" },
   statLabel: { color: T.textFaint, fontSize: 11 },
   subLabel: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 },
@@ -483,9 +483,9 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
   listRow: { flexDirection: "row", gap: 10, alignItems: "flex-start", paddingVertical: 6 },
   listText: { color: T.text, fontSize: 14, lineHeight: 20, flex: 1 },
 
-  exCard: { backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 16, marginBottom: 10, overflow: "hidden" },
+  exCard: { backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22, marginBottom: 10, overflow: "hidden" },
   exTop: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12 },
-  exIcon: { width: 46, height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  exIcon: { width: 46, height: 46, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   exName: { color: T.text, fontSize: 15, fontWeight: "700" },
   exMetaRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 4 },
   exMeta: { color: T.textDim, fontSize: 12, fontWeight: "600" },
@@ -500,15 +500,15 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
   barTrack: { height: 8, borderRadius: 4, backgroundColor: T.surfaceHi, overflow: "hidden" },
   barFill: { height: 8, borderRadius: 4 },
 
-  aiCard: { backgroundColor: T.bg2, borderWidth: 1, borderRadius: 16, padding: 16, marginTop: 6, marginBottom: 8 },
+  aiCard: { backgroundColor: T.bg2, borderWidth: 1, borderRadius: 22, padding: 16, marginTop: 6, marginBottom: 8 },
   aiHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
-  aiBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" },
+  aiBadge: { width: 26, height: 26, borderRadius: 22, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" },
   aiSub: { color: T.textDim, fontSize: 14, lineHeight: 20, marginBottom: 12 },
-  aiBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, paddingVertical: 12 },
+  aiBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 22, paddingVertical: 12 },
   aiBtnText: { color: T.bg, fontSize: 14, fontWeight: "800" },
   aiText: { color: T.text, fontSize: 14, lineHeight: 21, flex: 1 },
 
-  askBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.borderHi, borderRadius: 12, paddingVertical: 13, marginTop: 8 },
+  askBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.borderHi, borderRadius: 22, paddingVertical: 13, marginTop: 8 },
   askBtnText: { color: T.text, fontSize: 14, fontWeight: "700" },
   srcRow: {
     flexDirection: "row",
@@ -517,7 +517,7 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
     marginTop: 14,
     paddingHorizontal: 10,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 22,
     backgroundColor: T.bg2,
     borderWidth: 1,
     borderColor: T.border,

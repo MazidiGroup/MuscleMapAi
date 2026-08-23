@@ -82,7 +82,17 @@ test("there is exactly one Premium provider, one gate and one resolver", () => {
   // PremiumDiscovery holds the pre-paywall conversion surfaces only. It owns no
   // provider, no gate and no resolver — it reads the single context like any
   // other consumer.
-  assert.deepEqual(files, ["Paywall.tsx", "PremiumContext.tsx", "PremiumDiscovery.tsx", "PremiumGate.tsx", "entitlement.ts"]);
+  assert.deepEqual(files, ["Paywall.tsx", "PremiumContext.tsx", "PremiumDiscovery.tsx", "PremiumGate.tsx", "entitlement.ts", "freeLimits.ts"]);
+  // freeLimits holds the free-tier caps as plain numbers and pure functions. It
+  // must never gate: a cap keeps a surface free and reachable, and only a
+  // Premium surface may be locked.
+  // Comments are stripped first: this asserts what the module DOES, not what it
+  // explains about itself.
+  const limits = read("src/premium/freeLimits.ts")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/import/.test(limits), "caps depend on nothing — they are plain numbers and pure functions");
+  assert.ok(!/createContext|resolvePremium|usePremium|PremiumGate|Paywall/.test(limits), "caps never gate");
   const discovery = read("src/premium/PremiumDiscovery.tsx");
   assert.ok(
     !/createContext|resolvePremium|usePremium|designatedEntitlementActive/.test(discovery),

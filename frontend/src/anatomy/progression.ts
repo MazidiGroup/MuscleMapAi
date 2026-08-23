@@ -193,3 +193,42 @@ export const PR_LABEL: Record<PRKind, string> = {
 
 export const OVERLOAD_NOTE =
   "Suggested from your own completed sets on this exercise. Warm-ups are ignored. Train to how you feel on the day.";
+
+// ---------------------------------------------------------------------------
+// Opening values for a newly added exercise.
+// ---------------------------------------------------------------------------
+
+/**
+ * What a set row should start at when an exercise is added to a session.
+ *
+ * Taken from the user's own most recent completed performance of that exact
+ * exercise — never invented, and never carried across exercises. With no
+ * history the rows stay empty rather than guessing a load, because a wrong
+ * prefilled weight is worse than a blank one: a blank asks, a wrong number
+ * asserts. The values are a starting point only; every row remains editable
+ * and nothing is marked done.
+ */
+export function openingSets(
+  performances: Performance[],
+  plannedCount = 0,
+): { count: number; weight: number; reps: number } {
+  // A Plan day PROMISES a number of sets. That promise always wins — including
+  // when it promises exactly one — or the plan and the session disagree about
+  // the workout the user agreed to. History only decides the count when no plan
+  // asked for one.
+  const planned = plannedCount >= 1 ? Math.floor(plannedCount) : 0;
+  const last = performances.length ? performances[performances.length - 1] : null;
+  if (!last || last.completedSets.length === 0) {
+    return { count: Math.max(1, planned), weight: 0, reps: 0 };
+  }
+  // The heaviest working set of that session is the one worth repeating; ties
+  // resolve to the higher rep count.
+  const best = last.completedSets.reduce((a, b) =>
+    b.weight > a.weight || (b.weight === a.weight && b.reps > a.reps) ? b : a,
+  );
+  return {
+    count: planned || Math.max(1, last.completedSets.length),
+    weight: best.weight,
+    reps: best.reps,
+  };
+}

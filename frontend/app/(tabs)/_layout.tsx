@@ -99,7 +99,7 @@ export default function TabsLayout() {
               overflow: "hidden",
               elevation: 0,
             },
-        tabBarItemStyle: { borderRadius: 15, marginHorizontal: 2, marginVertical: 3 },
+        tabBarItemStyle: { borderRadius: 22, marginHorizontal: 2, marginVertical: 3 },
         tabBarLabelStyle: { fontSize: 10, fontWeight: "700", letterSpacing: 0.15 },
         sceneStyle: { backgroundColor: theme.bg },
       }}
@@ -107,9 +107,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="plan"
         options={{
-          title: "Plan",
+          title: "Today",
           tabBarAccessibilityLabel: tabName("Plan", "plan"),
-          tabBarIcon: ({ color, size }) => <TabIcon name="calendar-outline" size={size} color={color} lockBg={theme.accent} lockFg={theme.ctaText} />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="today-outline" size={size} color={color} lockBg={theme.accent} lockFg={theme.ctaText} />,
         }}
       />
       <Tabs.Screen
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     right: -9,
     width: 17,
     height: 17,
-    borderRadius: 9,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },

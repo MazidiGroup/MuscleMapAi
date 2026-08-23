@@ -290,14 +290,14 @@ const AnimationPlayer = React.memo(function AnimationPlayer({ exerciseId, playin
 });
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
-  thumb: { borderRadius: 10, backgroundColor: T.surfaceHi },
+  thumb: { borderRadius: 22, backgroundColor: T.surfaceHi },
   playBadge: {
     position: "absolute",
     right: -2,
     bottom: -2,
     width: 18,
     height: 18,
-    borderRadius: 9,
+    borderRadius: 22,
     backgroundColor: "rgba(7,10,15,0.85)",
     borderWidth: 1,
     borderColor: T.borderHi,
@@ -306,7 +306,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   },
   large: {
     aspectRatio: 16 / 10,
-    borderRadius: 16,
+    borderRadius: 22,
     backgroundColor: T.bg2,
     borderWidth: 1,
     borderColor: T.border,

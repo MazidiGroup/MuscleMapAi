@@ -27,6 +27,8 @@ import {
 import { legacyPalette, LegacyPalette } from "./ui";
 import { FLAGS } from "@/src/config/featureFlags";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { usePremium } from "@/src/premium/PremiumContext";
+import { canChartPeriod } from "@/src/premium/freeLimits";
 import { A11yControl } from "@/src/ui/A11yControl";
 import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 
@@ -42,16 +44,23 @@ export function InsightsView() {
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
   const { history, prs, unit } = useWorkout();
+  const { resolution } = usePremium();
   const [period, setPeriod] = useState<Period>("week");
 
-  const days = period === "week" ? 7 : 30;
+  // The current week is free; the 30-day view is Premium. Entitlement is read,
+  // never re-derived, and a free account is dropped back to the week rather
+  // than being shown an empty or half-populated chart.
+  const hasPremium = resolution.access;
+  const periodAllowed = canChartPeriod(period === "week" ? 7 : 30, hasPremium);
+  const effectivePeriod: Period = periodAllowed ? period : "week";
+  const days = effectivePeriod === "week" ? 7 : 30;
   const recovery = useMemo(() => computeRecovery(history), [history]);
   const activation = useMemo(() => weeklySetsByGroup(history, days), [history, days]);
   // Discrete rolling 7-day windows — deliberately NOT calendar weeks, and the
   // exact same series feeds the chart and its table alternative.
   const series = useMemo(
-    () => rollingVolumeSeries(history, period === "week" ? 6 : 12),
-    [history, period],
+    () => rollingVolumeSeries(history, effectivePeriod === "week" ? 6 : 12),
+    [history, effectivePeriod],
   );
   const [showTable, setShowTable] = useState(false);
   const stats = useMemo(() => periodStats(history, days), [history, days]);
@@ -112,13 +121,23 @@ export function InsightsView() {
                 {(["week", "month"] as Period[]).map((p) => (
                   <TouchableOpacity
                     key={p}
-                    style={[styles.periodBtn, period === p && styles.periodBtnActive]}
-                    onPress={() => setPeriod(p)}
+                    style={[styles.periodBtn, effectivePeriod === p && styles.periodBtnActive]}
+                    onPress={() => (p === "month" && !hasPremium ? router.push("/(tabs)/coach") : setPeriod(p))}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      p === "month" && !hasPremium
+                        ? "Last 30 days, part of Premium. Opens Premium."
+                        : p === "week" ? "Last 7 days" : "Last 30 days"
+                    }
+                    accessibilityState={{ selected: effectivePeriod === p }}
                     testID={`insights-period-${p}`}
                   >
-                    <Text style={[styles.periodText, period === p && styles.periodTextActive]}>
+                    <Text style={[styles.periodText, effectivePeriod === p && styles.periodTextActive]}>
                       {p === "week" ? "Last 7 days" : "Last 30 days"}
                     </Text>
+                    {p === "month" && !hasPremium ? (
+                      <Ionicons name="lock-closed" size={10} color={T.textFaint} style={{ marginLeft: 4 }} />
+                    ) : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -138,8 +157,8 @@ export function InsightsView() {
                   <Text style={styles.wLabel}>{`Volume (${unit})`}</Text>
                 </View>
                 <View style={styles.wStat}>
-                  <Text style={styles.wValue}>{period === "month" ? stats.perWeek : activation.list.filter((g) => g.sets > 0).length}</Text>
-                  <Text style={styles.wLabel}>{period === "month" ? "Per week" : "Groups hit"}</Text>
+                  <Text style={styles.wValue}>{effectivePeriod === "month" ? stats.perWeek : activation.list.filter((g) => g.sets > 0).length}</Text>
+                  <Text style={styles.wLabel}>{effectivePeriod === "month" ? "Per week" : "Groups hit"}</Text>
                 </View>
               </View>
 
@@ -163,7 +182,7 @@ export function InsightsView() {
           )}
 
           {/* sets per muscle group */}
-          <Text style={styles.section}>{period === "week" ? "Sets This Week" : "Sets Last 30 Days"}</Text>
+          <Text style={styles.section}>{effectivePeriod === "week" ? "Sets This Week" : "Sets Last 30 Days"}</Text>
           {activation.list
             .filter((g) => g.sets > 0)
             .map((g) => (
@@ -179,7 +198,7 @@ export function InsightsView() {
             <View style={styles.neglect}>
               <Ionicons name="alert-circle-outline" size={16} color={T.secondary} />
               <Text style={styles.neglectText}>
-                Not trained {period === "week" ? "this week" : "in the last 30 days"}: {activation.neglected.join(", ")}
+                Not trained {effectivePeriod === "week" ? "this week" : "in the last 30 days"}: {activation.neglected.join(", ")}
               </Text>
             </View>
           )}
@@ -285,7 +304,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   emptyText: { color: T.text, fontSize: 17, fontWeight: "700" },
   emptySub: { color: T.textDim, fontSize: 14, textAlign: "center", lineHeight: 20 },
   legendCard: {
-    backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 14,
+    backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22,
     padding: 14, marginTop: 12,
   },
   legendTitle: {
@@ -299,13 +318,13 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   legendHelp: { color: T.textFaint, fontSize: 11.5, marginTop: 1 },
   legendNote: { color: T.textFaint, fontSize: 10.5, lineHeight: 15, marginTop: 11 },
 
-  periodSeg: { flexDirection: "row", backgroundColor: T.bg2, borderRadius: 12, padding: 4, gap: 4, marginTop: 12, borderWidth: 1, borderColor: T.border },
-  periodBtn: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" },
+  periodSeg: { flexDirection: "row", backgroundColor: T.bg2, borderRadius: 22, padding: 4, gap: 4, marginTop: 12, borderWidth: 1, borderColor: T.border },
+  periodBtn: { flex: 1, paddingVertical: 8, borderRadius: 22, alignItems: "center" },
   periodBtnActive: { backgroundColor: T.accent },
   periodText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
   periodTextActive: { color: T.bg },
-  streakCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,138,61,0.10)", borderWidth: 1, borderColor: "rgba(255,138,61,0.35)", borderRadius: 14, padding: 14, marginTop: 8 },
-  streakIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,138,61,0.16)", alignItems: "center", justifyContent: "center" },
+  streakCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,138,61,0.10)", borderWidth: 1, borderColor: "rgba(255,138,61,0.35)", borderRadius: 22, padding: 14, marginTop: 8 },
+  streakIcon: { width: 40, height: 40, borderRadius: 22, backgroundColor: "rgba(255,138,61,0.16)", alignItems: "center", justifyContent: "center" },
   streakValue: { color: T.text, fontSize: 16, fontWeight: "800" },
   streakNote: { color: T.textFaint, fontSize: 11.5, marginTop: 2 },
   chartHead: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -314,18 +333,18 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     borderRadius: 999, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface,
   },
   tableToggleText: { color: T.text, fontSize: 12.5, fontWeight: "700" },
-  table: { borderWidth: 1, borderColor: T.border, borderRadius: 14, overflow: "hidden" },
+  table: { borderWidth: 1, borderColor: T.border, borderRadius: 22, overflow: "hidden" },
   tableRow: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border },
   tableRange: { color: T.textDim, fontSize: 12, fontWeight: "700" },
   tableValue: { color: T.text, fontSize: 14, fontWeight: "700", marginTop: 2 },
   streakSub: { color: T.textDim, fontSize: 12, marginTop: 2 },
-  prRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 7 },
-  prBadge: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,176,32,0.14)", alignItems: "center", justifyContent: "center" },
+  prRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 7 },
+  prBadge: { width: 30, height: 30, borderRadius: 22, backgroundColor: "rgba(255,176,32,0.14)", alignItems: "center", justifyContent: "center" },
   prName: { color: T.text, fontSize: 14, fontWeight: "700", flex: 1 },
   prWeight: { color: T.accent, fontSize: 15, fontWeight: "800" },
   section: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },
   weekStats: { flexDirection: "row", gap: 8, marginBottom: 14 },
-  wStat: { flex: 1, backgroundColor: T.bg2, borderRadius: 12, paddingVertical: 12, alignItems: "center", borderWidth: 1, borderColor: T.border },
+  wStat: { flex: 1, backgroundColor: T.bg2, borderRadius: 22, paddingVertical: 12, alignItems: "center", borderWidth: 1, borderColor: T.border },
   wValue: { color: T.accent, fontSize: 20, fontWeight: "800" },
   wLabel: { color: T.textFaint, fontSize: 11, marginTop: 2 },
   barRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
@@ -333,7 +352,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   barTrack: { flex: 1, height: 10, borderRadius: 5, backgroundColor: T.surfaceHi, overflow: "hidden" },
   barFill: { height: 10, borderRadius: 5, backgroundColor: T.accent },
   barVal: { color: T.textDim, fontSize: 13, fontWeight: "700", width: 28, textAlign: "right" },
-  neglect: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, backgroundColor: "rgba(255,176,32,0.1)", borderRadius: 10, padding: 12 },
+  neglect: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, backgroundColor: "rgba(255,176,32,0.1)", borderRadius: 22, padding: 12 },
   neglectText: { color: T.text, fontSize: 13, flex: 1 },
   chart: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", height: 150, gap: 8, paddingTop: 8 },
   chartCol: { flex: 1, alignItems: "center", height: "100%" },
@@ -349,7 +368,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     marginTop: 18,
     paddingHorizontal: 10,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 22,
     backgroundColor: T.bg2,
     borderWidth: 1,
     borderColor: T.border,

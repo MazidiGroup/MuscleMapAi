@@ -1,7 +1,8 @@
-import React from "react";
-import { Platform, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, Platform, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { useReducedMotion } from "@/src/components/useReducedMotion";
 import { ThemeMode } from "@/src/theme/tokens";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { GlassSurface, LiquidSheen } from "@/src/ui/GlassSurface";
@@ -21,6 +22,23 @@ export function ThemeSwitcher({
   style?: StyleProp<ViewStyle>;
 }) {
   const { mode, setMode, T } = useTheme();
+  const reduceMotion = useReducedMotion();
+  // The reference switcher squashes the selected option horizontally and lets
+  // it settle. Reduce Motion turns the animation off, never the selection.
+  const squash = useRef(new Animated.Value(1)).current;
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (reduceMotion) return;
+    Animated.sequence([
+      Animated.timing(squash, { toValue: 1.1, duration: 110, useNativeDriver: true }),
+      Animated.spring(squash, { toValue: 1, friction: 5, tension: 140, useNativeDriver: true }),
+    ]).start();
+  }, [mode, reduceMotion, squash]);
+
   return (
     <GlassSurface
       style={[styles.track, compact ? styles.trackCompact : styles.trackFull, style]}
@@ -41,9 +59,15 @@ export function ThemeSwitcher({
           >
             <View style={styles.itemContent}>
               {active ? (
-                <View style={[StyleSheet.absoluteFill, styles.active, { backgroundColor: T.accent }]}>
+                <Animated.View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    styles.active,
+                    { backgroundColor: T.accent, transform: [{ scaleX: squash }] },
+                  ]}
+                >
                   <LiquidSheen tone="accent" />
-                </View>
+                </Animated.View>
               ) : null}
               <View style={styles.itemForeground}>
                 <Ionicons
@@ -64,12 +88,12 @@ export function ThemeSwitcher({
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: "row", padding: 3, borderRadius: 17, gap: 3 },
+  track: { flexDirection: "row", padding: 3, borderRadius: 22, gap: 3 },
   trackCompact: { width: 124, height: 42 },
   trackFull: { width: "100%", height: 52 },
   item: { flex: 1, zIndex: 1 },
   itemContent: { flex: 1, alignItems: "center", justifyContent: "center" },
   itemForeground: { alignItems: "center", justifyContent: "center", flexDirection: "row", zIndex: 1 },
-  active: { borderRadius: 13, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
+  active: { borderRadius: 22, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   label: { fontSize: 11.5, fontWeight: "700", marginLeft: 6 },
 });

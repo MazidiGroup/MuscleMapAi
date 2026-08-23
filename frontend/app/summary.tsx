@@ -19,6 +19,7 @@ import {
 import { isCountableSet } from "@/src/anatomy/setRules";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { CARD_RADIUS } from "@/src/theme/tokens";
 import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 
 function fmt(sec: number) {
@@ -88,7 +89,7 @@ export default function SummaryScreen() {
           {newPRs.length > 0 && (
             <View style={styles.prCard}>
               <View style={styles.prHead}>
-                <Ionicons name="trophy" size={18} color={T.secondary} />
+                <Ionicons name="trophy" size={18} color={T.pr} />
                 <Text style={styles.prTitle}>Personal Records!</Text>
               </View>
               {newPRs.map((p, i) => (
@@ -167,18 +168,18 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   badge: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "center", marginBottom: 14 },
   badgeText: { color: T.text, fontSize: 18, fontWeight: "800" },
   statGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  stat: { width: "31.5%", backgroundColor: T.bg2, borderRadius: 12, paddingVertical: 12, alignItems: "center", gap: 3, borderWidth: 1, borderColor: T.border },
+  stat: { width: "31.5%", backgroundColor: T.bg2, borderRadius: 22, paddingVertical: 12, alignItems: "center", gap: 3, borderWidth: 1, borderColor: T.border },
   statValue: { color: T.text, fontSize: 15, fontWeight: "800" },
   statLabel: { color: T.textFaint, fontSize: 11 },
-  prCard: { backgroundColor: "rgba(255,176,32,0.12)", borderWidth: 1, borderColor: T.secondary + "55", borderRadius: 16, padding: 14, marginTop: 14 },
+  prCard: { backgroundColor: T.pr + "1F", borderWidth: 1, borderColor: T.pr + "55", borderRadius: CARD_RADIUS, padding: 14, marginTop: 14 },
   prHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
-  prTitle: { color: T.secondary, fontSize: 15, fontWeight: "800" },
+  prTitle: { color: T.pr, fontSize: 15, fontWeight: "800" },
   prItem: { color: T.text, fontSize: 14, marginTop: 2 },
   section: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },
-  exRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
+  exRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
   exName: { color: T.text, fontSize: 15, fontWeight: "600", flex: 1 },
   exSets: { color: T.textDim, fontSize: 13 },
-  doneBtn: { position: "absolute", left: 18, right: 18, backgroundColor: T.accent, borderRadius: 12, paddingVertical: 15, alignItems: "center" },
+  doneBtn: { position: "absolute", left: 18, right: 18, backgroundColor: T.accent, borderRadius: 22, paddingVertical: 15, alignItems: "center" },
   exBlock: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border },
   exStatus: { fontSize: 12, fontWeight: "800" },
   exNote: { color: T.textDim, fontSize: 12.5, lineHeight: 18, marginTop: 4 },

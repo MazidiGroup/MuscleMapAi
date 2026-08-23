@@ -88,10 +88,10 @@ export default function LibraryScreen() {
     }
     if (Platform.OS === "web") {
       // eslint-disable-next-line no-alert
-      if (window.confirm("Log out of Muscle Map Ai?")) logout();
+      if (window.confirm("Log out of Muscle Map?")) logout();
       return;
     }
-    Alert.alert("Log out", "Log out of Muscle Map Ai?", [
+    Alert.alert("Log out", "Log out of Muscle Map?", [
       { text: "Cancel", style: "cancel" },
       { text: "Log Out", style: "destructive", onPress: () => logout() },
     ]);
@@ -144,7 +144,7 @@ export default function LibraryScreen() {
     };
     if (Platform.OS === "web") {
       // eslint-disable-next-line no-alert
-      if (window.confirm("Delete your Muscle Map Ai account?")) step2();
+      if (window.confirm("Delete your Muscle Map account?")) step2();
       return;
     }
     Alert.alert(
@@ -492,12 +492,12 @@ export default function LibraryScreen() {
 
             <Text style={[styles.aboutTitle, { marginTop: 22 }]}>About</Text>
             <Text style={styles.aboutText}>
-              Muscle Map Ai — explore a life-size 3D muscle model with 270 named structures,
+              Muscle Map — explore a life-size 3D muscle model with 270 named structures,
               build a personalized weekly workout plan, and track your training.
             </Text>
             {/* Read from the app config rather than typed here, so the About
                 screen can never disagree with the version that shipped. */}
-            <Text style={styles.version}>v{APP_VERSION} · Plan · Workout · Coach · Explore · Library</Text>
+            <Text style={styles.version}>v{APP_VERSION} · Today · Workout · Coach · Explore · Library</Text>
 
             <View style={styles.linkList}>
               <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/references")} testID="link-references">
@@ -601,10 +601,10 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   h1: { color: T.text, fontSize: 26, fontWeight: "800" },
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
-  search: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 12, height: 44, marginTop: 14 },
+  search: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 12, height: 44, marginTop: 14 },
   searchInput: { flex: 1, color: T.text, fontSize: 15 },
   libSeg: { flexDirection: "row", backgroundColor: "transparent", padding: 0, gap: 3, marginTop: 14 },
-  libSegBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 44, paddingHorizontal: 3, borderRadius: 11 },
+  libSegBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 44, paddingHorizontal: 3, borderRadius: 22 },
   libSegActive: { backgroundColor: T.accent + "14", borderBottomWidth: 2, borderBottomColor: T.accent },
   libSegText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
   libSegTextActive: { color: T.accent },
@@ -615,12 +615,12 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   diffChipActive: { backgroundColor: T.accent + "22", borderColor: T.accent },
   diffChipText: { color: T.textDim, fontSize: 12, fontWeight: "700" },
   diffChipTextActive: { color: T.accent },
-  exIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", marginRight: 12 },
+  exIcon: { width: 36, height: 36, borderRadius: 22, alignItems: "center", justifyContent: "center", marginRight: 12 },
   groupCount: { color: T.textFaint, fontSize: 12, fontWeight: "700", marginLeft: "auto" },
   groupHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   gdot: { width: 10, height: 10, borderRadius: 5 },
   groupTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
-  row: { flexDirection: "row", alignItems: "center", backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
+  row: { flexDirection: "row", alignItems: "center", backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
   rowName: { color: T.text, fontSize: 15, fontWeight: "600" },
   rowFn: { color: T.textFaint, fontSize: 12, marginTop: 2 },
   pill: { backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
@@ -644,13 +644,13 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   aboutText: { color: T.textDim, fontSize: 14, lineHeight: 21 },
   version: { color: T.textFaint, fontSize: 12, marginTop: 12 },
   linkList: { marginTop: 16, gap: 8 },
-  linkRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13 },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 13 },
   h1Small: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 },
   lessonCard: {
     flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border,
-    borderRadius: 16, padding: 14, marginBottom: 10,
+    borderRadius: 22, padding: 14, marginBottom: 10,
   },
-  lessonIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center" },
+  lessonIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center" },
   lessonNumText: { color: T.accent, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 },
   linkRowText: { flex: 1, color: T.text, fontSize: 15, fontWeight: "600" },
   accountEmail: { color: T.textFaint, fontSize: 12, marginTop: 1 },

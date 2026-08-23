@@ -1,17 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 
-import { AnatomyViewer } from "@/src/anatomy/AnatomyViewer";
-import { DraggableSheet } from "@/src/anatomy/DraggableSheet";
 import { RestTimer } from "@/src/anatomy/RestTimer";
-import { InsightsView } from "@/src/anatomy/InsightsView";
-import { HistoryView } from "@/src/history/HistoryView";
-import { EXERCISES, getExercise } from "@/src/anatomy/exercises";
-import { getExerciseMeta } from "@/src/anatomy/gymGuide";
+import { getExercise } from "@/src/anatomy/exercises";
 import { useWorkout, workoutStats, type SessionExercise } from "@/src/anatomy/workoutStore";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
@@ -24,17 +19,14 @@ import type { Workout } from "@/src/anatomy/workoutScope";
 import type { WeightUnit } from "@/src/units/unitPreference";
 import type { Goal } from "@/src/plan/exercises";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { EmptyState, ErrorBanner } from "@/src/ui/state";
+import { R } from "@/src/theme/tokens";
+import { ErrorBanner } from "@/src/ui/state";
 import { A11yControl } from "@/src/ui/A11yControl";
 import { LiquidSheen } from "@/src/ui/GlassSurface";
-
-type Seg = "session" | "history" | "insights" | "exercises";
-const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower", "Mobility"];
 
 export default function WorkoutScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { height } = useWindowDimensions();
   const params = useLocalSearchParams<{ seg?: string; ex?: string }>();
   const w = useWorkout();
   // Progression targets follow the rep range the plan was built around.
@@ -44,24 +36,17 @@ export default function WorkoutScreen() {
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
 
-  const [seg, setSeg] = useState<Seg>("session");
-  const [cat, setCat] = useState("All");
   const [restVisible, setRestVisible] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
-  // The segmented header floats above the content, so its REAL height (it wraps to
-  // two lines on narrow screens) is what pushes a scrolling segment clear of it.
-  const [headerH, setHeaderH] = useState(0);
-
+  // An empty Workout tab has nothing to offer, so it hands back to Today rather
+  // than presenting a dead end. `replace` keeps it out of the back stack: a
+  // finished workout must not bounce the user back into an empty session.
   useEffect(() => {
-    if (["exercises", "session", "history", "insights"].includes(String(params.seg))) setSeg(params.seg as Seg);
-  }, [params.seg]);
-  // Tapping a segment keeps the URL honest, so the segment a user is looking at is
-  // the segment a reload or a shared link reopens.
-  const selectSeg = (next: Seg) => {
-    setSeg(next);
-    router.setParams({ seg: next });
-  };
+    if (isFocused && (!w.session || w.session.length === 0) && !finishing) {
+      router.replace("/(tabs)/plan");
+    }
+  }, [isFocused, w.session, finishing, router]);
   useEffect(() => {
     if (params.ex) w.addExercise(String(params.ex));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,28 +57,8 @@ export default function WorkoutScreen() {
   // — otherwise the modal stays mounted over whatever the user opens next and
   // swallows their taps.
   useEffect(() => {
-    if (!w.session || seg !== "session" || !isFocused) setRestVisible(false);
-  }, [w.session, seg, isFocused]);
-
-  const list = useMemo(() => {
-    return EXERCISES.filter((e) => {
-      if (cat === "All") return true;
-      if (cat === "Upper") return e.category === "Push" || e.category === "Pull";
-      if (cat === "Lower") return e.category === "Legs";
-      if (cat === "Mobility") return e.category === "Mobility";
-      return e.category === cat;
-    });
-  }, [cat]);
-
-  const catHighlight = useMemo(() => {
-    const p = new Set<string>();
-    const s = new Set<string>();
-    list.forEach((e) => {
-      e.primary.forEach((m) => p.add(m));
-      e.secondary.forEach((m) => s.add(m));
-    });
-    return { primary: [...p], secondary: [...s].filter((m) => !p.has(m)) };
-  }, [list]);
+    if (!w.session || !isFocused) setRestVisible(false);
+  }, [w.session, isFocused]);
 
   const stats = w.session ? workoutStats(w.session) : { sets: 0, completed: 0, reps: 0, volume: 0 };
 
@@ -120,161 +85,31 @@ export default function WorkoutScreen() {
 
   return (
     <View style={styles.root}>
-      {seg === "exercises" && <AnatomyViewer mode="workout" primary={catHighlight.primary} secondary={catHighlight.secondary} />}
-
-      {/* segmented header */}
-      <View
-        style={[
-          styles.segWrap,
-          {
-            paddingTop: insets.top + 8,
-            // The scrolling segments pass their content UNDER this floating header,
-            // so it needs an opaque backing or rows bleed through above it. Muscle
-            // Groups keeps it transparent: the 3D scene is meant to show through.
-            paddingBottom: 8,
-            backgroundColor: seg === "exercises" ? "transparent" : T.bg,
-            pointerEvents: "box-none",
-          },
-        ]}
-        onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <View style={[styles.seg, { flex: 1 }]}>
-            {(["session", "history", "insights", "exercises"] as Seg[]).map((s) => (
-              <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => selectSeg(s)} testID={`seg-${s}`}>
-                <LiquidSheen tone={seg === s ? "accent" : "subtle"} />
-                <Text style={[styles.segText, seg === s && styles.segTextActive]}>
-                  {s === "session" ? "Session" : s === "history" ? "History" : s === "insights" ? "Insights" : "Muscle Groups"}
-                </Text>
-                {s === "session" && w.session && w.session.length > 0 && <View style={styles.dot} />}
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TouchableOpacity
-            style={styles.unitBtn}
-            onPress={() => w.setUnit(w.unit === "kg" ? "lb" : "kg")}
-            accessibilityRole="button"
-            accessibilityLabel={`Weight unit, ${w.unit}. Tap to switch.`}
-            testID="unit-toggle"
-          >
-            <LiquidSheen tone="neutral" />
-            <Text style={styles.unitText}>{w.unit.toUpperCase()}</Text>
-          </TouchableOpacity>
-        </View>
+      {/* One destination, one header. The Workout tab is the live session and
+          nothing else — Muscle Groups, History and Insights each moved to where
+          they belong, so this tab no longer hides four screens behind a
+          segmented control. */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Text style={styles.headerTitle}>Workout</Text>
+        <TouchableOpacity
+          style={styles.unitBtn}
+          onPress={() => w.setUnit(w.unit === "kg" ? "lb" : "kg")}
+          accessibilityRole="button"
+          accessibilityLabel={`Weight unit, ${w.unit}. Tap to switch.`}
+          testID="unit-toggle"
+        >
+          <LiquidSheen tone="neutral" />
+          <Text style={styles.unitText}>{w.unit.toUpperCase()}</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* EXERCISES */}
-      {/* Muscle Groups, History and Insights are FREE surfaces (Direction B entitlement map). */}
-      {seg === "exercises" && (
-        <DraggableSheet peekHeight={230} maxHeight={Math.min(height * 0.82, height - insets.top - 60)} initial="collapsed">
-          <View style={{ flex: 1, paddingHorizontal: 16 }}>
-            {/* This model is colour-coded by the role each muscle plays in the
-                selected category — a different scale from the Insights recovery
-                map, so it states its own key rather than borrowing that one. */}
-            <View style={styles.mgLegend} testID="muscle-groups-legend">
-              <View style={styles.mgLegendItem} accessible accessibilityLabel="Red: prime mover for the selected category">
-                <View style={[styles.mgDot, { backgroundColor: "#FF4438" }]} />
-                <Text style={styles.mgLegendText}>Prime mover</Text>
-              </View>
-              <View style={styles.mgLegendItem} accessible accessibilityLabel="Amber: assisting muscle">
-                <View style={[styles.mgDot, { backgroundColor: "#FFB020" }]} />
-                <Text style={styles.mgLegendText}>Assists</Text>
-              </View>
-              <View style={styles.mgLegendItem} accessible accessibilityLabel="Grey: not targeted by this category">
-                <View style={[styles.mgDot, { backgroundColor: "#3A3D45" }]} />
-                <Text style={styles.mgLegendText}>Not targeted</Text>
-              </View>
-            </View>
-            {/* The row is given an explicit height: as a horizontal scroller inside a
-                flex column it otherwise collapses on the cross axis, which left the
-                chips rendering as empty pills with their labels clipped away. The
-                height also brings each chip up to the 44pt minimum target. */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ flexGrow: 0, flexShrink: 0, height: 44, marginBottom: 10 }}
-              contentContainerStyle={{ flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 4 }}
-            >
-              {CATS.map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[styles.cat, cat === c && styles.catActive]}
-                  onPress={() => setCat(c)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: cat === c }}
-                  accessibilityLabel={`${c} exercises`}
-                  testID={`cat-${c}`}
-                >
-                  <LiquidSheen tone={cat === c ? "accent" : "neutral"} />
-                  <Text numberOfLines={1} style={[styles.catText, cat === c && { color: T.bg }]}>
-                    {c}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-              {list.map((e) => {
-                const meta = getExerciseMeta(e.id);
-                return (
-                  <TouchableOpacity key={e.id} style={styles.exItem} onPress={() => router.push(`/exercise/${e.id}`)} testID={`ex-${e.id}`}>
-                    <LiquidSheen tone="subtle" />
-                    <ExerciseAnimation
-                      exerciseId={e.id}
-                      variant="thumb"
-                      size={42}
-                      fallback={
-                        <View style={[styles.exIcon, { backgroundColor: T.accent + "1A" }]}>
-                          <Ionicons name={meta.icon as any} size={20} color={T.accent} />
-                        </View>
-                      }
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.exItemName}>{e.name}</Text>
-                      <Text style={styles.exItemMeta}>
-                        {meta.difficulty} · {e.equipment} · {e.category}
-                      </Text>
-                    </View>
-                    {w.session ? (
-                      w.hasExercise(e.id) ? (
-                        <View style={styles.addedPill}>
-                          <Ionicons name="checkmark" size={15} color="#3DDC97" />
-                          <Text style={styles.addedText}>Added</Text>
-                        </View>
-                      ) : (
-                        <TouchableOpacity style={styles.addPill} onPress={() => w.addExercise(e.id)} testID={`add-ex-${e.id}`}>
-                          <LiquidSheen tone="accent" />
-                          <Ionicons name="add" size={16} color={T.bg} />
-                          <Text style={styles.addPillText}>Add</Text>
-                        </TouchableOpacity>
-                      )
-                    ) : (
-                      <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </DraggableSheet>
-      )}
-
-      {/* SESSION */}
-      {seg === "session" && (
-        <View style={[styles.full, { paddingTop: insets.top + 56 }]}>
-          {!w.session || w.session.length === 0 ? (
-            <View style={styles.empty}>
-              <EmptyState
-                icon="barbell-outline"
-                title="No workout in progress"
-                body="Start an empty workout, or open a day in your plan to load its exercises."
-                note="Everything you log is saved on this device as you go."
-                primary={{ label: "Start empty workout", onPress: () => w.startWorkout(), testID: "start-empty" }}
-                secondary={{ label: "Browse exercises", onPress: () => selectSeg("exercises"), testID: "browse-ex" }}
-                testID="session-empty"
-              />
-            </View>
-          ) : (
-            <>
+      {/* An empty Workout tab is a dead end, so it never renders one: the
+          redirect above returns to Today, which owns starting a workout. This
+          branch only covers the frame between that decision and the navigation
+          landing. */}
+      {!w.session || w.session.length === 0 ? null : (
+        <View style={styles.full}>
+          <>
               <View style={styles.statsBar}>
                 <LiquidSheen tone="neutral" />
                 <SBStat label="Exercises" value={`${w.session.length}`} styles={styles} />
@@ -298,7 +133,7 @@ export default function WorkoutScreen() {
                 ))}
                 <A11yControl
                   label="Add exercise"
-                  onPress={() => selectSeg("exercises")}
+                  onPress={() => router.push({ pathname: "/(tabs)/library", params: { seg: "exercises" } })}
                   style={styles.addExBtn}
                   testID="add-exercise"
                 >
@@ -335,20 +170,9 @@ export default function WorkoutScreen() {
                   <Text style={styles.finishText}>{finishing ? "Saving…" : "Finish Workout"}</Text>
                 </A11yControl>
               </View>
-            </>
-          )}
+          </>
         </View>
       )}
-
-      {/* INSIGHTS */}
-      {seg === "history" && (
-        <HistoryView
-          scrollPadding={insets.bottom + 96}
-          topPadding={(headerH || insets.top + 64) + 12}
-        />
-      )}
-
-      {seg === "insights" && <InsightsView />}
 
       <RestTimer visible={restVisible} initial={w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />
     </View>
@@ -385,6 +209,7 @@ function SessionCard({
 }) {
   const ex = getExercise(se.exerciseId);
   const bodyweight = isBodyweightEquipment(ex?.equipment);
+  const router = useRouter();
 
   // Completed working sets for THIS exercise, from finished workouts only.
   const perfs = useMemo(
@@ -411,13 +236,31 @@ function SessionCard({
       <LiquidSheen tone={inSuperset ? "accent" : "neutral"} />
       {linkedAbove && (
         <View style={styles.superTag}>
-          <Ionicons name="link" size={11} color={T.secondary} />
+          <Ionicons name="link" size={11} color={T.accent} />
           <Text style={styles.superTagText}>SUPERSET — alternate with the exercise above</Text>
         </View>
       )}
+      {/* The demo is a compact box on the left, not a full-width 16:9 block per
+          exercise: at five exercises that was most of the session's height. Its
+          left, top and bottom gaps are all the card's padding, so the row reads
+          as one square with the two controls beside it. Tapping opens the full
+          form demo on the exercise screen. */}
       <View style={styles.exCardHead}>
+        <TouchableOpacity
+          onPress={() => router.push(`/exercise/${se.exerciseId}`)}
+          accessibilityRole="button"
+          accessibilityLabel={`${ex?.name} form demo`}
+          testID={`ex-thumb-${se.exerciseId}`}
+        >
+          <ExerciseAnimation
+            exerciseId={se.exerciseId}
+            exerciseName={ex?.name}
+            variant="thumb"
+            size={56}
+          />
+        </TouchableOpacity>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-          <Text style={styles.exCardName}>{ex?.name}</Text>
+          <Text style={styles.exCardName} numberOfLines={2}>{ex?.name}</Text>
           {bodyweight && (
             <View style={styles.bwBadge}>
               <Text style={styles.bwBadgeText}>BW</Text>
@@ -435,7 +278,7 @@ function SessionCard({
             testID={`superset-${se.exerciseId}`}
           >
             <LiquidSheen tone={linkedAbove ? "accent" : "neutral"} />
-            <Ionicons name={linkedAbove ? "link" : "link-outline"} size={18} color={linkedAbove ? T.secondary : T.textFaint} />
+            <Ionicons name={linkedAbove ? "link" : "link-outline"} size={18} color={linkedAbove ? T.accent : T.textFaint} />
           </A11yControl>
         )}
         <A11yControl
@@ -448,9 +291,6 @@ function SessionCard({
           <Ionicons name="trash-outline" size={18} color={T.textFaint} />
         </A11yControl>
       </View>
-
-      {/* Form demo with play/pause + replay controls (paused poster by default) */}
-      <ExerciseAnimation exerciseId={se.exerciseId} exerciseName={ex?.name} variant="workout" />
 
       {/* Next target, derived from this exercise's own completed sets. Offered
           only once there is a performance to build on — never invented. */}
@@ -540,7 +380,7 @@ function SessionCard({
             <View style={styles.setActions}>
               {pr ? (
                 <View style={styles.prFlag} testID={`pr-${se.exerciseId}-${idx}`}>
-                  <Ionicons name="trophy" size={13} color={T.secondary} />
+                  <Ionicons name="trophy" size={13} color={T.pr} />
                 </View>
               ) : (
                 <A11yControl
@@ -587,7 +427,7 @@ function SessionCard({
       {/* Named once per card rather than on every row, so the log stays readable. */}
       {firstPR && (
         <View style={styles.prNote} testID={`pr-note-${se.exerciseId}`}>
-          <Ionicons name="trophy" size={13} color={T.secondary} />
+          <Ionicons name="trophy" size={13} color={T.pr} />
           <Text style={styles.prNoteText}>{PR_LABEL[firstPR]} — a new best on this exercise.</Text>
         </View>
       )}
@@ -628,10 +468,14 @@ function SBStat({ label, value, styles }: { label: string; value: string; styles
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
-  full: { ...StyleSheet.absoluteFillObject, backgroundColor: T.bg },
+  // The session is now a normal flex child under the header rather than an
+  // absolutely positioned overlay competing with a floating segmented control.
+  full: { flex: 1, backgroundColor: T.bg },
+  header: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingBottom: 10 },
+  headerTitle: { flex: 1, color: T.text, fontSize: 22, fontWeight: "800" },
   segWrap: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 16, zIndex: 10 },
   seg: { flexDirection: "row", backgroundColor: "transparent", padding: 0, gap: 3 },
-  segBtn: { flex: 1, minHeight: 44, paddingHorizontal: 4, borderRadius: 11, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 5, overflow: "hidden", borderWidth: 1, borderColor: T.border },
+  segBtn: { flex: 1, minHeight: 44, paddingHorizontal: 4, borderRadius: 22, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 5, overflow: "hidden", borderWidth: 1, borderColor: T.border },
   segActive: { backgroundColor: T.accent + "14", borderBottomWidth: 2, borderBottomColor: T.accent },
   segText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
   segTextActive: { color: T.accent },
@@ -648,14 +492,14 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   mgDot: { width: 10, height: 10, borderRadius: 5 },
   mgLegendText: { color: T.textDim, fontSize: 11.5, fontWeight: "600" },
   catText: { color: T.text, fontSize: 13, fontWeight: "700" },
-  exItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 14, padding: 12, marginBottom: 8, overflow: "hidden" },
-  exIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  exItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 12, marginBottom: 8, overflow: "hidden" },
+  exIcon: { width: 42, height: 42, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   exItemName: { color: T.text, fontSize: 15, fontWeight: "700" },
   exItemMeta: { color: T.textFaint, fontSize: 12, marginTop: 2 },
 
   empty: { flex: 1, justifyContent: "center", padding: 16 },
   unitBtn: {
-    minWidth: 44, height: 44, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1,
+    minWidth: 44, height: 44, paddingHorizontal: 10, borderRadius: 22, borderWidth: 1,
     borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center", overflow: "hidden",
   },
   unitText: { color: T.text, fontSize: 13, fontWeight: "800" },
@@ -664,31 +508,32 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   finishErrorWrap: { position: "absolute", left: 16, right: 16 },
   emptyText: { color: T.text, fontSize: 17, fontWeight: "700" },
   emptySub: { color: T.textDim, fontSize: 14, textAlign: "center" },
-  primaryBtn: { backgroundColor: T.accent, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 12, marginTop: 8 },
+  primaryBtn: { backgroundColor: T.accent, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 22, marginTop: 8 },
   primaryBtnText: { color: T.bg, fontSize: 15, fontWeight: "800" },
   ghostBtn: { paddingVertical: 10 },
   ghostText: { color: T.textDim, fontSize: 14, fontWeight: "600" },
 
-  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, paddingVertical: 12, overflow: "hidden" },
+  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surface, borderRadius: 22, borderWidth: 1, borderColor: T.border, paddingVertical: 12, overflow: "hidden" },
   sbStat: { flex: 1, alignItems: "center" },
   sbValue: { color: T.accent, fontSize: 17, fontWeight: "800" },
   sbLabel: { color: T.textFaint, fontSize: 11, marginTop: 2 },
 
-  exCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 14, marginBottom: 12, overflow: "hidden" },
-  exCardSuper: { borderColor: T.secondary + "66" },
-  exCardHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  // 12 all round, so the thumbnail's left gap matches its top and bottom gaps.
+  exCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 12, marginBottom: 10, overflow: "hidden" },
+  exCardSuper: { borderColor: T.accent + "66" },
+  exCardHead: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
   exCardName: { color: T.text, fontSize: 16, fontWeight: "800" },
   headBtn: {
     width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center",
     overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi,
   },
   superTag: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 8 },
-  superTagText: { color: T.secondary, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
+  superTagText: { color: T.accent, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
 
   suggestCard: {
     flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10,
     backgroundColor: T.accent + "14", borderWidth: 1, borderColor: T.accent + "44",
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 22, paddingHorizontal: 12, paddingVertical: 10,
   },
   suggestHeadline: { color: T.text, fontSize: 14, fontWeight: "800" },
   suggestBasis: { color: T.textDim, fontSize: 11.5, marginTop: 2 },
@@ -702,35 +547,35 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   prFlag: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   prNote: {
     flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8,
-    backgroundColor: "rgba(255,176,32,0.12)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7,
+    backgroundColor: T.pr + "1F", borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 7,
   },
-  prNoteText: { color: T.secondary, fontSize: 11.5, fontWeight: "700", flex: 1 },
+  prNoteText: { color: T.pr, fontSize: 11.5, fontWeight: "700", flex: 1 },
 
   setHeadRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
   setHead: { color: T.textFaint, fontSize: 11, fontWeight: "700" },
-  setRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 5 },
+  setRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 3 },
   setRowDone: { opacity: 0.85 },
   setIdxBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   setIdx: { color: T.text, fontSize: 14, fontWeight: "700" },
-  warmPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: T.secondary + "26" },
-  warmPillText: { color: T.secondary, fontSize: 11, fontWeight: "800" },
-  setInput: { flex: 1, minWidth: 0, backgroundColor: T.surfaceHi, borderRadius: 10, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600", borderWidth: 1, borderColor: T.border },
+  warmPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: T.surfaceHi, borderWidth: 1, borderColor: T.border },
+  warmPillText: { color: T.textDim, fontSize: 11, fontWeight: "800" },
+  setInput: { flex: 1, minWidth: 0, backgroundColor: T.surfaceHi, borderRadius: 22, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600", borderWidth: 1, borderColor: T.border },
   // Each control keeps its 18-24px glyph but owns a full 44x44 target.
   setActions: { width: 132, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   setActionBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi },
   removeBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border, backgroundColor: T.surfaceHi },
-  addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 10, backgroundColor: T.surfaceHi, overflow: "hidden", borderWidth: 1, borderColor: T.border },
+  addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 22, backgroundColor: T.surfaceHi, overflow: "hidden", borderWidth: 1, borderColor: T.border },
   addSetText: { color: T.accent, fontSize: 13, fontWeight: "700" },
-  notes: { backgroundColor: T.bg2, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: T.text, fontSize: 14, marginTop: 8, borderWidth: 1, borderColor: T.border },
-  addExBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: T.borderHi, borderStyle: "dashed", overflow: "hidden", backgroundColor: T.surfaceHi },
+  notes: { backgroundColor: T.bg2, borderRadius: 22, paddingHorizontal: 12, paddingVertical: 8, color: T.text, fontSize: 14, marginTop: 8, borderWidth: 1, borderColor: T.border },
+  addExBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 22, borderWidth: 1, borderColor: T.borderHi, borderStyle: "dashed", overflow: "hidden", backgroundColor: T.surfaceHi },
   addExText: { color: T.accent, fontSize: 14, fontWeight: "700" },
   finishBar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 10, backgroundColor: T.bg2, borderTopWidth: 1, borderTopColor: T.border },
-  cancelBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 12, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border },
+  cancelBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 22, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: T.border },
   cancelText: { color: T.textDim, fontSize: 14, fontWeight: "700" },
-  finishBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.accent, borderRadius: 12, paddingVertical: 14, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
+  finishBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: T.accent, borderRadius: 22, paddingVertical: 14, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   finishText: { color: T.bg, fontSize: 15, fontWeight: "800" },
 
-  histCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 16, marginBottom: 12 },
+  histCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 16, marginBottom: 12 },
   histTop: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
   histDate: { color: T.text, fontSize: 16, fontWeight: "800" },
   histDur: { color: T.accent, fontSize: 14, fontWeight: "700" },
@@ -745,12 +590,12 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
 
   histSectionTitle: { color: T.text, fontSize: 15, fontWeight: "800", marginBottom: 10 },
   histSectionEmpty: { color: T.textFaint, fontSize: 13, marginBottom: 4 },
-  calCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 12 },
+  calCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 22, padding: 12 },
   calWeekRow: { flexDirection: "row", marginBottom: 6 },
   calWeekday: { width: `${100 / 7}%`, textAlign: "center", color: T.textFaint, fontSize: 11, fontWeight: "700" },
   calGrid: { flexDirection: "row", flexWrap: "wrap" },
   calCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: "center", justifyContent: "center", paddingVertical: 3 },
-  calDay: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  calDay: { width: 34, height: 34, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   calDayMarked: { backgroundColor: T.accent },
   calDayToday: { borderWidth: 1, borderColor: T.borderHi },
   calDaySel: { backgroundColor: "#3DDC97", borderWidth: 2, borderColor: T.text },

@@ -91,7 +91,7 @@ export default function ReferencesScreen() {
           <LiquidSheen tone="subtle" />
           <Ionicons name="information-circle-outline" size={16} color={T.accent} />
           <Text style={styles.noticeText}>
-            Muscle Map Ai is an educational anatomy and fitness reference. The information below is
+            Muscle Map is an educational anatomy and fitness reference. The information below is
             provided for education only and is not medical advice. Always consult a qualified
             healthcare professional for medical concerns, injuries, or before starting a new
             training programme.
@@ -142,7 +142,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.border,
   },
-  back: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" },
+  back: { width: 40, height: 40, borderRadius: 22, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, alignItems: "center", justifyContent: "center" },
   backPlaceholder: { width: 40, height: 40 },
   headerTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
   notice: {
@@ -152,7 +152,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     backgroundColor: T.surface,
     borderWidth: 1,
     borderColor: T.border,
-    borderRadius: 12,
+    borderRadius: 22,
     padding: 14,
     marginBottom: 20,
     overflow: "hidden",
@@ -168,7 +168,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     backgroundColor: T.surface,
     borderWidth: 1,
     borderColor: T.border,
-    borderRadius: 10,
+    borderRadius: 22,
     paddingHorizontal: 12,
     paddingVertical: 11,
     marginBottom: 6,
