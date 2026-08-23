@@ -17,6 +17,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { liquidShadow } from "@/src/ui/GlassSurface";
+import { useTheme } from "@/src/theme/ThemeContext";
 import Animated, {
   Extrapolation,
   interpolate,
@@ -65,6 +67,10 @@ export function ExerciseStack<T>({
   testID?: string;
 }) {
   const total = items.length;
+  const { mode } = useTheme();
+  // Every card carries the same opaque fill, so depth has to come from the
+  // shadow: without it, overlapping cards of one colour read as a single blob.
+  const cardShadow = useMemo(() => liquidShadow(mode, true), [mode]);
   const progress = useSharedValue(index);
   const start = useSharedValue(index);
   const [heights, setHeights] = useState<Record<string, number>>({});
@@ -130,7 +136,7 @@ export function ExerciseStack<T>({
           const key = keyOf(item);
           const isFront = i === index;
           return (
-            <StackCard key={key} i={i} progress={progress} isFront={isFront} onHeight={(h) => onHeight(key, h)}>
+            <StackCard key={key} i={i} progress={progress} isFront={isFront} shadow={cardShadow} onHeight={(h) => onHeight(key, h)}>
               {renderCard(item, i, isFront)}
             </StackCard>
           );
@@ -144,12 +150,14 @@ function StackCard({
   i,
   progress,
   isFront,
+  shadow,
   onHeight,
   children,
 }: {
   i: number;
   progress: SharedValue<number>;
   isFront: boolean;
+  shadow: object;
   onHeight: (height: number) => void;
   children: React.ReactNode;
 }) {
@@ -170,7 +178,7 @@ function StackCard({
 
   return (
     <Animated.View
-      style={[styles.card, style]}
+      style={[styles.card, shadow, style]}
       pointerEvents={isFront ? "auto" : "none"}
       accessibilityElementsHidden={!isFront}
       importantForAccessibility={isFront ? "auto" : "no-hide-descendants"}

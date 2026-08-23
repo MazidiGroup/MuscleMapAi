@@ -22,7 +22,13 @@ export type Palette = {
   bgRadialFrom: string;   // radial gradient inner (used behind cards)
   bgRadialTo: string;     // radial gradient outer
   // surfaces
-  card: string;           // card fill
+  card: string;           // card fill (translucent — for blurred panels)
+  /**
+   * Opaque card fill. Composites to exactly the same colour as `card` over the
+   * page ground, but without alpha — so cards that OVERLAP (the exercise stack)
+   * do not show each other through.
+   */
+  cardSolid: string;
   cardAlt: string;        // secondary card fill (nested / rest days)
   border: string;         // 1 px card border
   borderDashed: string;   // dashed rest / cool-down border
@@ -55,6 +61,7 @@ const NIGHT: Palette = {
   bgRadialFrom: "#2a211b",
   bgRadialTo: "#0d0b0a",
   card: "rgba(30,26,23,0.78)",
+  cardSolid: "#1a1714",
   cardAlt: "rgba(46,40,35,0.60)",
   border: "rgba(240,228,215,0.14)",
   borderDashed: "rgba(240,228,215,0.09)",
@@ -83,6 +90,7 @@ const DIM: Palette = {
   bgRadialFrom: "#33291f",
   bgRadialTo: "#1b1917",
   card: "rgba(48,43,39,0.76)",
+  cardSolid: "#2b2723",
   cardAlt: "rgba(62,56,50,0.58)",
   border: "rgba(238,229,220,0.15)",
   borderDashed: "rgba(238,229,220,0.10)",
@@ -111,6 +119,7 @@ const DAY: Palette = {
   bgRadialFrom: "#efe7df",
   bgRadialTo: "#f6f3f0",
   card: "rgba(255,255,255,0.82)",
+  cardSolid: "#fdfdfc",
   cardAlt: "rgba(255,255,255,0.55)",
   border: "rgba(60,48,40,0.14)",
   borderDashed: "rgba(60,48,40,0.10)",

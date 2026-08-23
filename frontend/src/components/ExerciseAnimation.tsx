@@ -107,7 +107,7 @@ export function ExerciseAnimation({
         key={attempt}
         source={src}
         style={[styles.thumb, { width: size, height: size }]}
-        contentFit="cover"
+        contentFit="contain"
         transition={100}
         onError={() => setFailed(true)}
         accessibilityLabel={alt}
@@ -126,10 +126,10 @@ export function ExerciseAnimation({
       >
         <View style={[styles.thumb, { width: size, height: size, overflow: "hidden" }]}>
           {media.hasPoster && (
-            <Image source={{ uri: posterUrl(exerciseId) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={100} />
+            <Image source={{ uri: posterUrl(exerciseId) }} style={StyleSheet.absoluteFill} contentFit="contain" transition={100} />
           )}
           {media.hasAnimation && (
-            <AnimationPlayer exerciseId={exerciseId} playing={shouldPlay} contentFit="cover" />
+            <AnimationPlayer exerciseId={exerciseId} playing={shouldPlay} contentFit="contain" />
           )}
           {!shouldPlay && media.hasAnimation && (
             <View style={styles.playBadge}>
@@ -304,16 +304,17 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // The exercise pack ships 720x402 posters and 1936x1072 clips — both ~16:9.
+  // The box matches that, so `contain` fills it edge to edge with no crop and
+  // no letterbox.
   large: {
-    aspectRatio: 16 / 10,
+    aspectRatio: 16 / 9,
     borderRadius: 22,
     backgroundColor: T.bg2,
-    
-    
     overflow: "hidden",
     marginTop: 12,
   },
-  largeWorkout: { aspectRatio: 16 / 9, marginTop: 0, marginBottom: 10 },
+  largeWorkout: { marginTop: 0, marginBottom: 10 },
   controls: { position: "absolute", right: 8, bottom: 8, flexDirection: "row", gap: 8 },
   failed: { alignItems: "center", justifyContent: "center", gap: 8, padding: 16 },
   failedText: { color: T.textDim, fontSize: 12.5, lineHeight: 18, textAlign: "center" },

@@ -601,7 +601,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   h1: { color: T.text, fontSize: 26, fontWeight: "800" },
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
-  search: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surface, borderRadius: 22, paddingHorizontal: 12, height: 44, marginTop: 14 },
+  search: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surface, borderRadius: 22, paddingHorizontal: 12, height: 44, marginTop: 14, overflow: "hidden" },
   searchInput: { flex: 1, color: T.text, fontSize: 15 },
   libSeg: { flexDirection: "row", backgroundColor: "transparent", padding: 0, gap: 3, marginTop: 14 },
   // Page selection is an accent outline on an unchanged fill. Every selector
@@ -646,7 +646,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   aboutText: { color: T.textDim, fontSize: 14, lineHeight: 21 },
   version: { color: T.textFaint, fontSize: 12, marginTop: 12 },
   linkList: { marginTop: 16, gap: 8 },
-  linkRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 13 },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 13, overflow: "hidden" },
   h1Small: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 },
   lessonCard: {
     flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.surface, 

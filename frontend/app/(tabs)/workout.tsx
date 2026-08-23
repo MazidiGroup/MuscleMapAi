@@ -494,17 +494,19 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   bwBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: T.accent + "22" },
   bwBadgeText: { color: T.accent, fontSize: 10.5, fontWeight: "800" },
   finishErrorWrap: { position: "absolute", left: 16, right: 16 },
-  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surface, borderRadius: 22, paddingVertical: 12, overflow: "hidden" },
+  statsBar: { flexDirection: "row", marginHorizontal: 16, backgroundColor: T.surfaceSolid, borderRadius: 22, paddingVertical: 12, overflow: "hidden" },
   sbStat: { flex: 1, alignItems: "center" },
   sbValue: { color: T.accent, fontSize: 17, fontWeight: "800" },
   sbLabel: { color: T.textFaint, fontSize: 11, marginTop: 2 },
 
   // 12 all round, so the thumbnail's left gap matches its top and bottom gaps.
-  exCard: { backgroundColor: T.surface, borderRadius: 22, padding: 12, overflow: "hidden" },
+  // Opaque, not translucent: stack cards sit ON one another, so any alpha
+  // shows the card behind through the one in front.
+  exCard: { backgroundColor: T.surfaceSolid, borderRadius: 22, padding: 12, overflow: "hidden" },
   stackNav: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, marginTop: 12, marginBottom: 12 },
   stackNavBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: T.surfaceHi },
   stackCount: { color: T.textDim, fontSize: 12.5, fontWeight: "700", minWidth: 56, textAlign: "center" },
-  demoCard: { backgroundColor: T.surface, borderRadius: 22, padding: 12, marginBottom: 12, overflow: "hidden" },
+  demoCard: { backgroundColor: T.surfaceSolid, borderRadius: 22, padding: 12, marginBottom: 12, overflow: "hidden" },
   demoTitle: { color: T.textFaint, fontSize: 11, fontWeight: "800", letterSpacing: 0.9 },
   demoName: { color: T.text, fontSize: 15, fontWeight: "800", marginTop: 2, marginBottom: 10 },
   exCardHead: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },

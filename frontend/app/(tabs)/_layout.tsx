@@ -83,7 +83,6 @@ export default function TabsLayout() {
         animation: "fade",
         tabBarButton: (props) => <DeckButton {...props} />,
         tabBarBackground: () => <DeckBackground mode={theme.mode} />,
-        tabBarActiveBackgroundColor: theme.accent + "12",
         tabBarStyle: preOnboarding
           ? { display: "none" }
           : {
@@ -99,6 +98,9 @@ export default function TabsLayout() {
               overflow: "hidden",
               elevation: 0,
             },
+        // No active background: on the deck, selection is carried by
+        // tabBarActiveTintColor alone — the label and icon change colour and
+        // the button behind them never repaints.
         tabBarItemStyle: { borderRadius: 22, marginHorizontal: 2, marginVertical: 3 },
         tabBarLabelStyle: { fontSize: 10, fontWeight: "700", letterSpacing: 0.15 },
         sceneStyle: { backgroundColor: theme.bg },

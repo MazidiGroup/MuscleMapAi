@@ -8,6 +8,8 @@ export type LegacyPalette = {
   bg: string;
   bg2: string;
   surface: string;
+  /** Opaque card fill — for cards that overlap. */
+  surfaceSolid: string;
   surfaceHi: string;
   border: string;
   borderHi: string;
@@ -30,6 +32,7 @@ export function legacyPalette(mode: ThemeMode = DEFAULT_MODE): LegacyPalette {
     bg: p.bg,
     bg2: p.cardAlt,
     surface: p.card,
+    surfaceSolid: p.cardSolid,
     surfaceHi: p.cardAlt,
     border: p.border,
     borderHi: mode === "day" ? "rgba(45,34,27,0.20)" : "rgba(255,244,235,0.20)",
