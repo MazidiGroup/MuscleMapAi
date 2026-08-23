@@ -107,9 +107,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="plan"
         options={{
-          title: "Plan",
+          title: "Today",
           tabBarAccessibilityLabel: tabName("Plan", "plan"),
-          tabBarIcon: ({ color, size }) => <TabIcon name="calendar-outline" size={size} color={color} lockBg={theme.accent} lockFg={theme.ctaText} />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="today-outline" size={size} color={color} lockBg={theme.accent} lockFg={theme.ctaText} />,
         }}
       />
       <Tabs.Screen

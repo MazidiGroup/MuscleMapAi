@@ -27,6 +27,8 @@ import {
 import { legacyPalette, LegacyPalette } from "./ui";
 import { FLAGS } from "@/src/config/featureFlags";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { usePremium } from "@/src/premium/PremiumContext";
+import { canChartPeriod } from "@/src/premium/freeLimits";
 import { A11yControl } from "@/src/ui/A11yControl";
 import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 
@@ -42,16 +44,23 @@ export function InsightsView() {
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
   const { history, prs, unit } = useWorkout();
+  const { resolution } = usePremium();
   const [period, setPeriod] = useState<Period>("week");
 
-  const days = period === "week" ? 7 : 30;
+  // The current week is free; the 30-day view is Premium. Entitlement is read,
+  // never re-derived, and a free account is dropped back to the week rather
+  // than being shown an empty or half-populated chart.
+  const hasPremium = resolution.access;
+  const periodAllowed = canChartPeriod(period === "week" ? 7 : 30, hasPremium);
+  const effectivePeriod: Period = periodAllowed ? period : "week";
+  const days = effectivePeriod === "week" ? 7 : 30;
   const recovery = useMemo(() => computeRecovery(history), [history]);
   const activation = useMemo(() => weeklySetsByGroup(history, days), [history, days]);
   // Discrete rolling 7-day windows — deliberately NOT calendar weeks, and the
   // exact same series feeds the chart and its table alternative.
   const series = useMemo(
-    () => rollingVolumeSeries(history, period === "week" ? 6 : 12),
-    [history, period],
+    () => rollingVolumeSeries(history, effectivePeriod === "week" ? 6 : 12),
+    [history, effectivePeriod],
   );
   const [showTable, setShowTable] = useState(false);
   const stats = useMemo(() => periodStats(history, days), [history, days]);
@@ -112,13 +121,23 @@ export function InsightsView() {
                 {(["week", "month"] as Period[]).map((p) => (
                   <TouchableOpacity
                     key={p}
-                    style={[styles.periodBtn, period === p && styles.periodBtnActive]}
-                    onPress={() => setPeriod(p)}
+                    style={[styles.periodBtn, effectivePeriod === p && styles.periodBtnActive]}
+                    onPress={() => (p === "month" && !hasPremium ? router.push("/(tabs)/coach") : setPeriod(p))}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      p === "month" && !hasPremium
+                        ? "Last 30 days, part of Premium. Opens Premium."
+                        : p === "week" ? "Last 7 days" : "Last 30 days"
+                    }
+                    accessibilityState={{ selected: effectivePeriod === p }}
                     testID={`insights-period-${p}`}
                   >
-                    <Text style={[styles.periodText, period === p && styles.periodTextActive]}>
+                    <Text style={[styles.periodText, effectivePeriod === p && styles.periodTextActive]}>
                       {p === "week" ? "Last 7 days" : "Last 30 days"}
                     </Text>
+                    {p === "month" && !hasPremium ? (
+                      <Ionicons name="lock-closed" size={10} color={T.textFaint} style={{ marginLeft: 4 }} />
+                    ) : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -138,8 +157,8 @@ export function InsightsView() {
                   <Text style={styles.wLabel}>{`Volume (${unit})`}</Text>
                 </View>
                 <View style={styles.wStat}>
-                  <Text style={styles.wValue}>{period === "month" ? stats.perWeek : activation.list.filter((g) => g.sets > 0).length}</Text>
-                  <Text style={styles.wLabel}>{period === "month" ? "Per week" : "Groups hit"}</Text>
+                  <Text style={styles.wValue}>{effectivePeriod === "month" ? stats.perWeek : activation.list.filter((g) => g.sets > 0).length}</Text>
+                  <Text style={styles.wLabel}>{effectivePeriod === "month" ? "Per week" : "Groups hit"}</Text>
                 </View>
               </View>
 
@@ -163,7 +182,7 @@ export function InsightsView() {
           )}
 
           {/* sets per muscle group */}
-          <Text style={styles.section}>{period === "week" ? "Sets This Week" : "Sets Last 30 Days"}</Text>
+          <Text style={styles.section}>{effectivePeriod === "week" ? "Sets This Week" : "Sets Last 30 Days"}</Text>
           {activation.list
             .filter((g) => g.sets > 0)
             .map((g) => (
@@ -179,7 +198,7 @@ export function InsightsView() {
             <View style={styles.neglect}>
               <Ionicons name="alert-circle-outline" size={16} color={T.secondary} />
               <Text style={styles.neglectText}>
-                Not trained {period === "week" ? "this week" : "in the last 30 days"}: {activation.neglected.join(", ")}
+                Not trained {effectivePeriod === "week" ? "this week" : "in the last 30 days"}: {activation.neglected.join(", ")}
               </Text>
             </View>
           )}

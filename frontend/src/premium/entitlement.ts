@@ -103,7 +103,6 @@ export type Surface =
   | "workout.session"
   | "workout.history"
   | "workout.insights"
-  | "workout.muscleGroups"
   | "library.exercises"
   | "library.exerciseDetail"
   | "library.account"
@@ -120,7 +119,6 @@ export const FREE_SURFACES: Surface[] = [
   "workout.session",
   "workout.history",
   "workout.insights",
-  "workout.muscleGroups",
   "library.exercises",
   "library.exerciseDetail",
   "library.account",
@@ -268,7 +266,10 @@ export function classifyRestore(input: { threw?: boolean; entitlementActive?: bo
 export const PAYWALL_COPY = {
   title: "Understand every workout",
   subtitle: "Turn your plan into guidance you can question, adapt and see on the body.",
-  freeReassurance: "Premium is optional. Your current Plan, workouts, History, Insights and exercise library stay available.",
+  // Must describe the free tier EXACTLY as the app behaves. Free History and
+  // Insights are capped (see freeLimits.ts), so this no longer promises all of
+  // either — an inaccurate free promise is an App Store risk, not just bad copy.
+  freeReassurance: "Premium is optional. Your Plan, workouts, recent History, this week's Insights and the exercise library stay free.",
   selectPrompt: "Choose an option to continue",
   ctaUnselected: "Select an option",
   cta: (_label: string) => "Unlock Premium",

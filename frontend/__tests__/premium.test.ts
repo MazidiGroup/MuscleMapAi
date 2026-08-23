@@ -135,7 +135,6 @@ test("exactly four surfaces are Premium and the Direction B free set is untouche
     "workout.session",
     "workout.history",
     "workout.insights",
-    "workout.muscleGroups",
     "library.exercises",
     "library.exerciseDetail",
     "library.account",

@@ -25,6 +25,7 @@ import type { PlanDay, PlanExerciseEntry } from "./exercises";
 import { posterUrl } from "@/src/anatomy/media";
 import { useWorkout } from "@/src/anatomy/workoutStore";
 import { isCountableSet } from "@/src/anatomy/setRules";
+import { startOfWeek, weekSummary } from "@/src/history/metrics";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { LiquidSheen } from "@/src/ui/GlassSurface";
 import { ThemeSwitcher } from "@/src/ui/ThemeSwitcher";
@@ -46,6 +47,23 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
   const activeDone = (w.session || []).reduce((a, e) => a + e.sets.filter(isCountableSet).length, 0);
   const todayIdx = (new Date().getDay() + 6) % 7;
   const todayDay = days[todayIdx];
+  const todayLabel = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }).toUpperCase();
+
+  // This week's totals come from completed History only, so an open session
+  // never inflates them and a rebuilt plan never resets them.
+  const week = weekSummary(w.history);
+  const weekStart = startOfWeek(Date.now());
+  const weekWorkouts = w.history.filter((x) => x.date >= weekStart);
+  const weekSets = weekWorkouts.reduce(
+    (a, x) => a + x.exercises.reduce((b, e) => b + e.sets.filter(isCountableSet).length, 0),
+    0,
+  );
+  const weekVolume = Math.round(
+    weekWorkouts.reduce(
+      (a, x) => a + x.exercises.reduce((b, e) => b + e.sets.filter(isCountableSet).reduce((c, st) => c + st.weight * st.reps, 0), 0),
+      0,
+    ),
+  );
 
   // A session started under a previous plan must not be advertised as part of
   // this week. The seed changes whenever the plan is regenerated, so a mismatch
@@ -60,23 +78,32 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
   return (
     <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={styles.wpScroll}>
       <View style={styles.wpHeader}>
-        <Text style={[styles.wpTitle, { color: T.text }]}>Your weekly plan</Text>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <TouchableOpacity
-            style={[styles.adjustBtn, { backgroundColor: T.accent }]}
-            onPress={() => setAdjusting(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Adjust plan"
-            testID="wp-adjust"
-          >
-            <LiquidSheen tone="accent" />
-            <Ionicons name="options-outline" size={14} color={T.ctaText} />
-            <Text style={[styles.adjustText, { color: T.ctaText }]}>Adjust plan</Text>
-          </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.wpEyebrow, { color: T.textFaint }]}>{todayLabel}</Text>
+          <Text style={[styles.wpTitle, { color: T.text }]}>Today</Text>
         </View>
+        <TouchableOpacity
+          style={[styles.adjustBtn, { backgroundColor: T.cardAlt, borderWidth: 1, borderColor: T.border }]}
+          onPress={() => setAdjusting(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Adjust plan"
+          testID="wp-adjust"
+        >
+          <LiquidSheen tone="neutral" />
+          <Ionicons name="options-outline" size={14} color={T.text2} />
+          <Text style={[styles.adjustText, { color: T.text2 }]}>Adjust plan</Text>
+        </TouchableOpacity>
       </View>
 
-      <ThemeSwitcher compact style={{ marginTop: 8 }} />
+      {/* Where the week actually stands, before anything is asked of the user. */}
+      <View style={[styles.summaryRow, { backgroundColor: T.card, borderColor: T.border }]} testID="today-summary">
+        <LiquidSheen tone="neutral" />
+        <SummaryStat value={String(week.count)} label={week.count === 1 ? "workout" : "workouts"} T={T} styles={styles} />
+        <View style={[styles.summaryDivider, { backgroundColor: T.border }]} />
+        <SummaryStat value={String(weekSets)} label="sets logged" T={T} styles={styles} />
+        <View style={[styles.summaryDivider, { backgroundColor: T.border }]} />
+        <SummaryStat value={`${weekVolume}`} label={`${w.unit} volume`} T={T} styles={styles} />
+      </View>
 
       <View style={styles.chipsRow}>
         <Chip label={GOAL_LABEL[answers.goal]} />
@@ -143,7 +170,27 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
         </View>
       ) : null}
 
-      <View style={{ gap: 10, marginTop: 20 }}>
+      <View style={styles.progressRow}>
+        <ProgressLink
+          icon="calendar-outline"
+          label="History"
+          onPress={() => router.push("/history")}
+          testID="today-history"
+          T={T}
+          styles={styles}
+        />
+        <ProgressLink
+          icon="stats-chart-outline"
+          label="Insights"
+          onPress={() => router.push("/insights")}
+          testID="today-insights"
+          T={T}
+          styles={styles}
+        />
+      </View>
+
+      <Text style={[styles.sectionHead, { color: T.textFaint }]}>THIS WEEK</Text>
+      <View style={{ gap: 10 }}>
         {days.map((day, i) => (
           <DayCard key={i} day={day} onPress={() => !day.rest && onOpenDay(i)} />
         ))}
@@ -168,6 +215,34 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
         onPreview={previewPremium}
       />
     </ScrollView>
+  );
+}
+
+function SummaryStat({ value, label, T, styles }: { value: string; label: string; T: any; styles: any }) {
+  return (
+    <View style={styles.summaryStat}>
+      <Text style={[styles.summaryValue, { color: T.text }]}>{value}</Text>
+      <Text style={[styles.summaryLabel, { color: T.textMuted }]}>{label}</Text>
+    </View>
+  );
+}
+
+function ProgressLink({
+  icon, label, onPress, testID, T, styles,
+}: { icon: any; label: string; onPress: () => void; testID: string; T: any; styles: any }) {
+  return (
+    <TouchableOpacity
+      style={[styles.progressLink, { backgroundColor: T.card, borderColor: T.border }]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      testID={testID}
+    >
+      <LiquidSheen tone="neutral" />
+      <Ionicons name={icon} size={17} color={T.accent} />
+      <Text style={[styles.progressLinkText, { color: T.text }]}>{label}</Text>
+      <Ionicons name="chevron-forward" size={15} color={T.textFaint} />
+    </TouchableOpacity>
   );
 }
 
@@ -539,6 +614,24 @@ function SwapSheet({ visible, currentId, excludeIds, onDismiss, onPick }: {
 // ---- Styles --------------------------------------------------------------
 const styles = StyleSheet.create({
   wpScroll: { padding: 20, paddingTop: 56, paddingBottom: 40 },
+  wpEyebrow: { fontSize: 11, fontWeight: "800", letterSpacing: 0.9 },
+  sectionHead: { fontSize: 11, fontWeight: "800", letterSpacing: 0.9, marginTop: 22, marginBottom: 10 },
+  summaryRow: {
+    flexDirection: "row", alignItems: "center", marginTop: 14,
+    borderRadius: 22, overflow: "hidden", paddingVertical: 14,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: "transparent",
+  },
+  summaryStat: { flex: 1, alignItems: "center", gap: 2 },
+  summaryValue: { fontSize: 19, fontWeight: "800" },
+  summaryLabel: { fontSize: 11, fontWeight: "600" },
+  summaryDivider: { width: StyleSheet.hairlineWidth, height: 26 },
+  progressRow: { flexDirection: "row", gap: 10, marginTop: 18 },
+  progressLink: {
+    flex: 1, flexDirection: "row", alignItems: "center", gap: 8,
+    minHeight: 52, paddingHorizontal: 14, borderRadius: 22,
+    borderWidth: 1, overflow: "hidden",
+  },
+  progressLinkText: { flex: 1, fontSize: 14, fontWeight: "700" },
   wpHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingBottom: 8,

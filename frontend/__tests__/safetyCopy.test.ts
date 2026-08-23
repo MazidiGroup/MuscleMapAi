@@ -167,7 +167,7 @@ test("no legacy-adoption UI exists on any implemented surface", () => {
   }
 });
 
-test("History and Insights stay Workout-tab segments — no sixth tab was added", () => {
+test("History and Insights are stack routes off Today — no sixth tab was added", () => {
   const tabs = fs.readFileSync(path.join(ROOT, "app/(tabs)/_layout.tsx"), "utf8");
   const screens = [...tabs.matchAll(/<Tabs\.Screen\s+name="([^"]+)"([\s\S]*?)\/>/g)]
     .filter((m) => !/href:\s*null/.test(m[2]))
@@ -175,8 +175,22 @@ test("History and Insights stay Workout-tab segments — no sixth tab was added"
   assert.deepEqual(screens, ["plan", "workout", "coach", "explore", "library"]);
   assert.equal(screens.length, 5, `expected five tabs, found ${screens.join(", ")}`);
   assert.ok(!screens.includes("history"));
+  assert.ok(!screens.includes("insights"));
+
+  // History and Insights used to be two of four segments inside the Workout
+  // tab, which hid four unrelated destinations behind one control. They are now
+  // their own stack screens, reached from Today, where progress belongs. The
+  // tab bar is unchanged at five, which is what this test exists to protect.
+  assert.ok(fs.existsSync(path.join(ROOT, "app/history.tsx")), "History is its own screen");
+  assert.ok(fs.existsSync(path.join(ROOT, "app/insights.tsx")), "Insights is its own screen");
+  const plan = fs.readFileSync(path.join(ROOT, "src/plan/PlanViews.tsx"), "utf8");
+  assert.ok(plan.includes('router.push("/history")'), "Today reaches History");
+  assert.ok(plan.includes('router.push("/insights")'), "Today reaches Insights");
+
+  // The Workout tab is the live session and nothing else.
   const workout = fs.readFileSync(path.join(ROOT, "app/(tabs)/workout.tsx"), "utf8");
-  assert.ok(/"session", "history", "insights", "exercises"/.test(workout), "History is a Workout-tab segment");
+  assert.ok(!/type Seg =/.test(workout), "the Workout tab no longer carries segments");
+  assert.ok(!/HistoryView|InsightsView|AnatomyViewer/.test(workout), "no other destination renders inside Workout");
 });
 
 test("no Premium lock is attached to an individual exercise row", () => {

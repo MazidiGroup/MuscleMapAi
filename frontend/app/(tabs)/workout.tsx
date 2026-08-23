@@ -1,17 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 
-import { AnatomyViewer } from "@/src/anatomy/AnatomyViewer";
-import { DraggableSheet } from "@/src/anatomy/DraggableSheet";
 import { RestTimer } from "@/src/anatomy/RestTimer";
-import { InsightsView } from "@/src/anatomy/InsightsView";
-import { HistoryView } from "@/src/history/HistoryView";
-import { EXERCISES, getExercise } from "@/src/anatomy/exercises";
-import { getExerciseMeta } from "@/src/anatomy/gymGuide";
+import { getExercise } from "@/src/anatomy/exercises";
 import { useWorkout, workoutStats, type SessionExercise } from "@/src/anatomy/workoutStore";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
@@ -24,18 +19,14 @@ import type { Workout } from "@/src/anatomy/workoutScope";
 import type { WeightUnit } from "@/src/units/unitPreference";
 import type { Goal } from "@/src/plan/exercises";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { CARD_RADIUS, R } from "@/src/theme/tokens";
-import { EmptyState, ErrorBanner } from "@/src/ui/state";
+import { R } from "@/src/theme/tokens";
+import { ErrorBanner } from "@/src/ui/state";
 import { A11yControl } from "@/src/ui/A11yControl";
 import { LiquidSheen } from "@/src/ui/GlassSurface";
-
-type Seg = "session" | "history" | "insights" | "exercises";
-const CATS = ["All", "Push", "Pull", "Legs", "Core", "Upper", "Lower", "Mobility"];
 
 export default function WorkoutScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { height } = useWindowDimensions();
   const params = useLocalSearchParams<{ seg?: string; ex?: string }>();
   const w = useWorkout();
   // Progression targets follow the rep range the plan was built around.
@@ -45,24 +36,17 @@ export default function WorkoutScreen() {
   const T = useMemo(() => legacyPalette(mode), [mode]);
   const styles = useMemo(() => makeStyles(T), [T]);
 
-  const [seg, setSeg] = useState<Seg>("session");
-  const [cat, setCat] = useState("All");
   const [restVisible, setRestVisible] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
-  // The segmented header floats above the content, so its REAL height (it wraps to
-  // two lines on narrow screens) is what pushes a scrolling segment clear of it.
-  const [headerH, setHeaderH] = useState(0);
-
+  // An empty Workout tab has nothing to offer, so it hands back to Today rather
+  // than presenting a dead end. `replace` keeps it out of the back stack: a
+  // finished workout must not bounce the user back into an empty session.
   useEffect(() => {
-    if (["exercises", "session", "history", "insights"].includes(String(params.seg))) setSeg(params.seg as Seg);
-  }, [params.seg]);
-  // Tapping a segment keeps the URL honest, so the segment a user is looking at is
-  // the segment a reload or a shared link reopens.
-  const selectSeg = (next: Seg) => {
-    setSeg(next);
-    router.setParams({ seg: next });
-  };
+    if (isFocused && (!w.session || w.session.length === 0) && !finishing) {
+      router.replace("/(tabs)/plan");
+    }
+  }, [isFocused, w.session, finishing, router]);
   useEffect(() => {
     if (params.ex) w.addExercise(String(params.ex));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,28 +57,8 @@ export default function WorkoutScreen() {
   // — otherwise the modal stays mounted over whatever the user opens next and
   // swallows their taps.
   useEffect(() => {
-    if (!w.session || seg !== "session" || !isFocused) setRestVisible(false);
-  }, [w.session, seg, isFocused]);
-
-  const list = useMemo(() => {
-    return EXERCISES.filter((e) => {
-      if (cat === "All") return true;
-      if (cat === "Upper") return e.category === "Push" || e.category === "Pull";
-      if (cat === "Lower") return e.category === "Legs";
-      if (cat === "Mobility") return e.category === "Mobility";
-      return e.category === cat;
-    });
-  }, [cat]);
-
-  const catHighlight = useMemo(() => {
-    const p = new Set<string>();
-    const s = new Set<string>();
-    list.forEach((e) => {
-      e.primary.forEach((m) => p.add(m));
-      e.secondary.forEach((m) => s.add(m));
-    });
-    return { primary: [...p], secondary: [...s].filter((m) => !p.has(m)) };
-  }, [list]);
+    if (!w.session || !isFocused) setRestVisible(false);
+  }, [w.session, isFocused]);
 
   const stats = w.session ? workoutStats(w.session) : { sets: 0, completed: 0, reps: 0, volume: 0 };
 
@@ -121,161 +85,31 @@ export default function WorkoutScreen() {
 
   return (
     <View style={styles.root}>
-      {seg === "exercises" && <AnatomyViewer mode="workout" primary={catHighlight.primary} secondary={catHighlight.secondary} />}
-
-      {/* segmented header */}
-      <View
-        style={[
-          styles.segWrap,
-          {
-            paddingTop: insets.top + 8,
-            // The scrolling segments pass their content UNDER this floating header,
-            // so it needs an opaque backing or rows bleed through above it. Muscle
-            // Groups keeps it transparent: the 3D scene is meant to show through.
-            paddingBottom: 8,
-            backgroundColor: seg === "exercises" ? "transparent" : T.bg,
-            pointerEvents: "box-none",
-          },
-        ]}
-        onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <View style={[styles.seg, { flex: 1 }]}>
-            {(["session", "history", "insights", "exercises"] as Seg[]).map((s) => (
-              <TouchableOpacity key={s} style={[styles.segBtn, seg === s && styles.segActive]} onPress={() => selectSeg(s)} testID={`seg-${s}`}>
-                <LiquidSheen tone={seg === s ? "accent" : "subtle"} />
-                <Text style={[styles.segText, seg === s && styles.segTextActive]}>
-                  {s === "session" ? "Session" : s === "history" ? "History" : s === "insights" ? "Insights" : "Muscle Groups"}
-                </Text>
-                {s === "session" && w.session && w.session.length > 0 && <View style={styles.dot} />}
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TouchableOpacity
-            style={styles.unitBtn}
-            onPress={() => w.setUnit(w.unit === "kg" ? "lb" : "kg")}
-            accessibilityRole="button"
-            accessibilityLabel={`Weight unit, ${w.unit}. Tap to switch.`}
-            testID="unit-toggle"
-          >
-            <LiquidSheen tone="neutral" />
-            <Text style={styles.unitText}>{w.unit.toUpperCase()}</Text>
-          </TouchableOpacity>
-        </View>
+      {/* One destination, one header. The Workout tab is the live session and
+          nothing else — Muscle Groups, History and Insights each moved to where
+          they belong, so this tab no longer hides four screens behind a
+          segmented control. */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Text style={styles.headerTitle}>Workout</Text>
+        <TouchableOpacity
+          style={styles.unitBtn}
+          onPress={() => w.setUnit(w.unit === "kg" ? "lb" : "kg")}
+          accessibilityRole="button"
+          accessibilityLabel={`Weight unit, ${w.unit}. Tap to switch.`}
+          testID="unit-toggle"
+        >
+          <LiquidSheen tone="neutral" />
+          <Text style={styles.unitText}>{w.unit.toUpperCase()}</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* EXERCISES */}
-      {/* Muscle Groups, History and Insights are FREE surfaces (Direction B entitlement map). */}
-      {seg === "exercises" && (
-        <DraggableSheet peekHeight={230} maxHeight={Math.min(height * 0.82, height - insets.top - 60)} initial="collapsed">
-          <View style={{ flex: 1, paddingHorizontal: 16 }}>
-            {/* This model is colour-coded by the role each muscle plays in the
-                selected category — a different scale from the Insights recovery
-                map, so it states its own key rather than borrowing that one. */}
-            <View style={styles.mgLegend} testID="muscle-groups-legend">
-              <View style={styles.mgLegendItem} accessible accessibilityLabel="Red: prime mover for the selected category">
-                <View style={[styles.mgDot, { backgroundColor: "#FF4438" }]} />
-                <Text style={styles.mgLegendText}>Prime mover</Text>
-              </View>
-              <View style={styles.mgLegendItem} accessible accessibilityLabel="Amber: assisting muscle">
-                <View style={[styles.mgDot, { backgroundColor: "#FFB020" }]} />
-                <Text style={styles.mgLegendText}>Assists</Text>
-              </View>
-              <View style={styles.mgLegendItem} accessible accessibilityLabel="Grey: not targeted by this category">
-                <View style={[styles.mgDot, { backgroundColor: "#3A3D45" }]} />
-                <Text style={styles.mgLegendText}>Not targeted</Text>
-              </View>
-            </View>
-            {/* The row is given an explicit height: as a horizontal scroller inside a
-                flex column it otherwise collapses on the cross axis, which left the
-                chips rendering as empty pills with their labels clipped away. The
-                height also brings each chip up to the 44pt minimum target. */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ flexGrow: 0, flexShrink: 0, height: 44, marginBottom: 10 }}
-              contentContainerStyle={{ flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 4 }}
-            >
-              {CATS.map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[styles.cat, cat === c && styles.catActive]}
-                  onPress={() => setCat(c)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: cat === c }}
-                  accessibilityLabel={`${c} exercises`}
-                  testID={`cat-${c}`}
-                >
-                  <LiquidSheen tone={cat === c ? "accent" : "neutral"} />
-                  <Text numberOfLines={1} style={[styles.catText, cat === c && { color: T.bg }]}>
-                    {c}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-              {list.map((e) => {
-                const meta = getExerciseMeta(e.id);
-                return (
-                  <TouchableOpacity key={e.id} style={styles.exItem} onPress={() => router.push(`/exercise/${e.id}`)} testID={`ex-${e.id}`}>
-                    <LiquidSheen tone="subtle" />
-                    <ExerciseAnimation
-                      exerciseId={e.id}
-                      variant="thumb"
-                      size={42}
-                      fallback={
-                        <View style={[styles.exIcon, { backgroundColor: T.accent + "1A" }]}>
-                          <Ionicons name={meta.icon as any} size={20} color={T.accent} />
-                        </View>
-                      }
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.exItemName}>{e.name}</Text>
-                      <Text style={styles.exItemMeta}>
-                        {meta.difficulty} · {e.equipment} · {e.category}
-                      </Text>
-                    </View>
-                    {w.session ? (
-                      w.hasExercise(e.id) ? (
-                        <View style={styles.addedPill}>
-                          <Ionicons name="checkmark" size={15} color="#3DDC97" />
-                          <Text style={styles.addedText}>Added</Text>
-                        </View>
-                      ) : (
-                        <TouchableOpacity style={styles.addPill} onPress={() => w.addExercise(e.id)} testID={`add-ex-${e.id}`}>
-                          <LiquidSheen tone="accent" />
-                          <Ionicons name="add" size={16} color={T.bg} />
-                          <Text style={styles.addPillText}>Add</Text>
-                        </TouchableOpacity>
-                      )
-                    ) : (
-                      <Ionicons name="chevron-forward" size={18} color={T.textFaint} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </DraggableSheet>
-      )}
-
-      {/* SESSION */}
-      {seg === "session" && (
-        <View style={[styles.full, { paddingTop: insets.top + 56 }]}>
-          {!w.session || w.session.length === 0 ? (
-            <View style={styles.empty}>
-              <EmptyState
-                icon="barbell-outline"
-                title="No workout in progress"
-                body="Start an empty workout, or open a day in your plan to load its exercises."
-                note="Everything you log is saved on this device as you go."
-                primary={{ label: "Start empty workout", onPress: () => w.startWorkout(), testID: "start-empty" }}
-                secondary={{ label: "Browse exercises", onPress: () => selectSeg("exercises"), testID: "browse-ex" }}
-                testID="session-empty"
-              />
-            </View>
-          ) : (
-            <>
+      {/* An empty Workout tab is a dead end, so it never renders one: the
+          redirect above returns to Today, which owns starting a workout. This
+          branch only covers the frame between that decision and the navigation
+          landing. */}
+      {!w.session || w.session.length === 0 ? null : (
+        <View style={styles.full}>
+          <>
               <View style={styles.statsBar}>
                 <LiquidSheen tone="neutral" />
                 <SBStat label="Exercises" value={`${w.session.length}`} styles={styles} />
@@ -299,7 +133,7 @@ export default function WorkoutScreen() {
                 ))}
                 <A11yControl
                   label="Add exercise"
-                  onPress={() => selectSeg("exercises")}
+                  onPress={() => router.push({ pathname: "/(tabs)/library", params: { seg: "exercises" } })}
                   style={styles.addExBtn}
                   testID="add-exercise"
                 >
@@ -336,20 +170,9 @@ export default function WorkoutScreen() {
                   <Text style={styles.finishText}>{finishing ? "Saving…" : "Finish Workout"}</Text>
                 </A11yControl>
               </View>
-            </>
-          )}
+          </>
         </View>
       )}
-
-      {/* INSIGHTS */}
-      {seg === "history" && (
-        <HistoryView
-          scrollPadding={insets.bottom + 96}
-          topPadding={(headerH || insets.top + 64) + 12}
-        />
-      )}
-
-      {seg === "insights" && <InsightsView />}
 
       <RestTimer visible={restVisible} initial={w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />
     </View>
@@ -629,7 +452,11 @@ function SBStat({ label, value, styles }: { label: string; value: string; styles
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
-  full: { ...StyleSheet.absoluteFillObject, backgroundColor: T.bg },
+  // The session is now a normal flex child under the header rather than an
+  // absolutely positioned overlay competing with a floating segmented control.
+  full: { flex: 1, backgroundColor: T.bg },
+  header: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingBottom: 10 },
+  headerTitle: { flex: 1, color: T.text, fontSize: 22, fontWeight: "800" },
   segWrap: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 16, zIndex: 10 },
   seg: { flexDirection: "row", backgroundColor: "transparent", padding: 0, gap: 3 },
   segBtn: { flex: 1, minHeight: 44, paddingHorizontal: 4, borderRadius: 22, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 5, overflow: "hidden", borderWidth: 1, borderColor: T.border },
