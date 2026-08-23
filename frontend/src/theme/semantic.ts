@@ -33,6 +33,7 @@ export type SemanticTokens = {
   color: {
     bg: string;
     surface: string;
+    surfaceSolid: string;
     surfaceAlt: string;
     border: string;
     borderSubtle: string;
@@ -99,6 +100,7 @@ export function semanticTokens(palette: Palette): SemanticTokens {
     color: {
       bg: palette.bg,
       surface: palette.card,
+      surfaceSolid: palette.cardSolid,
       surfaceAlt: palette.cardAlt,
       border: palette.border,
       borderSubtle: palette.borderDashed,
