@@ -1,4 +1,4 @@
-// Branded loading screen — matches the Muscle Map AI loading design for both
+// Branded loading screen — matches the Muscle Map loading design for both
 // Night and Day mode. Shown during session restore / store hydration.
 //
 // Pulsing logo + gradient wordmark + three staggered pulsing dots.

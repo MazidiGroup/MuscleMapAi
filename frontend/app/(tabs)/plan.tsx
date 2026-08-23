@@ -1,4 +1,4 @@
-// Plan tab — the primary screen of Muscle Map AI.
+// Plan tab — the primary screen of Muscle Map.
 //
 // State machine (persisted per owner in `planStore`):
 //   step 0            → Welcome (two actions only)

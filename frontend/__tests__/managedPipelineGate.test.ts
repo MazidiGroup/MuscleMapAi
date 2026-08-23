@@ -439,7 +439,7 @@ test("RC6.1 — local mode accepts the committed version with the committed slug
   assert.equal(app.ios.bundleIdentifier, "com.mazidigroup.apexai");
   assert.equal(app.android.package, "com.mazidigroup.apexai");
   assert.equal(app.scheme, "apexai");
-  assert.equal(app.name, "Muscle Map Ai");
+  assert.equal(app.name, "Muscle Map");
   assert.equal(app.ios.buildNumber, "3");
   assert.equal(app.android.versionCode, 3);
   assert.equal(app.updates, undefined, "no Expo Updates configuration");

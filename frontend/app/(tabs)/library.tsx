@@ -88,10 +88,10 @@ export default function LibraryScreen() {
     }
     if (Platform.OS === "web") {
       // eslint-disable-next-line no-alert
-      if (window.confirm("Log out of Muscle Map Ai?")) logout();
+      if (window.confirm("Log out of Muscle Map?")) logout();
       return;
     }
-    Alert.alert("Log out", "Log out of Muscle Map Ai?", [
+    Alert.alert("Log out", "Log out of Muscle Map?", [
       { text: "Cancel", style: "cancel" },
       { text: "Log Out", style: "destructive", onPress: () => logout() },
     ]);
@@ -144,7 +144,7 @@ export default function LibraryScreen() {
     };
     if (Platform.OS === "web") {
       // eslint-disable-next-line no-alert
-      if (window.confirm("Delete your Muscle Map Ai account?")) step2();
+      if (window.confirm("Delete your Muscle Map account?")) step2();
       return;
     }
     Alert.alert(
@@ -492,7 +492,7 @@ export default function LibraryScreen() {
 
             <Text style={[styles.aboutTitle, { marginTop: 22 }]}>About</Text>
             <Text style={styles.aboutText}>
-              Muscle Map Ai — explore a life-size 3D muscle model with 270 named structures,
+              Muscle Map — explore a life-size 3D muscle model with 270 named structures,
               build a personalized weekly workout plan, and track your training.
             </Text>
             {/* Read from the app config rather than typed here, so the About

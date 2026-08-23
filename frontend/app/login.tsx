@@ -86,7 +86,7 @@ export default function LoginScreen() {
             <LiquidSheen tone="neutral" />
             <Image source={require("../assets/images/icon.png")} style={styles.logo} />
           </View>
-          <Text style={styles.appName}>Muscle Map Ai</Text>
+          <Text style={styles.appName}>Muscle Map</Text>
           <Text style={styles.tagline}>Learn the body. Train it smarter.</Text>
         </View>
 

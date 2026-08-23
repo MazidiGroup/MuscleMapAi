@@ -22,7 +22,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>{title} — Muscle Map Ai</title>
+<title>{title} — Muscle Map</title>
 <style>
   :root {{ color-scheme: dark; }}
   body {{
@@ -44,19 +44,19 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
   <div class="wrap">
-    <div class="brand">Muscle Map Ai</div>
+    <div class="brand">Muscle Map</div>
     <h1>{title}</h1>
     <div class="updated">Last updated: {updated}</div>
     {body}
     <div class="footer">
-      &copy; Muscle Map Ai · Questions: <a href="mailto:{email}">{email}</a>
+      &copy; Muscle Map · Questions: <a href="mailto:{email}">{email}</a>
     </div>
   </div>
 </body>
 </html>"""
 
 _PRIVACY_BODY = f"""
-<p>Muscle Map Ai ("the app") respects your privacy. This policy explains what data the app
+<p>Muscle Map ("the app") respects your privacy. This policy explains what data the app
 handles and how it is used. We designed the app to keep your personal data on your device
 wherever possible.</p>
 
@@ -106,7 +106,7 @@ the date at the top of this page.</p>
 
 _TERMS_BODY = f"""
 <h2>Acceptance</h2>
-<p>By downloading, installing or using Muscle Map Ai (the app), you agree to be bound by these
+<p>By downloading, installing or using Muscle Map (the app), you agree to be bound by these
 Terms of Use (Terms) and by Apple's Standard End User License Agreement (EULA), which applies to
 all apps distributed through the Apple App Store:
 <a href="{APPLE_EULA_URL}">Apple Standard EULA</a>.</p>
@@ -117,7 +117,7 @@ the app on any Apple-branded product that you own or control, solely for persona
 non-commercial use, subject to these Terms.</p>
 
 <h2>Subscriptions and Auto-Renewal</h2>
-<p>Muscle Map Ai offers auto-renewing subscriptions (Premium) that unlock the AI Coach, Learn
+<p>Muscle Map offers auto-renewing subscriptions (Premium) that unlock the AI Coach, Learn
 lessons, recovery insights and other premium features. Subscription titles, lengths and prices
 are displayed on the in-app paywall before purchase and match the products published on the
 App Store.</p>
@@ -156,7 +156,7 @@ Terms.</p>
 express, implied or statutory, to the maximum extent permitted by law.</p>
 
 <h2>Limitation of Liability</h2>
-<p>To the maximum extent permitted by law, Muscle Map Ai and its publisher are not liable for
+<p>To the maximum extent permitted by law, Muscle Map and its publisher are not liable for
 any indirect, incidental, special, consequential or punitive damages arising out of or in
 connection with your use of the app.</p>
 

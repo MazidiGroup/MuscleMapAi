@@ -1,4 +1,4 @@
-// Design tokens for the Muscle Map AI redesign (graphite + copper, Aug 2026).
+// Design tokens for the Muscle Map redesign (graphite + copper, Aug 2026).
 //
 // The app supports three persisted appearance modes. Day is a warm paper
 // canvas; Night is a warm near-black premium treatment; Dim sits between them

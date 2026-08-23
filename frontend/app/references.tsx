@@ -91,7 +91,7 @@ export default function ReferencesScreen() {
           <LiquidSheen tone="subtle" />
           <Ionicons name="information-circle-outline" size={16} color={T.accent} />
           <Text style={styles.noticeText}>
-            Muscle Map Ai is an educational anatomy and fitness reference. The information below is
+            Muscle Map is an educational anatomy and fitness reference. The information below is
             provided for education only and is not medical advice. Always consult a qualified
             healthcare professional for medical concerns, injuries, or before starting a new
             training programme.
