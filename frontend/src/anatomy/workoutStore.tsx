@@ -22,6 +22,10 @@ import { usePlanStore } from "@/src/plan/planStore";
 import { canMarkDone, isCountableSet, isWorkingSet, setVolume } from "./setRules";
 import { openingSets, plannedRepsFrom } from "./progression";
 import { exercisePerformances } from "@/src/history/metrics";
+import { WATCH_SCHEMA_VERSION, WatchAck } from "@/src/watch/protocol";
+import { routeEnvelope } from "@/src/watch/bridge";
+import { knowsExercise } from "@/src/watch/catalogue";
+import { persistWatchLedger, readWatchLedger } from "@/src/watch/store";
 
 export type LoggedSet = {
   id: string;
@@ -142,6 +146,11 @@ export function muscleActivation(exs: SessionExercise[]): { list: Activation[]; 
 
 type Ctx = {
   session: SessionExercise[] | null;
+  /**
+   * The active session's stable id, or null when none is running. This is the
+   * identity a paired watch binds its events to, so it must be the real one.
+   */
+  sessionId: string | null;
   startedAt: number | null;
   /**
    * Plan seed the active session was started under, or null when unknown
@@ -174,6 +183,11 @@ type Ctx = {
   setRestPref: (n: number) => void;
   finish: () => Promise<FinishResult>;
   cancel: () => void;
+  /**
+   * Applies one batch of Apple Watch events and returns the acknowledgement the
+   * watch's outbox needs before it may drop them.
+   */
+  receiveWatchEnvelope: (raw: unknown, entitled: boolean) => Promise<WatchAck>;
   /** The one stored weight unit for Workout and History. */
   unit: WeightUnit;
   setUnit: (u: WeightUnit) => void;
@@ -204,7 +218,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [hydratedFor, setHydratedFor] = useState<string | null>(null);
   const [readFailed, setReadFailed] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
+  // The active session's id, held in BOTH a ref and state on purpose: effects
+  // read it synchronously, and the watch link needs it to re-render with. It is
+  // the identity a watch binds its events to, so a placeholder here would make
+  // two different workouts look like the same one.
   const sessionIdRef = useRef<string | null>(null);
+  const [sessionId, setSessionIdState] = useState<string | null>(null);
+  const setSessionId = useCallback((id: string | null) => {
+    sessionIdRef.current = id;
+    setSessionIdState(id);
+  }, []);
   // The plan seed the session was started under, so a session that outlived a
   // plan regeneration can be identified instead of silently advertised as
   // belonging to the new week.
@@ -222,7 +245,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setUnitState("kg");
     setHydratedFor(null);
     setReadFailed(false);
-    sessionIdRef.current = null;
+    setSessionId(null);
     setSessionPlanSeed(null);
     if (!ready || !owner) return;
 
@@ -246,7 +269,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setRestPrefState(snap.restPref);
       setUnitState(snap.unit);
       if (snap.active) {
-        sessionIdRef.current = snap.active.sessionId;
+        setSessionId(snap.active.sessionId);
         setSession(
           snap.active.exercises.map((e) => ({
             exerciseId: e.exerciseId,
@@ -275,14 +298,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (hydratedFor !== ownerKey || !token || !owner) return;
     if (session === null) {
-      sessionIdRef.current = null;
+      setSessionId(null);
       clearActiveSession(store, owner).catch(() => {});
       return;
     }
-    if (!sessionIdRef.current) sessionIdRef.current = `s_${Date.now().toString(36)}_${uid()}`;
+    const id = sessionIdRef.current ?? `s_${Date.now().toString(36)}_${uid()}`;
+    if (id !== sessionIdRef.current) setSessionId(id);
     const payload = buildActiveSession(
       token,
-      sessionIdRef.current,
+      id,
       startedAt ?? Date.now(),
       session,
       Date.now,
@@ -485,7 +509,18 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     [store, token],
   );
 
-  const finish = useCallback(async (): Promise<FinishResult> => {
+  /**
+   * The commit itself, taking the exercises explicitly rather than reading them
+   * from the closure. The watch path applies a batch of events and has to finish
+   * THAT result, which a callback closed over the previous render's `session`
+   * would not yet have seen.
+   */
+  const commitSession = useCallback(async (
+    sess: SessionExercise[] | null,
+    began: number | null,
+  ): Promise<FinishResult> => {
+    const session = sess;
+    const startedAt = began;
     if (!session || session.length === 0) return { ok: false, reason: "empty_session" };
     if (!token || !owner) return { ok: false, reason: "unresolved_owner" };
 
@@ -508,18 +543,93 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
     setHistory(res.history);
     setPRs(res.prs);
-    sessionIdRef.current = null;
+    setSessionId(null);
     setSession(null);
     setStartedAt(null);
     setSessionPlanSeed(null);
     return { ok: true, workout, newPRs };
-  }, [session, startedAt, history, prs, store, token, owner, unit]);
+  }, [history, prs, store, token, owner, unit]);
+
+  const finish = useCallback(
+    () => commitSession(session, startedAt),
+    [commitSession, session, startedAt],
+  );
 
   const cancel = useCallback(() => {
     setSession(null);
     setStartedAt(null);
     setSessionPlanSeed(null);
   }, []);
+
+  // Envelopes are handled one at a time. Two arriving together would otherwise
+  // both read the same ledger, both decide the same event was new, and write the
+  // same set twice — the exact duplication the event ids exist to prevent.
+  const watchQueue = useRef<Promise<unknown>>(Promise.resolve());
+
+  /**
+   * Applies a batch of Apple Watch events and returns the acknowledgement the
+   * watch's outbox needs before it may forget them.
+   *
+   * The rules live in `@/src/watch`; this is the adapter that gives them the
+   * live session, persists the ledger and runs the app's own finish path when
+   * the watch ended the workout. `entitled` is the phone's answer — the watch's
+   * claim about its own entitlement is never taken at face value.
+   */
+  const receiveWatchEnvelope = useCallback(
+    (raw: unknown, entitled: boolean): Promise<WatchAck> => {
+      const run = watchQueue.current.then(async (): Promise<WatchAck> => {
+        const empty: WatchAck = { schema: WATCH_SCHEMA_VERSION, envelopeId: "", accepted: [], rejected: [] };
+        if (!token || !owner) return empty;
+
+        const ledger = await readWatchLedger(store, owner);
+        if (!sessionIdRef.current && session) setSessionId(`s_${Date.now().toString(36)}_${uid()}`);
+        const current =
+          session && sessionIdRef.current
+            ? buildActiveSession(
+                token,
+                sessionIdRef.current,
+                startedAt ?? Date.now(),
+                session,
+                Date.now,
+                sessionPlanSeed ?? undefined,
+              )
+            : null;
+
+        const result = routeEnvelope(raw, {
+          session: current,
+          ledger,
+          ctx: {
+            sessionUnit: unit,
+            entitled,
+            knowsExercise,
+            ownerKind: token.kind,
+            ownerId: token.id,
+            now: Date.now(),
+          },
+        });
+
+        // The ledger is written BEFORE the acknowledgement goes back, so a crash
+        // between the two costs a retry the phone recognises rather than a set
+        // the watch has already forgotten.
+        await persistWatchLedger(store, token, result.ledger).catch(() => {});
+
+        if (result.session) {
+          setSessionId(result.session.sessionId);
+          if (result.finished) {
+            await commitSession(result.session.exercises, result.session.startedAt);
+          } else {
+            setSession(result.session.exercises);
+            setStartedAt(result.session.startedAt);
+          }
+        }
+        return result.ack;
+      });
+      // Failures must not wedge the queue for every later envelope.
+      watchQueue.current = run.catch(() => undefined);
+      return run;
+    },
+    [commitSession, owner, session, sessionPlanSeed, startedAt, store, token, unit],
+  );
 
   // Keep the Plan tick in sync with the Session in BOTH directions: a plan-linked
   // exercise is ticked when every set is done, and un-ticked if a set is removed
@@ -548,6 +658,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       session,
+      sessionId,
       startedAt,
       sessionPlanSeed,
       restPref,
@@ -569,13 +680,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setRestPref,
       finish,
       cancel,
+      receiveWatchEnvelope,
       unit,
       setUnit,
       hydrated: hydratedFor === ownerKey,
       readFailed,
       retryRead,
     }),
-    [addExercise, addExerciseFromPlan, addSet, cancel, deleteSet, duplicateSet, finish, hasExercise, history, hydratedFor, ownerKey, prs, readFailed, removeExercise, restPref, retryRead, session, sessionPlanSeed, setNotes, setRestPref, setUnit, startWorkout, startedAt, toggleDone, toggleSuperset, toggleWarmup, unit, updateSet],
+    [addExercise, addExerciseFromPlan, addSet, cancel, deleteSet, duplicateSet, finish, hasExercise, history, hydratedFor, ownerKey, prs, readFailed, receiveWatchEnvelope, removeExercise, restPref, retryRead, session, sessionId, sessionPlanSeed, setNotes, setRestPref, setUnit, startWorkout, startedAt, toggleDone, toggleSuperset, toggleWarmup, unit, updateSet],
   );
 
   return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>;

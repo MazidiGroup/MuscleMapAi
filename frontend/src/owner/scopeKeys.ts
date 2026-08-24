@@ -41,6 +41,13 @@ export const DOMAINS = [
   "restPref",
   "activeSession",
   "unitPreference",
+  /**
+   * Apple Watch synchronisation state: the ledger of events already applied and
+   * the sessions recently closed. Owner-scoped like everything else, so one
+   * account's watch backlog can never be applied under another's, and so
+   * account deletion removes it with the rest of the namespace.
+   */
+  "watchSync",
 ] as const;
 
 export type Domain = (typeof DOMAINS)[number];
@@ -58,6 +65,7 @@ export const DOMAIN_SCHEMA_VERSION: Record<Domain, number> = {
   restPref: 1,
   activeSession: 1,
   unitPreference: 1,
+  watchSync: 1,
 };
 
 /** Migration/adoption contract version. */

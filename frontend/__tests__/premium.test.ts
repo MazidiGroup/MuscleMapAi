@@ -128,8 +128,11 @@ test("an owner switch that clears entitlement state removes access immediately",
 
 // --- gating contract --------------------------------------------------------
 
-test("exactly four surfaces are Premium and the Direction B free set is untouched", () => {
-  assert.deepEqual([...PREMIUM_SURFACES].sort(), ["coach", "explore", "library.learn", "library.muscles"]);
+test("the Premium set is the four frozen areas plus the watch, and the free set is untouched", () => {
+  assert.deepEqual(
+    [...PREMIUM_SURFACES].sort(),
+    ["coach", "explore", "library.learn", "library.muscles", "watch.session"],
+  );
   for (const free of [
     "plan",
     "workout.session",
@@ -171,13 +174,20 @@ test("Premium surfaces lock, show loading, or allow — never anything else", ()
 
 // --- paywall copy -----------------------------------------------------------
 
-test("the paywall value list contains only the four frozen Premium areas", () => {
-  assert.equal(PREMIUM_VALUE_ITEMS.length, 4);
+test("the paywall value list contains only Premium areas", () => {
+  assert.equal(PREMIUM_VALUE_ITEMS.length, 5);
   const text = PREMIUM_VALUE_ITEMS.map((v) => `${v.label} ${v.desc}`).join(" ").toLowerCase();
   assert.ok(text.includes("3d anatomy"));
   assert.ok(text.includes("coach"));
   assert.ok(text.includes("muscles"));
   assert.ok(text.includes("learn"));
+  assert.ok(text.includes("apple watch"));
+});
+
+test("iPhone workout logging stays free — only the watch is Premium", () => {
+  assert.equal(isPremiumSurface("workout.session"), false);
+  assert.ok(FREE_SURFACES.includes("workout.session"));
+  assert.equal(isPremiumSurface("watch.session"), true);
 });
 
 test("no free area is advertised as Premium", () => {

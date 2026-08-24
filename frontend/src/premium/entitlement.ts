@@ -109,10 +109,26 @@ export type Surface =
   | "explore"
   | "coach"
   | "library.muscles"
-  | "library.learn";
+  | "library.learn"
+  | "watch.session";
 
-/** Frozen Direction B Premium set — exactly four surfaces. */
-export const PREMIUM_SURFACES: Surface[] = ["explore", "coach", "library.muscles", "library.learn"];
+/**
+ * The Premium set: the four frozen Direction B surfaces, plus the Apple Watch
+ * companion.
+ *
+ * The watch is listed here rather than gated separately so that Siri, Shortcuts,
+ * a deep link and the watch's own controls all resolve through `gate()` like
+ * every other surface. Note what did NOT change: `workout.session` is still
+ * free. Logging a workout on the iPhone is free and stays free; the premium
+ * thing is doing it from the wrist.
+ */
+export const PREMIUM_SURFACES: Surface[] = [
+  "explore",
+  "coach",
+  "library.muscles",
+  "library.learn",
+  "watch.session",
+];
 
 export const FREE_SURFACES: Surface[] = [
   "plan",
@@ -148,6 +164,7 @@ export const PREMIUM_VALUE_ITEMS: { icon: string; label: string; desc: string }[
   { icon: "cube", label: "See what every movement trains", desc: "Rotate, isolate and inspect the body in interactive 3D anatomy" },
   { icon: "body", label: "Understand every muscle", desc: "Explore how muscles function and move, highlighted in 3D" },
   { icon: "school", label: "Learn workout anatomy", desc: "Build lasting knowledge with lessons and quizzes" },
+  { icon: "watch", label: "Log sets from Apple Watch", desc: "Say the reps or turn the crown, phone left in your bag" },
 ];
 
 /** Copy that must never appear in the Premium value list (these areas are Free). */
@@ -309,12 +326,16 @@ export const PAYWALL_COPY = {
   },
 } as const;
 
-/** Human names for the four Premium areas, used by the locked value path. */
-export const PREMIUM_AREA_NAMES: Record<"explore" | "coach" | "library.muscles" | "library.learn", string> = {
+/** Human names for the Premium areas, used by the locked value path. */
+export const PREMIUM_AREA_NAMES: Record<
+  "explore" | "coach" | "library.muscles" | "library.learn" | "watch.session",
+  string
+> = {
   explore: "The 3D anatomy explorer",
   coach: "AI Coach",
   "library.muscles": "The Muscle library",
   "library.learn": "Guided lessons",
+  "watch.session": "Apple Watch logging",
 };
 
 /** Outcome-led entry copy for each locked surface. */
@@ -334,5 +355,9 @@ export const PREMIUM_ENTRY_COPY: Record<keyof typeof PREMIUM_AREA_NAMES, { title
   "library.learn": {
     title: "Learn the anatomy that makes training click",
     body: "Build practical knowledge with guided lessons and short quizzes.",
+  },
+  "watch.session": {
+    title: "Run your whole session from your wrist",
+    body: "Say how many reps you did, or turn the Digital Crown. Your sets reach your iPhone on their own, even if you trained without a signal.",
   },
 };

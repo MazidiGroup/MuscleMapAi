@@ -55,7 +55,8 @@
           }
         }
       ],
-      "expo-video"
+      "expo-video",
+      "./plugins/withWatchTarget"
     ],
     "experiments": {
       "typedRoutes": true

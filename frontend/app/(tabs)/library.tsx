@@ -444,6 +444,20 @@ export default function LibraryScreen() {
                 <Text style={[styles.linkRowText, { flex: 0, color: T.textDim }]}>{advancedOn ? "On" : "Off"}</Text>
                 <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
               </TouchableOpacity>
+              {/* Shown to everyone, subscriber or not: the screen explains the
+                  feature and routes a purchase to the paywall, rather than
+                  hiding a Premium feature from the people who would buy it. */}
+              <TouchableOpacity
+                style={styles.linkRow}
+                onPress={() => router.push("/watch")}
+                accessibilityRole="button"
+                accessibilityLabel="Apple Watch logging"
+                testID="open-watch-settings"
+              >
+                <Ionicons name="watch-outline" size={18} color={T.accent} />
+                <Text style={styles.linkRowText}>Apple Watch</Text>
+                <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+              </TouchableOpacity>
               {!user ? (
                 <TouchableOpacity style={styles.linkRow} onPress={() => router.push("/login")} testID="signin-btn">
                   <Ionicons name="log-in-outline" size={18} color={T.accent} />

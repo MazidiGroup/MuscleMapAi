@@ -16,14 +16,17 @@ import { LayoutSkeleton, StatusAnnouncement } from "@/src/ui/state";
 
 import { Paywall } from "./Paywall";
 import { usePremium } from "./PremiumContext";
-import { PREMIUM_ENTRY_COPY, Surface, gate, isPremiumSurface } from "./entitlement";
+import { PREMIUM_AREA_NAMES, PREMIUM_ENTRY_COPY, Surface, gate, isPremiumSurface } from "./entitlement";
+
+/** Every surface that has locked-state copy, so the two can never drift apart. */
+export type GateableSurface = Extract<Surface, keyof typeof PREMIUM_AREA_NAMES>;
 
 export function PremiumGate({
   surface,
   children,
   headerOffset = 0,
 }: {
-  surface: Extract<Surface, "explore" | "coach" | "library.muscles" | "library.learn">;
+  surface: GateableSurface;
   children: React.ReactNode;
   headerOffset?: number;
 }) {

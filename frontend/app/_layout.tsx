@@ -9,6 +9,7 @@ import { enableScreens } from "react-native-screens";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { WorkoutProvider } from "@/src/anatomy/workoutStore";
 import { PremiumProvider } from "@/src/premium/PremiumContext";
+import { WatchLink } from "@/src/watch/WatchLink";
 import { RootErrorBoundary } from "@/src/ui/RootErrorBoundary";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
 import { OwnerProvider, useOwner } from "@/src/owner/OwnerContext";
@@ -124,6 +125,10 @@ export default function RootLayout() {
             <OwnerProvider>
               <WorkoutProvider>
                 <PremiumProvider>
+                  {/* Renders nothing. Keeps a paired Apple Watch in step with
+                      the session and applies what it records. Inert with no
+                      watch, and on every platform that has no watch at all. */}
+                  <WatchLink />
                   <ThemeProvider>
                     <ThemedStack />
                   </ThemeProvider>
