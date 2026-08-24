@@ -157,9 +157,19 @@ test("undo on the watch still confirms before it removes anything", () => {
 test("the intents are adapters — none of them decides anything", () => {
   const body = code(INTENTS);
   assert.match(body, /WatchStore\.shared\.run\(/, "every intent routes to the one command path");
-  // Declaring the accepted range to App Intents is fine — it is the shared
-  // constant, and it lets Siri re-ask instead of the app refusing. Running the
-  // check here would be a second copy of the rule.
+  // Declaring the accepted range to App Intents is fine — it lets Siri re-ask
+  // instead of the app refusing. Running the check here would be a second copy
+  // of the rule.
+  //
+  // The range cannot NAME the shared constant: `inclusiveRange` is macro-
+  // expanded and rejects anything that is not a compile-time literal
+  // ("expect a compile-time constant literal"), which is why this reads as two
+  // numbers in the Swift. Pin them to the specification so the unavoidable
+  // second copy cannot drift.
+  const range = /inclusiveRange:\s*\((\d+),\s*(\d+)\)/.exec(INTENTS);
+  assert.ok(range, "LogSetIntent must declare the accepted rep range to App Intents");
+  assert.equal(Number(range![1]), MIN_REPS, "the declared minimum must be the shared MIN_REPS");
+  assert.equal(Number(range![2]), MAX_REPS, "the declared maximum must be the shared MAX_REPS");
   assert.equal(/isValidReps|\.isValid\b/.test(body), false, "an intent must not validate");
   assert.equal(/WatchRules\./.test(body), false, "an intent must not reach past the store into the reducer");
 });

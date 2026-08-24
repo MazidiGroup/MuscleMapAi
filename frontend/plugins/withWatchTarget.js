@@ -152,6 +152,18 @@ function withWatchXcodeTarget(config) {
     // be a child of the iPhone app's.
     const bundleId = `${appBundleId}.watchkitapp`;
 
+    // `addTarget` registers the app -> watch dependency itself, but
+    // `addTargetDependency` wraps that work in
+    // `if (pbxContainerItemProxySection && pbxTargetDependencySection)` and
+    // returns quietly when either is absent. A managed Expo project has one
+    // target and no dependencies, so neither section exists and the dependency
+    // was being dropped in silence — leaving an "Embed Watch Content" phase
+    // with nothing ordered before it. Create the sections first so the
+    // library's own call lands.
+    const objects = project.hash.project.objects;
+    objects.PBXTargetDependency = objects.PBXTargetDependency || {};
+    objects.PBXContainerItemProxy = objects.PBXContainerItemProxy || {};
+
     const target = project.addTarget(TARGET_NAME, "watch2_app", TARGET_NAME, bundleId);
 
     // A single-target watch app (watchOS 7+, `WKApplication` in the plist) is a
@@ -164,8 +176,12 @@ function withWatchXcodeTarget(config) {
     project.addBuildPhase([], "PBXResourcesBuildPhase", "Resources", target.uuid);
     project.addBuildPhase([], "PBXFrameworksBuildPhase", "Frameworks", target.uuid);
 
+    // Only the plist is listed here. `addSourceFile` below creates its own file
+    // reference AND the Sources build-phase entry, so naming the Swift files
+    // here as well produced two references per file — the compiled one and a
+    // stray duplicate.
     const group = project.addPbxGroup(
-      [...SWIFT_SOURCES, `${TARGET_NAME}-Info.plist`],
+      [`${TARGET_NAME}-Info.plist`],
       TARGET_NAME,
       TARGET_NAME,
     );
@@ -181,8 +197,24 @@ function withWatchXcodeTarget(config) {
       }
     }
 
+    // The path is relative to the GROUP, and the group already carries
+    // `path = MuscleMapWatch`. Prefixing the target name again produced
+    // `MuscleMapWatch/MuscleMapWatch/Model.swift` — seven file references that
+    // resolved to nothing, sitting in the Sources phase where they are the only
+    // copies the compiler ever sees.
     for (const file of SWIFT_SOURCES) {
-      project.addSourceFile(`${TARGET_NAME}/${file}`, { target: target.uuid }, group.uuid);
+      project.addSourceFile(file, { target: target.uuid }, group.uuid);
+    }
+
+    // The dependency is what orders the watch build before the embed phase, so
+    // assert it rather than trusting a call that is documented to fail quietly.
+    const appTarget = project.getFirstTarget();
+    const dependencies = project.pbxNativeTargetSection()[appTarget.uuid]?.dependencies || [];
+    if (dependencies.length === 0) {
+      throw new Error(
+        "[withWatchTarget] the iPhone target has no dependency on the watch app; " +
+          "'Embed Watch Content' would copy an unbuilt product.",
+      );
     }
 
     applyBuildSettings(project, target.uuid, {

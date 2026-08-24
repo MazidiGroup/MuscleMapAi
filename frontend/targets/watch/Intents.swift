@@ -68,7 +68,16 @@ struct LogSetIntent: AppIntent {
     "Records a set against the exercise you are on. Say a weight to change it at the same time.")
   static var openAppWhenRun = false
 
-  @Parameter(title: "Reps", inclusiveRange: (Double(WatchLimits.minReps), Double(WatchLimits.maxReps)))
+  // Two SDK constraints, both discovered by compiling:
+  //   · the range is typed as the parameter is, and `reps` is an Int (matching
+  //     `Number.isInteger(reps)` in protocol.ts), so a (Double, Double) range
+  //     does not type-check against `Int.ValueType`;
+  //   · `inclusiveRange` is macro-expanded and rejects anything that is not a
+  //     compile-time literal, so `WatchLimits.minReps` cannot be named here.
+  // The literals are therefore a second copy of the constant, and
+  // __tests__/watchParity.test.ts pins them to MIN_REPS/MAX_REPS so the copy
+  // cannot drift from the specification.
+  @Parameter(title: "Reps", inclusiveRange: (1, 200))
   var reps: Int
 
   /// Optional: with no weight the set inherits the working weight, which is the
