@@ -292,7 +292,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [ownerKey, ready, owner, store, reloadNonce]);
+  }, [ownerKey, ready, owner, setSessionId, store, reloadNonce]);
 
   // Persist the active session so an interruption cannot lose it. One key per
   // owner means one active session per owner.
@@ -314,7 +314,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       sessionPlanSeed ?? undefined,
     );
     persistActiveSession(store, token, payload).catch(() => {});
-  }, [session, startedAt, hydratedFor, ownerKey, token, owner, store, sessionPlanSeed]);
+  }, [session, startedAt, hydratedFor, ownerKey, token, owner, setSessionId, store, sessionPlanSeed]);
 
   /**
    * Records which plan a session belongs to, exactly once per session. Mirrors
@@ -549,7 +549,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setStartedAt(null);
     setSessionPlanSeed(null);
     return { ok: true, workout, newPRs };
-  }, [history, prs, store, token, owner, unit]);
+  }, [history, prs, store, token, owner, setSessionId, unit]);
 
   const finish = useCallback(
     () => commitSession(session, startedAt),
@@ -655,7 +655,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       watchQueue.current = run.catch(() => undefined);
       return run;
     },
-    [commitSession, owner, session, sessionPlanSeed, startedAt, store, token, unit],
+    [commitSession, owner, session, sessionPlanSeed, setSessionId, startedAt, store, token, unit],
   );
 
   // Keep the Plan tick in sync with the Session in BOTH directions: a plan-linked
