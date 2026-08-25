@@ -35,7 +35,13 @@ import {
   parseWatchEnvelope,
   parseWatchEvent,
 } from "../src/watch/protocol";
-import { buildContextPayload, isNewerPayload, mergeSnapshot } from "../src/watch/snapshot";
+import {
+  REVISION_TICKS_PER_MS,
+  buildContextPayload,
+  isNewerPayload,
+  mergeSnapshot,
+  nextRevision,
+} from "../src/watch/snapshot";
 import { emptySnapshot } from "../src/watch/session";
 
 const NOW = 1_700_000_000_000;
@@ -431,6 +437,53 @@ test("the snapshot carries only completed sets and no notes", () => {
   assert.equal(payload.session?.exercises[0].sets.length, 1, "an empty row is not a result");
   assert.equal(payload.session?.exercises[0].name, "Bench Press");
   assert.equal(JSON.stringify(payload).includes("notes"), false);
+});
+
+test("a revision survives the JS instance being replaced", () => {
+  // The bug this pins: the counter lived in a useRef, so a Metro reload or an
+  // app relaunch restarted it at 1 while the WATCH still held the high-water
+  // mark from the previous instance. Every payload after the restart was then
+  // silently below it and dropped — a phone verified as Premium while the watch
+  // stayed locked until someone force-quit the watch app.
+  // A long run: thousands of pushes, arriving in bursts across real time the
+  // way a session actually produces them. A raw-millisecond floor would let the
+  // counter climb past the clock here; the scaled one absorbs the bursts.
+  let revision = 0;
+  let clock = NOW;
+  for (let i = 0; i < 3000; i++) {
+    if (i % 10 === 0) clock += 1; // ten pushes inside one millisecond
+    revision = nextRevision(revision, clock);
+  }
+  const beforeRestart = revision;
+  assert.ok(beforeRestart >= NOW * REVISION_TICKS_PER_MS, "the scaled clock is the floor");
+
+  // A fresh instance starts from zero one millisecond later and must still land
+  // above everything the old one could have sent.
+  const afterRestart = nextRevision(0, clock + 1);
+  assert.ok(afterRestart > beforeRestart, "a restart must not go backwards");
+  assert.equal(isNewerPayload(beforeRestart, { revision: afterRestart } as never), true);
+
+  // And it stays inside the range a double represents exactly, so neither JSON
+  // nor Swift's Int rounds two distinct revisions together.
+  assert.ok(afterRestart < Number.MAX_SAFE_INTEGER);
+  assert.equal(Number.isSafeInteger(afterRestart), true);
+});
+
+test("the clock floor absorbs any burst a UI can actually produce", () => {
+  // The guarantee, stated exactly: a whole millisecond of pushes still lands
+  // below the NEXT millisecond's floor. Exceeding it would need a thousand
+  // pushes inside one millisecond, which React cannot do — and if that ever
+  // changed, this is the number to raise.
+  let revision = 0;
+  for (let i = 0; i < REVISION_TICKS_PER_MS; i++) revision = nextRevision(revision, NOW);
+  assert.ok(revision <= (NOW + 1) * REVISION_TICKS_PER_MS, "a full millisecond of pushes stays under the next floor");
+});
+
+test("two pushes in the same millisecond still differ", () => {
+  const first = nextRevision(0, NOW);
+  const second = nextRevision(first, NOW);
+  assert.equal(second, first + 1, "strictly increasing within a run, not merely non-decreasing");
+  assert.ok(isNewerPayload(first, { revision: second } as never));
 });
 
 test("an older application context is discarded by revision", () => {

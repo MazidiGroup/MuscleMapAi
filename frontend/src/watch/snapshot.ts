@@ -50,8 +50,11 @@ export type SnapshotSession = {
 export type WatchContextPayload = {
   schema: number;
   /**
-   * Monotonic per phone install. Application context has no ordering guarantee,
-   * so an older payload arriving after a newer one is discarded by number.
+   * Strictly increasing for the life of the INSTALL, not the life of a JS
+   * instance. Application context has no ordering guarantee, so the watch
+   * discards anything not newer than what it has applied — which makes a
+   * counter that restarts at zero a trap rather than an optimisation. See
+   * `nextRevision`.
    */
   revision: number;
   sentAt: number;
@@ -289,6 +292,40 @@ function reconcile(base: WatchSnapshot, payload: WatchContextPayload, input: Mer
     exercises,
     currentIndex: Math.min(nextIndex, Math.max(0, exercises.length - 1)),
   };
+}
+
+/**
+ * Sub-divisions of a millisecond available to the in-run counter.
+ *
+ * The floor is the wall clock SCALED, not the raw clock, and the scale is the
+ * whole point: `previous + 1` has to be able to advance many times inside one
+ * millisecond without ever climbing past the next millisecond's floor. At 1000
+ * it would take a thousand pushes in a single millisecond to outrun it, which
+ * React cannot do. Raw milliseconds are not enough — a busy run really can push
+ * a few thousand times, ending several "milliseconds" ahead of the clock, and a
+ * restart inside that window lands underneath the old high-water mark and
+ * strands the watch all over again.
+ */
+export const REVISION_TICKS_PER_MS = 1000;
+
+/**
+ * The next revision number to send.
+ *
+ * Taking the scaled wall clock as a floor is what makes it survive a restart. A
+ * plain counter in memory restarts at zero every time the JS instance is
+ * replaced — a Metro reload, an app relaunch, an update — while the WATCH is
+ * still holding the high-water mark from the previous instance. Every payload
+ * after the restart is then quietly below it and discarded, and the watch
+ * follows the phone no further until someone force-quits the watch app. That was
+ * observed on a simulator: a phone verified as Premium while the watch sat
+ * locked indefinitely.
+ *
+ * `previous + 1` keeps it strictly increasing within a run, so two pushes in the
+ * same millisecond still differ; the scaled clock guarantees a fresh run starts
+ * above every value the old one could have reached.
+ */
+export function nextRevision(previous: number, now: number): number {
+  return Math.max(previous + 1, now * REVISION_TICKS_PER_MS);
 }
 
 /**

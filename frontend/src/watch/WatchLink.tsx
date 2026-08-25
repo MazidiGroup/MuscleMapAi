@@ -34,7 +34,7 @@ import {
 } from "@/modules/watch-link";
 
 import { exerciseName } from "./catalogue";
-import { buildContextPayload } from "./snapshot";
+import { buildContextPayload, nextRevision } from "./snapshot";
 
 /**
  * The rep target the plan set for an exercise, if it set one.
@@ -65,7 +65,7 @@ function planTargetReps(exerciseId: string): number {
 const REVERIFY_INTERVAL_MS = 15 * 60 * 1000;
 
 export function WatchLink() {
-  const { session, sessionId, startedAt, unit, restPref, receiveWatchEnvelope } = useWorkout();
+  const { session, sessionId, startedAt, unit, restPref, hydrated, receiveWatchEnvelope } = useWorkout();
   const { resolution } = usePremium();
   const { token } = useOwner();
   const [, setState] = useState<WatchLinkState>(UNSUPPORTED);
@@ -84,6 +84,11 @@ export function WatchLink() {
 
   const push = useCallback(() => {
     if (!isWatchLinkAvailable || !token) return;
+    // Nothing may be sent until THIS owner's scope has hydrated. On an owner
+    // switch the token changes a render before the store clears the previous
+    // owner's session, and a child effect runs before its parent's — so pushing
+    // here would describe the last account's workout under the new one.
+    if (!hydrated) return;
     // A session with no id yet is one render away from having one. Sending it
     // under a placeholder would give two different workouts the same identity,
     // and the watch binds its events to exactly that value.
@@ -100,7 +105,7 @@ export function WatchLink() {
     // reads as "never verified" and answers with the wrong locked screen.
     const confirmedAt = resolution.state === "ready" ? verifiedAt || Date.now() : verifiedAt;
 
-    revision.current += 1;
+    revision.current = nextRevision(revision.current, Date.now());
     const payload = buildContextPayload({
       session: active,
       unit,
@@ -112,7 +117,7 @@ export function WatchLink() {
       targetRepsFor: (exerciseId) => planTargetReps(exerciseId),
     });
     updateApplicationContext(payload as unknown as Record<string, unknown>);
-  }, [resolution.access, resolution.state, restPref, session, sessionId, startedAt, token, unit, verifiedAt]);
+  }, [hydrated, resolution.access, resolution.state, restPref, session, sessionId, startedAt, token, unit, verifiedAt]);
 
   // Out: a new snapshot whenever anything the watch renders has changed.
   useEffect(() => {
