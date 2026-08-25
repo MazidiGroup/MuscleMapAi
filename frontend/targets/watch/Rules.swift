@@ -166,13 +166,16 @@ enum AccessBasis: String {
   case verified, cached
   case activeSessionGrace = "active_session_grace"
   case neverVerified = "never_verified"
+  // Spelled out even though Swift would infer it: the parity test matches the
+  // wire string literally, and an inferred raw value is invisible to it.
+  case unconfirmed = "unconfirmed"
   case expiredCache = "expired_cache"
   case notPremium = "not_premium"
   case loading
 
   /// Whether the denial is "reconnect", not "upgrade". Purchases are on iPhone.
   var needsPhone: Bool {
-    self == .loading || self == .neverVerified || self == .expiredCache
+    self == .loading || self == .neverVerified || self == .unconfirmed || self == .expiredCache
   }
 
   var copy: String {
@@ -181,6 +184,13 @@ enum AccessBasis: String {
     case .loading: return NSLocalizedString("Checking your Premium access on your iPhone…", comment: "")
     case .neverVerified:
       return NSLocalizedString("Open Muscle Map on your iPhone once to set up watch logging.", comment: "")
+    case .unconfirmed:
+      // The phone answered and the answer was "I could not check". Naming the
+      // connection is the only thing the user can act on; telling them to open
+      // an app they are holding is not.
+      return NSLocalizedString(
+        "Your iPhone could not confirm your Premium access. Check its connection, then try again.",
+        comment: "")
     case .expiredCache:
       return NSLocalizedString("Reconnect to your iPhone to confirm your Premium access.", comment: "")
     case .notPremium:
@@ -207,6 +217,12 @@ func watchAccess(_ entitlement: WatchEntitlement, now: Double, sessionGranted: B
   if sessionGranted { return AccessDecision(allow: true, basis: .activeSessionGrace) }
 
   if entitlement.verifiedAt == 0 {
+    // No confirmed answer yet — but `state` already says whether the phone has
+    // spoken at all, because a watch that has heard nothing still holds the
+    // `loading` default. An `error` therefore means the phone DID answer and
+    // could not confirm, which must not be reported as "open the app once":
+    // the app is open, and that instruction sends the user in a circle.
+    if entitlement.state == "error" { return AccessDecision(allow: false, basis: .unconfirmed) }
     return AccessDecision(allow: false, basis: entitlement.state == "loading" ? .loading : .neverVerified)
   }
   if entitlement.access, age > WatchLimits.entitlementCacheTtlMs {

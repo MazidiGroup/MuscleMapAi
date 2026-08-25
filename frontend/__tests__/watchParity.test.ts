@@ -117,7 +117,13 @@ test("every refusal reason exists on both sides", () => {
 
 test("every access basis exists on both sides", () => {
   const gateTs = read("src/watch/gate.ts");
-  for (const basis of ["active_session_grace", "never_verified", "expired_cache", "not_premium"]) {
+  for (const basis of [
+    "active_session_grace",
+    "never_verified",
+    "unconfirmed",
+    "expired_cache",
+    "not_premium",
+  ]) {
     assert.ok(gateTs.includes(`"${basis}"`), `gate.ts is missing ${basis}`);
     assert.ok(RULES.includes(`"${basis}"`), `Rules.swift is missing ${basis}`);
   }

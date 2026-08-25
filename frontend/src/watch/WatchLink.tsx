@@ -94,12 +94,18 @@ export function WatchLink() {
         ? buildActiveSession(token, sessionId, startedAt ?? Date.now(), session)
         : null;
 
+    // A resolved answer must never travel without the moment it was resolved.
+    // The stamping effect lands one render after the state flips, so the first
+    // push could otherwise carry `ready` with a zero timestamp — which the watch
+    // reads as "never verified" and answers with the wrong locked screen.
+    const confirmedAt = resolution.state === "ready" ? verifiedAt || Date.now() : verifiedAt;
+
     revision.current += 1;
     const payload = buildContextPayload({
       session: active,
       unit,
       restSeconds: restPref,
-      entitlement: { access: resolution.access, state: resolution.state, verifiedAt },
+      entitlement: { access: resolution.access, state: resolution.state, verifiedAt: confirmedAt },
       revision: revision.current,
       now: Date.now(),
       nameOf: exerciseName,

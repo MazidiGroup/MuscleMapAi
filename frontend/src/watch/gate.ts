@@ -55,6 +55,7 @@ export type AccessBasis =
   | "cached"
   | "active_session_grace"
   | "never_verified"
+  | "unconfirmed"
   | "expired_cache"
   | "not_premium"
   | "loading";
@@ -89,7 +90,15 @@ export function watchAccess(entitlement: WatchEntitlement, input: AccessInput): 
   // grant, in which case that session finishes.
   if (input.sessionGranted) return { allow: true, basis: "active_session_grace" };
 
-  if (verifiedAt === 0) return { allow: false, basis: state === "loading" ? "loading" : "never_verified" };
+  if (verifiedAt === 0) {
+    // No confirmed answer yet — but `state` already says whether the phone has
+    // spoken at all, because a watch that has heard nothing still holds the
+    // `loading` default. An `error` therefore means the phone DID answer and
+    // could not confirm, which must not be reported as "open the app once":
+    // the app is open, and that instruction sends the user in a circle.
+    if (state === "error") return { allow: false, basis: "unconfirmed" };
+    return { allow: false, basis: state === "loading" ? "loading" : "never_verified" };
+  }
   if (access && age > ENTITLEMENT_CACHE_TTL_MS) return { allow: false, basis: "expired_cache" };
   if (state === "loading") return { allow: false, basis: "loading" };
   return { allow: false, basis: "not_premium" };
@@ -102,7 +111,12 @@ export function watchAccess(entitlement: WatchEntitlement, input: AccessInput): 
  * which is on the iPhone because that is where the purchase happens.
  */
 export function deniedNeedsPhone(basis: AccessBasis): boolean {
-  return basis === "loading" || basis === "never_verified" || basis === "expired_cache";
+  return (
+    basis === "loading" ||
+    basis === "never_verified" ||
+    basis === "unconfirmed" ||
+    basis === "expired_cache"
+  );
 }
 
 export const ACCESS_COPY: Record<AccessBasis, string> = {
@@ -111,6 +125,10 @@ export const ACCESS_COPY: Record<AccessBasis, string> = {
   active_session_grace: "",
   loading: "Checking your Premium access on your iPhone…",
   never_verified: "Open Muscle Map on your iPhone once to set up watch logging.",
+  // The phone answered and the answer was "I could not check". Naming the
+  // connection is the only thing the user can act on; telling them to open an
+  // app they are holding is not.
+  unconfirmed: "Your iPhone could not confirm your Premium access. Check its connection, then try again.",
   expired_cache: "Reconnect to your iPhone to confirm your Premium access.",
   not_premium: "Apple Watch logging is part of Premium. You can upgrade on your iPhone.",
 };

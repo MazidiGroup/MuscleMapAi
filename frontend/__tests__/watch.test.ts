@@ -14,7 +14,14 @@ import {
   confirmSetLine,
   isMutatingCommand,
 } from "../src/watch/commands";
-import { ENTITLEMENT_CACHE_TTL_MS, ENTITLEMENT_FRESH_MS, WatchEntitlement, deniedNeedsPhone, watchAccess } from "../src/watch/gate";
+import {
+  ACCESS_COPY,
+  ENTITLEMENT_CACHE_TTL_MS,
+  ENTITLEMENT_FRESH_MS,
+  WatchEntitlement,
+  deniedNeedsPhone,
+  watchAccess,
+} from "../src/watch/gate";
 import { MAX_REPS, MAX_WEIGHT, SetLogPayload, isValidReps, isValidWeight } from "../src/watch/protocol";
 import { matchScore, normalizeSpoken, resolveExercise } from "../src/watch/resolve";
 import {
@@ -395,6 +402,28 @@ test("a watch that has never heard from the phone is denied", () => {
   const d = watchAccess(never, { now: NOW, sessionGranted: false });
   assert.equal(d.allow, false, "absence of an answer is not a yes");
   assert.equal(d.basis, "loading");
+});
+
+test("a phone that answered but could not confirm says so, not “open the app”", () => {
+  // Found in the simulator: with no .env, RevenueCat never configures, the read
+  // errors, and the watch told the user to open an app that was open in front of
+  // them. `error` can only arrive in a payload, so it proves the phone answered.
+  const failed: WatchEntitlement = { access: false, state: "error", verifiedAt: 0 };
+  const d = watchAccess(failed, { now: NOW, sessionGranted: false });
+  assert.equal(d.allow, false, "a failed read never fabricates access");
+  assert.equal(d.basis, "unconfirmed");
+  assert.equal(deniedNeedsPhone(d.basis), true, "this is a reconnect prompt, not a sales pitch");
+  const copy = ACCESS_COPY.unconfirmed.toLowerCase();
+  assert.ok(!copy.includes("open muscle map"), "must not send the user to an app they already have open");
+  assert.ok(copy.includes("connection"), "name the thing the user can actually act on");
+});
+
+test("only a genuinely silent phone is told to open the app once", () => {
+  // `never_verified` is now reachable only from a `ready` answer with no
+  // timestamp, which WatchLink stamps before it sends. Kept as a defensive
+  // default rather than a state the user is expected to reach.
+  const odd: WatchEntitlement = { access: false, state: "ready", verifiedAt: 0 };
+  assert.equal(watchAccess(odd, { now: NOW, sessionGranted: false }).basis, "never_verified");
 });
 
 test("a non-subscriber is denied and pointed at the iPhone", () => {
