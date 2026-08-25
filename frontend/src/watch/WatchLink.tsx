@@ -145,8 +145,14 @@ export function WatchLink() {
         .then((ack) => {
           if (ack.accepted.length === 0 && ack.rejected.length === 0) return;
           sendAck(ack as unknown as Record<string, unknown>);
-          // The watch's picture of the workout has just changed underneath it.
-          push();
+          // No push here, deliberately. This closure holds the PRE-apply state,
+          // and it resolves after React has flushed the post-apply push from
+          // the [push] effect — so a push from here re-sends the old snapshot
+          // last, and latest-wins hands the watch back the workout it just
+          // ended. Observed live: End workout released the session on the
+          // phone, then the stale push resurrected it on the watch. An applied
+          // event always changes store state, so the effect push already
+          // covers "the watch's picture just changed".
         })
         .catch(() => {});
     });
