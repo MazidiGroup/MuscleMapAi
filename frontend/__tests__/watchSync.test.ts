@@ -10,7 +10,14 @@ import test from "node:test";
 
 import { ActiveSession } from "../src/session/activeSession";
 import { routeEnvelope } from "../src/watch/bridge";
-import { ApplyContext, WatchLedger, applyWatchEvents, contiguousUpTo, emptyLedger } from "../src/watch/apply";
+import {
+  ApplyContext,
+  WatchLedger,
+  applyWatchEvents,
+  closeBoundSession,
+  contiguousUpTo,
+  emptyLedger,
+} from "../src/watch/apply";
 import {
   applyAck,
   backoffMs,
@@ -292,17 +299,57 @@ test("a workout is not committed while part of it is still queued", () => {
   assert.equal(allSets(end.session).length, 3);
 });
 
-test("a late redelivery after the workout is saved does not start a second one", () => {
+test("ending a workout REQUESTS the close; only the caller retires it", () => {
   const events = [startEv(), logEv(1, "set1", 8), ev("session.end", 2, { endedAt: NOW + 1000 })];
   const done = applyWatchEvents(null, emptyLedger(), events, ctx());
   assert.equal(done.finished, true);
-  assert.equal(done.ledger.sessionId, null, "the session is retired");
-  assert.equal(done.ledger.closed.length, 1, "but remembered");
+  assert.equal(done.ledger.endRequested, true, "the request is recorded");
+  assert.equal(done.ledger.sessionId, SESSION, "and the session stays bound until it is released");
+  assert.equal(done.ledger.closed.length, 0);
+});
 
-  // The caller commits and clears the session; the watch retries anyway.
-  const replay = applyWatchEvents(null, done.ledger, events, ctx());
+test("a late redelivery after the workout is saved does not start a second one", () => {
+  const events = [startEv(), logEv(1, "set1", 8), ev("session.end", 2, { endedAt: NOW + 1000 })];
+  const done = applyWatchEvents(null, emptyLedger(), events, ctx());
+
+  // The caller commits the workout, and only then retires the session.
+  const closed = closeBoundSession(done.ledger, NOW + 2000);
+  assert.equal(closed.sessionId, null, "the session is retired");
+  assert.equal(closed.endRequested, false);
+  assert.equal(closed.closed.length, 1, "but remembered");
+
+  // The watch retries anyway.
+  const replay = applyWatchEvents(null, closed, events, ctx());
   assert.equal(replay.session, null, "no second workout is created");
   assert.deepEqual(replay.accepted.sort(), events.map((e) => e.eventId).sort());
+});
+
+test("a failed commit keeps the session reachable so the next retry drives it", () => {
+  // The zombie: the applier used to retire the session itself, so a commit the
+  // caller could not complete left the ledger closed and the store still live —
+  // a workout that showed as in progress for ever and was re-adopted by the
+  // watch on every push. The request now outlives the failure.
+  const events = [startEv(), logEv(1, "set1", 8), ev("session.end", 2, { endedAt: NOW + 1000 })];
+  const first = applyWatchEvents(null, emptyLedger(), events, ctx());
+  assert.equal(first.ledger.endRequested, true);
+
+  // The caller's write failed, so it closes nothing and persists the ledger as
+  // it is. The watch resends; the request is still there to be driven again.
+  const retry = applyWatchEvents(first.session, first.ledger, events, ctx());
+  assert.equal(retry.ledger.endRequested, true, "still asking");
+  assert.equal(retry.ledger.sessionId, SESSION, "still bound");
+  assert.equal(allSets(retry.session).length, 1, "and the work is intact");
+
+  // When the commit finally succeeds, one close settles it.
+  const settled = closeBoundSession(retry.ledger, NOW + 3000);
+  assert.equal(settled.sessionId, null);
+  assert.equal(settled.endRequested, false);
+});
+
+test("closing a ledger that is not bound to anything is harmless", () => {
+  const settled = closeBoundSession({ ...emptyLedger(), endRequested: true }, NOW);
+  assert.equal(settled.closed.length, 0, "nothing to remember");
+  assert.equal(settled.endRequested, false, "but the request is cleared");
 });
 
 // --- session binding ---------------------------------------------------------

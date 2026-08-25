@@ -106,7 +106,7 @@ struct IdleView: View {
         store.run(.startWorkout)
       }
       if store.pendingCount > 0 {
-        SyncBadge(count: store.pendingCount, reachable: store.reachable)
+        SyncBadge(sets: store.pendingSets, total: store.pendingCount, reachable: store.reachable)
       }
     }
     .padding(.horizontal, 6)
@@ -141,7 +141,7 @@ struct ActiveWorkoutView: View {
             .accessibilityAddTraits(.updatesFrequently)
         }
         if store.pendingCount > 0 {
-          SyncBadge(count: store.pendingCount, reachable: store.reachable)
+          SyncBadge(sets: store.pendingSets, total: store.pendingCount, reachable: store.reachable)
         }
       }
       .padding(.horizontal, 4)
@@ -265,21 +265,30 @@ struct RestTimerView: View {
 }
 
 struct SyncBadge: View {
-  let count: Int
+  /// Logged sets only. `total` is every queued event, which is what decides
+  /// whether the badge shows at all — starting a workout with no sets yet is
+  /// still something waiting, it is just not a set.
+  let sets: Int
+  let total: Int
   let reachable: Bool
 
+  private var summary: String {
+    if sets == 1 { return NSLocalizedString("1 set waiting to sync", comment: "") }
+    if sets > 1 { return String(format: NSLocalizedString("%d sets waiting to sync", comment: ""), sets) }
+    return NSLocalizedString("Waiting to sync", comment: "")
+  }
+
   var body: some View {
-    Label(
-      count == 1 ? "1 set waiting to sync" : "\(count) sets waiting to sync",
-      systemImage: reachable ? "arrow.triangle.2.circlepath" : "iphone.slash"
-    )
-    .font(.caption2)
-    .foregroundStyle(Palette.muted)
-    .accessibilityLabel(
-      Text(
-        reachable
-          ? "\(count) items syncing to your iPhone"
-          : "\(count) items saved on your watch, waiting for your iPhone"))
+    Label(summary, systemImage: reachable ? "arrow.triangle.2.circlepath" : "iphone.slash")
+      .font(.caption2)
+      .foregroundStyle(Palette.muted)
+      .accessibilityLabel(
+        Text(
+          reachable
+            ? String(format: NSLocalizedString("%@, syncing to your iPhone", comment: ""), summary)
+            : String(
+              format: NSLocalizedString("%@, saved on your watch and waiting for your iPhone", comment: ""),
+              summary)))
   }
 }
 

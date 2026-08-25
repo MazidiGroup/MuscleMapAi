@@ -63,6 +63,16 @@ export type WatchLedger = {
   revisions: Record<string, number>;
   /** Tombstoned set ids. Terminal — a revision never revives one. */
   voided: string[];
+  /**
+   * The watch has asked to end this session and the phone has not released it
+   * yet. Durable on purpose: whether a workout can actually be committed is
+   * something only the caller knows — an empty session writes no history, and a
+   * failed write must keep the session exactly as it was — so the applier
+   * records the REQUEST and the caller decides when it is satisfied. Closing
+   * here instead is what stranded a session as a zombie: retired in the ledger,
+   * still live in the store, re-adopted by the watch on every push.
+   */
+  endRequested: boolean;
   /** Recently finished sessions, newest first. */
   closed: ClosedSession[];
 };
@@ -78,7 +88,16 @@ export const LEDGER_SCHEMA = 1;
 export const CLOSED_SESSION_MEMORY = 5;
 
 export function emptyLedger(): WatchLedger {
-  return { schema: LEDGER_SCHEMA, sessionId: null, processed: [], seenSeqs: [], revisions: {}, voided: [], closed: [] };
+  return {
+    schema: LEDGER_SCHEMA,
+    sessionId: null,
+    processed: [],
+    seenSeqs: [],
+    revisions: {},
+    voided: [],
+    endRequested: false,
+    closed: [],
+  };
 }
 
 function isClosed(ledger: WatchLedger, sessionId: string): boolean {
@@ -239,8 +258,10 @@ export function applyWatchEvents(
         seenSeqs: next.seenSeqs.includes(event.seq) ? next.seenSeqs : [...next.seenSeqs, event.seq],
       };
       if (event.kind === "session.end") {
+        // Recorded, not acted on. `closeBoundSession` runs once the caller has
+        // actually released the workout.
         finished = true;
-        next = closeSession(next, event, ctx);
+        next = { ...next, endRequested: true };
       }
     } else if (result.verdict.kind === "reject") {
       rejected.push({ eventId: event.eventId, reason: result.verdict.reason });
@@ -252,11 +273,20 @@ export function applyWatchEvents(
   return { session, ledger: next, accepted, rejected, deferred, finished };
 }
 
-/** Retires the bound session, keeping its ids so a late retry is recognised. */
-function closeSession(ledger: WatchLedger, endEvent: WatchEvent, ctx: ApplyContext): WatchLedger {
+/**
+ * Retires the bound session, keeping its event ids so a late retry is
+ * recognised as a duplicate rather than starting a second workout.
+ *
+ * Called by the caller, and ONLY once the workout has genuinely been released —
+ * committed to history, or discarded because it held no sets. While a commit is
+ * failing the session must stay bound, so the watch's next retry drives another
+ * attempt instead of finding the session already retired and unreachable.
+ */
+export function closeBoundSession(ledger: WatchLedger, now: number): WatchLedger {
+  if (!ledger.sessionId) return { ...ledger, endRequested: false };
   const closed: ClosedSession = {
-    sessionId: endEvent.sessionId,
-    endedAt: ctx.now,
+    sessionId: ledger.sessionId,
+    endedAt: now,
     eventIds: [...ledger.processed],
   };
   return {
@@ -266,6 +296,7 @@ function closeSession(ledger: WatchLedger, endEvent: WatchEvent, ctx: ApplyConte
     seenSeqs: [],
     revisions: {},
     voided: [],
+    endRequested: false,
     closed: [closed, ...ledger.closed].slice(0, CLOSED_SESSION_MEMORY),
   };
 }

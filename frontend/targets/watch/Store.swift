@@ -72,6 +72,11 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
 
   var isLocked: Bool { !access.allow }
 
+  /// Sets specifically, as distinct from every queued event. The badge names
+  /// what a user recognises, and a queued `session.start` is not a set — it read
+  /// as "1 set waiting to sync" when nothing had been logged at all.
+  var pendingSets: Int { outbox.unackedSetIds.count }
+
   // MARK: - Commands
 
   /// The one way anything changes. Returns the outcome so an App Intent can

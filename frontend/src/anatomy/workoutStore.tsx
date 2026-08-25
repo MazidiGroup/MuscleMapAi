@@ -24,6 +24,7 @@ import { openingSets, plannedRepsFrom } from "./progression";
 import { exercisePerformances } from "@/src/history/metrics";
 import { WATCH_SCHEMA_VERSION, WatchAck } from "@/src/watch/protocol";
 import { routeEnvelope } from "@/src/watch/bridge";
+import { closeBoundSession } from "@/src/watch/apply";
 import { knowsExercise } from "@/src/watch/catalogue";
 import { persistWatchLedger, readWatchLedger } from "@/src/watch/store";
 
@@ -608,20 +609,46 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
-        // The ledger is written BEFORE the acknowledgement goes back, so a crash
-        // between the two costs a retry the phone recognises rather than a set
-        // the watch has already forgotten.
-        await persistWatchLedger(store, token, result.ledger).catch(() => {});
+        let nextLedger = result.ledger;
 
         if (result.session) {
           setSessionId(result.session.sessionId);
-          if (result.finished) {
-            await commitSession(result.session.exercises, result.session.startedAt);
+
+          // Driven by the DURABLE request rather than by this batch, so an end
+          // whose commit failed earlier is retried by the next envelope instead
+          // of being stranded.
+          if (nextLedger.endRequested) {
+            const outcome = await commitSession(result.session.exercises, result.session.startedAt);
+            // A workout with no sets writes no history — that is deliberate —
+            // but it must still be RELEASED. Retiring it in the ledger while
+            // leaving it live in the store is what produced a session that
+            // showed as in progress for ever and was re-adopted by the watch on
+            // every push.
+            const released = outcome.ok || outcome.reason === "empty_session";
+            if (released) {
+              if (!outcome.ok) {
+                setSessionId(null);
+                setSession(null);
+                setStartedAt(null);
+                setSessionPlanSeed(null);
+              }
+              nextLedger = closeBoundSession(nextLedger, Date.now());
+            } else {
+              // A failed write keeps the user exactly the session they had, and
+              // keeps the request open so the watch's next retry drives it again.
+              setSession(result.session.exercises);
+              setStartedAt(result.session.startedAt);
+            }
           } else {
             setSession(result.session.exercises);
             setStartedAt(result.session.startedAt);
           }
         }
+
+        // The ledger is written BEFORE the acknowledgement goes back, so a crash
+        // between the two costs a retry the phone recognises rather than a set
+        // the watch has already forgotten.
+        await persistWatchLedger(store, token, nextLedger).catch(() => {});
         return result.ack;
       });
       // Failures must not wedge the queue for every later envelope.

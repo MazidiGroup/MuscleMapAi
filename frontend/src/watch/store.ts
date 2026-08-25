@@ -32,6 +32,7 @@ export async function readWatchLedger(store: ScopedStore, owner: Owner | null): 
     seenSeqs: Array.isArray(stored.seenSeqs) ? stored.seenSeqs.filter((x) => typeof x === "number") : [],
     revisions: stored.revisions && typeof stored.revisions === "object" ? stored.revisions : {},
     voided: Array.isArray(stored.voided) ? stored.voided.filter((x) => typeof x === "string") : [],
+    endRequested: stored.endRequested === true,
     closed: Array.isArray(stored.closed) ? stored.closed.filter((c) => c && typeof c.sessionId === "string") : [],
   };
 }
