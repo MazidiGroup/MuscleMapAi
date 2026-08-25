@@ -29,8 +29,14 @@ public final class WatchLinkModule: Module {
     Events("onEnvelope", "onStateChange")
 
     OnCreate {
+      // The envelope is delivered AS the event payload, not wrapped in a
+      // ["envelope": …] dictionary. index.ts declares "The payload is the raw
+      // envelope" and the JS listener hands it straight to
+      // `receiveWatchEnvelope`; the wrapper made validation see an
+      // unidentifiable object, produce an empty ack, and send nothing — the
+      // watch retried the same events every 15 seconds forever.
       self.delegate.onEnvelope = { [weak self] envelope in
-        self?.sendEvent("onEnvelope", ["envelope": envelope])
+        self?.sendEvent("onEnvelope", envelope)
       }
       self.delegate.onStateChange = { [weak self] state in
         self?.sendEvent("onStateChange", state)
