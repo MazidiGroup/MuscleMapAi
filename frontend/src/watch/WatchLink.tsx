@@ -116,7 +116,17 @@ export function WatchLink() {
       nameOf: exerciseName,
       targetRepsFor: (exerciseId) => planTargetReps(exerciseId),
     });
-    updateApplicationContext(payload as unknown as Record<string, unknown>);
+    // `session: null` cannot cross the bridge: JS null arrives in the native
+    // module as NSNull, and WCSession's serializer rejects the whole payload
+    // with WCErrorCodePayloadUnsupportedTypes — silently, since the module's
+    // updateApplicationContext has no error path back to here. The key is
+    // OMITTED instead; Model.swift declares `session: SnapshotSession?`, and an
+    // absent key decodes to nil, which merge() already handles as "the phone
+    // has no workout". Every earlier payload happened to carry a session, which
+    // is why the first session-less owner was what exposed it.
+    const wire = { ...payload } as Record<string, unknown>;
+    if (wire.session === null) delete wire.session;
+    updateApplicationContext(wire);
   }, [hydrated, resolution.access, resolution.state, restPref, session, sessionId, startedAt, token, unit, verifiedAt]);
 
   // Out: a new snapshot whenever anything the watch renders has changed.
