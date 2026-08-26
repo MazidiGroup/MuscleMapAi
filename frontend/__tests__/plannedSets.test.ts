@@ -33,8 +33,10 @@ test("the plan-linked add path passes the planned count through", () => {
   const plan = fs.readFileSync(path.join(root, "src/plan/PlanViews.tsx"), "utf8");
   const store = fs.readFileSync(path.join(root, "src/anatomy/workoutStore.tsx"), "utf8");
   const calls = plan.match(/addExerciseFromPlan\([^)]*\)/g) ?? [];
-  // Today's own start button is a third plan-linked call site.
-  assert.ok(calls.length >= 3, "every Plan call site exists");
+  // Two call sites since the day-view redesign: Today's start button and the
+  // day view's Start workout. The old per-row "add this exercise to the active
+  // session" button was removed with that redesign, taking the third site.
+  assert.ok(calls.length >= 2, "every Plan call site exists");
   for (const call of calls) {
     // The planned count is followed by the plan day name, which the title
     // helper stores, and then by the plan's rep text, which pre-fills the rows.
