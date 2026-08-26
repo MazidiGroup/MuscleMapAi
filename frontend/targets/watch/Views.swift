@@ -38,7 +38,10 @@ struct RootView: View {
         ActiveWorkoutView()
       }
     }
-    .background(Palette.ground.ignoresSafeArea())
+    // No background of its own. `Palette.ground` is a hair lighter than the
+    // watch's true black, and applied to a Group it painted only the content's
+    // own frame — which read as a grey band floating on the black bezel rather
+    // than as a screen. watchOS already gives us black.
     .confirmationDialog(
       store.lastFeedback?.message ?? "",
       isPresented: Binding(

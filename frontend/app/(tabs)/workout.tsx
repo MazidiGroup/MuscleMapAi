@@ -14,7 +14,7 @@ import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { formatSetLoad, isBodyweightEquipment, loadColumnLabel, loadPlaceholder } from "@/src/anatomy/bodyweight";
 import { canMarkDone, ZERO_REP_HINT } from "@/src/anatomy/setRules";
-import { OVERLOAD_NOTE, PR_LABEL, prForSet, recordsFrom, suggestNext } from "@/src/anatomy/progression";
+import { PR_LABEL, prForSet, recordsFrom, suggestNext } from "@/src/anatomy/progression";
 import { exercisePerformances } from "@/src/history/metrics";
 import { usePlanStore } from "@/src/plan/planStore";
 import type { Workout } from "@/src/anatomy/workoutScope";
@@ -151,6 +151,8 @@ export default function WorkoutScreen() {
                   renderCard={(se) => (
                     <SessionCard
                       se={se}
+                      position={w.session ? w.session.indexOf(se) : 0}
+                      total={sessionLength}
                       history={w.history}
                       unit={w.unit}
                       goal={goal}
@@ -254,6 +256,8 @@ export default function WorkoutScreen() {
  */
 function SessionCard({
   se,
+  position,
+  total,
   history,
   unit,
   goal,
@@ -263,6 +267,9 @@ function SessionCard({
   onToggleDone,
 }: {
   se: SessionExercise;
+  /** Where this card sits in the session, so the card can say so itself. */
+  position: number;
+  total: number;
   history: Workout[];
   unit: WeightUnit;
   goal: Goal | undefined;
@@ -478,7 +485,29 @@ function SessionCard({
         accessibilityLabel={`Notes for ${ex?.name}`}
         testID={`notes-${se.exerciseId}`}
       />
-      <Text style={styles.overloadNote}>{OVERLOAD_NOTE}</Text>
+      {/* Where this exercise sits in the session. The card is one of a stack
+          that can be swiped, and a stack with no position indicator gives the
+          user no idea how much is left — which the paragraph of progression
+          copy that used to sit here did not tell them either. */}
+      {total > 1 && (
+        <View
+          style={styles.cardProgress}
+          accessible
+          accessibilityLabel={`Exercise ${position + 1} of ${total}`}
+          testID={`card-progress-${se.exerciseId}`}
+        >
+          {Array.from({ length: total }, (_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.cardProgressSeg,
+                i === position && styles.cardProgressSegOn,
+                i < position && styles.cardProgressSegDone,
+              ]}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -543,7 +572,6 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   },
   suggestApplyText: { color: T.bg, fontSize: 12.5, fontWeight: "800" },
   suggestCardEmpty: { backgroundColor: T.surfaceHi, borderColor: T.border },
-  overloadNote: { color: T.textFaint, fontSize: 10.5, lineHeight: 15, marginTop: 8 },
 
   prNote: {
     flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8,
@@ -576,6 +604,10 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   prSlot: { width: 24, alignSelf: "center", height: 44, alignItems: "center", justifyContent: "center" },
   setInput: { flex: 1, minWidth: 0, alignSelf: "center", backgroundColor: "transparent", paddingVertical: 10, textAlign: "center", color: T.text, fontSize: 17, fontWeight: "600" },
   setValueDone: { color: T.textDim },
+  cardProgress: { flexDirection: "row", gap: 4, marginTop: 12, marginBottom: 2 },
+  cardProgressSeg: { flex: 1, height: 3, borderRadius: 2, backgroundColor: T.border },
+  cardProgressSegDone: { backgroundColor: T.accent + "66" },
+  cardProgressSegOn: { backgroundColor: T.accent },
   setHint: { color: T.textFaint, fontSize: 11.5, textAlign: "center", marginTop: 6, marginBottom: 2 },
   addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 22, backgroundColor: T.surfaceHi, overflow: "hidden", },
   addSetText: { color: T.accent, fontSize: 13, fontWeight: "700" },
