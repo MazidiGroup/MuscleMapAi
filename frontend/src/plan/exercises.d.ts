@@ -22,15 +22,46 @@ export type Answers = {
   advanced?: boolean;
 };
 
+/**
+ * One row of `EXERCISES` AS IT EXISTS AT RUNTIME: the rows are parsed straight
+ * out of the compact `DB` string and carry COMPACT keys (`m`, `eq`, `pat`,
+ * `c`, `t`) — never the normalised spellings. The normalised names are
+ * declared as optional `undefined` so `row.muscle ?? row.m` reads typecheck,
+ * and so nobody can silently treat a raw row as a normalised entry again.
+ * Normalised shapes come only from `planAdapter.entryFor`.
+ */
 export type LibraryExercise = {
   id: string;
-  muscle: MuscleKey;
-  equipment: Equipment;
-  pattern: string;
-  level: number;
-  compound: boolean;
-  timed: boolean;
   name: string;
+  m: MuscleKey;
+  eq: Equipment;
+  pat: string;
+  level: number;
+  c: boolean;
+  t: boolean;
+  muscle?: undefined;
+  equipment?: undefined;
+  pattern?: undefined;
+  compound?: undefined;
+  timed?: undefined;
+};
+
+/** What `exercises.js/entryFor` actually returns — `muscle` is a HUMAN LABEL
+ *  ("Chest"), not a MuscleKey. `planAdapter.toEntry` converts this to
+ *  `PlanExerciseEntry`; call sites should go through `planAdapter.entryFor`. */
+export type RawPlanEntry = {
+  id: string;
+  name: string;
+  img: string;
+  muscle: string;
+  region: Region | null;
+  sets: number;
+  reps: string;
+  rest: string;
+  setsLabel: string;
+  focus: boolean;
+  finisher: boolean;
+  posture: boolean;
 };
 
 export type PlanExerciseEntry = {
@@ -76,5 +107,10 @@ export const ADVANCED_MIN_DAYS: number;
 export const PROGRESS_TIP: Record<Goal, string>;
 export const posterUrl: (id: string) => string;
 export function buildPlan(answers: Answers, seed: number): Plan;
-export function entryFor(id: string, answers: Answers, opts?: { badge?: string }): PlanExerciseEntry;
-export function alternativesFor(id: string, answers: Answers, excludeIds: string[]): LibraryExercise[];
+export function entryFor(id: string, answers: Answers, opts?: { focus?: boolean; finisher?: boolean; posture?: boolean }): RawPlanEntry;
+/** Returns up to 6 candidates; `muscle` here is a human label, like RawPlanEntry's. */
+export function alternativesFor(
+  id: string,
+  answers: Answers,
+  excludeIds: string[],
+): { id: string; name: string; img: string; muscle: string }[];
