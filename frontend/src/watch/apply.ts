@@ -148,6 +148,12 @@ export type ApplyOutcome = {
   deferred: string[];
   /** True when a `session.end` was applied and the caller must now finish. */
   finished: boolean;
+  /**
+   * The watch's own clock at the moment the user ended the workout, or null.
+   * The commit is dated from THIS, not from when the sync happened — a session
+   * finished last night and delivered this morning belongs to last night.
+   */
+  endedAt: number | null;
 };
 
 type Verdict = { kind: "accept" } | { kind: "reject"; reason: RejectReason } | { kind: "defer" };
@@ -215,12 +221,24 @@ export function applyWatchEvents(
   const rejected: { eventId: string; reason: RejectReason }[] = [];
   const deferred: string[] = [];
   let finished = false;
+  let endedAt: number | null = null;
 
   for (const event of orderEvents(events)) {
     // A duplicate is done, whatever else is true — including after the workout
     // has been saved, which is what stops a late retry becoming a second one.
-    if (alreadyProcessed(next, event) || isClosed(next, event.sessionId)) {
+    // `alreadyProcessed` covers a closed session's own event ids, so this is a
+    // true redelivery.
+    if (alreadyProcessed(next, event)) {
       accepted.push(event.eventId);
+      continue;
+    }
+    // An event for a closed session that is NOT one of its own is new work that
+    // arrived after the workout was committed — a set logged offline whose
+    // delivery lost the race with the end event. Accepting it silently is how a
+    // set disappears with nothing to show for it: refuse it, so the watch
+    // surfaces the loss instead of the user finding out from their history.
+    if (isClosed(next, event.sessionId)) {
+      rejected.push({ eventId: event.eventId, reason: "unknown_session" });
       continue;
     }
     if (event.schema > WATCH_SCHEMA_VERSION) {
@@ -261,6 +279,7 @@ export function applyWatchEvents(
         // Recorded, not acted on. `closeBoundSession` runs once the caller has
         // actually released the workout.
         finished = true;
+        endedAt = (event.payload as SessionEndPayload).endedAt;
         next = { ...next, endRequested: true };
       }
     } else if (result.verdict.kind === "reject") {
@@ -270,7 +289,7 @@ export function applyWatchEvents(
     }
   }
 
-  return { session, ledger: next, accepted, rejected, deferred, finished };
+  return { session, ledger: next, accepted, rejected, deferred, finished, endedAt };
 }
 
 /**

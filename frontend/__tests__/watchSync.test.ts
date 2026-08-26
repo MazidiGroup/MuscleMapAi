@@ -346,6 +346,47 @@ test("a failed commit keeps the session reachable so the next retry drives it", 
   assert.equal(settled.endRequested, false);
 });
 
+test("a set that lost the race to the end event is refused, not swallowed", () => {
+  // Found on the simulator: the phone was shut down, a 4th set was logged
+  // offline, the workout was ended, and on reconnect the set vanished — not in
+  // History, not in the session, no rejection to show for it. Anything for a
+  // closed session used to be accepted as a duplicate, which is right for a
+  // REDELIVERY and catastrophic for work that never landed.
+  const events = [startEv(), logEv(1, "set1", 8), ev("session.end", 2, { endedAt: NOW + 1000 })];
+  const done = applyWatchEvents(null, emptyLedger(), events, ctx());
+  const closed = closeBoundSession(done.ledger, NOW + 2000);
+
+  const late = logEv(3, "setLost", 8);
+  const out = applyWatchEvents(null, closed, [late], ctx());
+  assert.deepEqual(out.accepted, [], "it must not be quietly acknowledged");
+  assert.deepEqual(
+    out.rejected,
+    [{ eventId: late.eventId, reason: "unknown_session" }],
+    "the watch has to be told, so the user learns from the app and not from a gap in their history",
+  );
+
+  // A genuine redelivery of the session's OWN events is still a silent no-op.
+  const replay = applyWatchEvents(null, closed, events, ctx());
+  assert.deepEqual(replay.accepted.sort(), events.map((e) => e.eventId).sort());
+  assert.deepEqual(replay.rejected, []);
+});
+
+test("the end time comes from the watch, not from whenever the sync happened", () => {
+  const endedAt = NOW + 3_600_000;
+  const events = [startEv(), logEv(1, "set1", 8), ev("session.end", 2, { endedAt })];
+  // Delivered a day later — `ctx.now` is the sync, `endedAt` is the workout.
+  const out = applyWatchEvents(null, emptyLedger(), events, ctx({ now: NOW + 86_400_000 }));
+  assert.equal(out.finished, true);
+  assert.equal(out.endedAt, endedAt, "the caller dates the commit from this");
+  assert.notEqual(out.endedAt, NOW + 86_400_000);
+});
+
+test("no end event means no end time to date a commit from", () => {
+  const out = applyWatchEvents(null, emptyLedger(), [startEv(), logEv(1, "set1", 8)], ctx());
+  assert.equal(out.finished, false);
+  assert.equal(out.endedAt, null);
+});
+
 test("closing a ledger that is not bound to anything is harmless", () => {
   const settled = closeBoundSession({ ...emptyLedger(), endRequested: true }, NOW);
   assert.equal(settled.closed.length, 0, "nothing to remember");

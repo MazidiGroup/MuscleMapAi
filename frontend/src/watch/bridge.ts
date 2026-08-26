@@ -20,6 +20,8 @@ export type RouteResult = {
   ack: WatchAck;
   /** True when a `session.end` was applied — the caller runs the finish path. */
   finished: boolean;
+  /** The watch's clock when the user ended it. The commit is dated from this. */
+  endedAt: number | null;
   /** Ids left queued on the watch on purpose. Useful for diagnostics only. */
   deferred: string[];
 };
@@ -47,6 +49,7 @@ export function routeEnvelope(
       ledger: input.ledger,
       ack: { schema: WATCH_SCHEMA_VERSION, envelopeId: "", accepted: [], rejected: [] },
       finished: false,
+      endedAt: null,
       deferred: [],
     };
   }
@@ -59,6 +62,7 @@ export function routeEnvelope(
     ledger: outcome.ledger,
     ack: ackFor(envelope, outcome, rejected as { eventId: string; reason: RejectReason }[]),
     finished: outcome.finished,
+    endedAt: outcome.endedAt,
     deferred: outcome.deferred,
   };
 }

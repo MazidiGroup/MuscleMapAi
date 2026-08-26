@@ -519,14 +519,23 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const commitSession = useCallback(async (
     sess: SessionExercise[] | null,
     began: number | null,
+    /**
+     * When the workout actually ended. Defaults to now, which is right for a
+     * finish tapped on the phone. The watch supplies its OWN clock instead: a
+     * session ended last night and delivered this morning belongs to last
+     * night, and dating it from the sync put it in History under the wrong day
+     * with a duration measured from the start of the workout to the moment the
+     * phone happened to reconnect.
+     */
+    finishedAt: number = Date.now(),
   ): Promise<FinishResult> => {
     const session = sess;
     const startedAt = began;
     if (!session || session.length === 0) return { ok: false, reason: "empty_session" };
     if (!token || !owner) return { ok: false, reason: "unresolved_owner" };
 
-    const durationSec = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
-    const workout: Workout = { id: uid(), date: Date.now(), durationSec, exercises: session, unit };
+    const durationSec = startedAt ? Math.max(0, Math.round((finishedAt - startedAt) / 1000)) : 0;
+    const workout: Workout = { id: uid(), date: finishedAt, durationSec, exercises: session, unit };
     const { prs: nextPRs, newPRs } = computePRUpdate(prs, session, {
       unit,
       durationSec,
@@ -583,7 +592,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         if (!token || !owner) return empty;
 
         const ledger = await readWatchLedger(store, owner);
-        if (!sessionIdRef.current && session) setSessionId(`s_${Date.now().toString(36)}_${uid()}`);
+        // Deliberately NOT minting an id when one is missing. This callback
+        // closes over `session`, and after a commit that value is stale until
+        // React re-renders — so minting here rebuilt the JUST-COMMITTED workout
+        // under a brand new id, with its original startedAt intact. The result
+        // was the same workout in History and "in progress" at once, and the
+        // watch re-adopting the corpse. With no id there is no active session
+        // to describe, and the applier rebuilds one from the watch's own events
+        // under the watch's own session id, which is the correct identity.
         const current =
           session && sessionIdRef.current
             ? buildActiveSession(
@@ -618,7 +634,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           // whose commit failed earlier is retried by the next envelope instead
           // of being stranded.
           if (nextLedger.endRequested) {
-            const outcome = await commitSession(result.session.exercises, result.session.startedAt);
+            const outcome = await commitSession(
+              result.session.exercises,
+              result.session.startedAt,
+              result.endedAt ?? Date.now(),
+            );
             // A workout with no sets writes no history — that is deliberate —
             // but it must still be RELEASED. Retiring it in the ledger while
             // leaving it live in the store is what produced a session that
