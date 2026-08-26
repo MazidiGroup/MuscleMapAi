@@ -141,6 +141,33 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
     run(.setWeight(WatchRules.nudgeWeight(snapshot, steps: steps, increment: increment)))
   }
 
+  // Rest controls. The rest clock is watch-local: it never crosses the wire and
+  // carries no event, so these mutate the snapshot directly rather than going
+  // through `run`. The arithmetic itself is the port of restClock.ts, which is
+  // where the rule lives.
+  func extendRest(seconds: Int) {
+    guard let clock = snapshot.rest else { return }
+    snapshot.rest = clock.extended(by: seconds, now: nowMs())
+    persistSnapshot()
+  }
+
+  func setRestTotal(_ seconds: Int) {
+    let bounded = min(max(seconds, 15), 600)
+    snapshot.restSeconds = bounded
+    if let clock = snapshot.rest {
+      snapshot.rest = clock.withTotal(bounded, now: nowMs())
+    }
+    persistSnapshot()
+  }
+
+  /// Ends the rest period now. The same thing the phone's Skip does — the timer
+  /// is a prompt, never a gate on the next set.
+  func skipRest() {
+    guard snapshot.rest != nil else { return }
+    snapshot.rest = nil
+    persistSnapshot()
+  }
+
   private func announce(_ feedback: Feedback) {
     lastFeedback = feedback
     Haptics.play(feedback.haptic)

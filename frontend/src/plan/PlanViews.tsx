@@ -29,7 +29,6 @@ import { isCountableSet } from "@/src/anatomy/setRules";
 import { startOfWeek, weekSummary } from "@/src/history/metrics";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { LiquidSheen } from "@/src/ui/GlassSurface";
-import { ThemeSwitcher } from "@/src/ui/ThemeSwitcher";
 import { PremiumDiscoveryCard, PremiumValueMoment } from "@/src/premium/PremiumDiscovery";
 
 export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number) => void; onEditAnswers: () => void }) {

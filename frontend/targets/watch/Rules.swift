@@ -305,6 +305,26 @@ struct RestClock: Codable, Equatable {
     guard let held = pausedRemaining else { return self }
     return RestClock(total: total, endsAt: now + Double(held) * 1000, pausedRemaining: nil)
   }
+
+  /// Port of `extendClock` in src/anatomy/restClock.ts. Extends an ALREADY
+  /// RUNNING (or paused) rest without restarting it: the time already served is
+  /// kept and only the remainder grows, with the total growing to match so the
+  /// remainder is never clamped back down.
+  func extended(by seconds: Int, now: Double) -> RestClock {
+    let next = max(0, remaining(now: now) + seconds)
+    return RestClock(
+      total: max(total, next),
+      endsAt: now + Double(next) * 1000,
+      pausedRemaining: pausedRemaining == nil ? nil : next)
+  }
+
+  /// Port of `setClockTotal`. Choosing a new total restarts the rest period.
+  func withTotal(_ newTotal: Int, now: Double) -> RestClock {
+    RestClock(
+      total: newTotal,
+      endsAt: now + Double(newTotal) * 1000,
+      pausedRemaining: pausedRemaining == nil ? nil : newTotal)
+  }
 }
 
 struct WatchSnapshot: Codable, Equatable {
