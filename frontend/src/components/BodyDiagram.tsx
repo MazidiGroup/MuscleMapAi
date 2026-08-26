@@ -4,7 +4,7 @@ import Svg, { Path, Defs, LinearGradient, Stop, G, Circle } from "react-native-s
 
 import { COLORS } from "@/src/theme";
 
-export type MuscleStatus = "green" | "yellow" | "red" | "none";
+export type MuscleStatus = "green" | "yellow" | "red" | "highlight" | "none";
 
 export type MuscleMap = Partial<Record<
   | "chest" | "shoulders" | "arms" | "core" | "quads" | "calves"
@@ -16,6 +16,13 @@ const COLOR_FOR_STATUS: Record<MuscleStatus, string> = {
   green: "#34D399",
   yellow: "#F59E0B",
   red: "#EF4444",
+  /**
+   * "This is the muscle you are looking at" — the atlas's selection colour,
+   * carrying no recovery or fatigue meaning. It is deliberately warm rather
+   * than one of the three status colours, so a browsing screen can never be
+   * misread as a readiness readout.
+   */
+  highlight: "#E08A6B",
   none: "#2A2A30",
 };
 
@@ -45,9 +52,13 @@ export function BodyDiagram({ view, muscles, onPressMuscle, size = 280 }: Props)
               <Stop offset="0" stopColor="#0F0F14" />
               <Stop offset="1" stopColor="#080810" />
             </LinearGradient>
+            {/* Alpha belongs in stopOpacity, not inside stopColor: react-native-svg
+                ignores the alpha channel of an rgba() stop and paints it opaque,
+                which turned this shading pass into a solid white wash over
+                whatever colour the muscle underneath was meant to be. */}
             <LinearGradient id="muscleShade" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor="rgba(255,255,255,0.25)" />
-              <Stop offset="1" stopColor="rgba(0,0,0,0.25)" />
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.25} />
+              <Stop offset="1" stopColor="#000000" stopOpacity={0.25} />
             </LinearGradient>
           </Defs>
           {/* Background silhouette / skeleton hint */}
@@ -128,8 +139,8 @@ export function BodyDiagram({ view, muscles, onPressMuscle, size = 280 }: Props)
         <Svg width={w} height={h} viewBox="0 0 200 370">
           <Defs>
             <LinearGradient id="muscleShadeBack" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor="rgba(255,255,255,0.25)" />
-              <Stop offset="1" stopColor="rgba(0,0,0,0.25)" />
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.25} />
+              <Stop offset="1" stopColor="#000000" stopOpacity={0.25} />
             </LinearGradient>
           </Defs>
           <G opacity={0.92}>
