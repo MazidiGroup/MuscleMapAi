@@ -382,7 +382,10 @@ function SessionCard({
                     duplicates it. A set with no reps records no work, so it
                     cannot be ticked. */}
                 <View style={styles.setRail}>
-                  <View style={[styles.railSeg, idx === 0 && styles.railHidden]} />
+                  {/* One continuous line behind the badge; the badge's opaque
+                      fill masks it inside the ring. Clipped at the card's first
+                      and last badge by the half-height segments. */}
+                  <View style={[styles.railLine, idx === 0 && styles.railLineFirst, idx === se.sets.length - 1 && styles.railLineLast]} />
                   <A11yControl
                     role="checkbox"
                     checked={s.done}
@@ -409,7 +412,6 @@ function SessionCard({
                       )}
                     </View>
                   </A11yControl>
-                  <View style={[styles.railSeg, idx === se.sets.length - 1 && styles.railHidden]} />
                 </View>
                 <TextInput
                   style={[styles.setInput, s.done && styles.setValueDone]}
@@ -574,13 +576,16 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   setRowDone: { opacity: 0.9 },
   // Hairline between rows, indented so the timeline rail runs through unbroken.
   setSep: { height: StyleSheet.hairlineWidth, backgroundColor: T.border, marginLeft: 52 },
-  // The rail: a 2px line passing behind every badge, hidden beyond the ends.
-  setRail: { width: 44, alignItems: "center" },
-  // T.border disappears against the card at 2px; the rail needs its own step up.
-  railSeg: { width: 2, flex: 1, backgroundColor: "rgba(255,255,255,0.14)" },
-  railHidden: { backgroundColor: "transparent" },
+  setRail: { width: 44, alignItems: "center", justifyContent: "center" },
+  // One continuous 2px line down the rail; the badge's opaque fill sits on top.
+  // T.border disappears against the card at this width, hence the explicit step up.
+  railLine: { position: "absolute", left: 21, top: 0, bottom: 0, width: 2, backgroundColor: "rgba(255,255,255,0.14)" },
+  railLineFirst: { top: "50%" },
+  railLineLast: { bottom: "50%" },
   setIdxBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  setBadge: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  // The un-done fills are the card's own surface so the rail cannot show
+  // through the inside of an outlined ring.
+  setBadge: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: T.surfaceSolid },
   setBadgeDone: { backgroundColor: T.accent },
   setBadgeNext: { borderWidth: 2, borderColor: T.accent },
   setBadgeIdle: { borderWidth: 1.5, borderColor: T.border },
