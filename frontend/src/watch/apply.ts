@@ -217,6 +217,25 @@ export function applyWatchEvents(
     closed: [...ledger.closed],
   };
 
+  // A binding whose session the phone no longer has is a ZOMBIE, and it is the
+  // one state this function could never leave: release is driven by the bound
+  // session's own end event, which can never be satisfied once the phone's
+  // active session is a different workout — the phone will never commit the
+  // bound one. Left in place, the binding deferred every event for every OTHER
+  // session for ever; observed live as a ledger bound to a fourth id with nine
+  // events from three sessions retrying for hours. Closing it moves its
+  // processed ids into `closed`, so redeliveries are still recognised as
+  // duplicates and anything never applied is REFUSED as unknown_session — the
+  // watch surfaces the loss instead of retrying silently.
+  //
+  // Only a NON-NULL phone session with a different id is proof of death. A
+  // null one is not: the caller rebuilds `current` from render-time state, so
+  // an offline backlog spread across envelopes legitimately arrives with the
+  // session still null while the ledger is already bound.
+  if (next.sessionId !== null && session && session.sessionId !== next.sessionId) {
+    next = closeBoundSession(next, ctx.now);
+  }
+
   const accepted: string[] = [];
   const rejected: { eventId: string; reason: RejectReason }[] = [];
   const deferred: string[] = [];
@@ -310,7 +329,12 @@ export function applyWatchEvents(
  * attempt instead of finding the session already retired and unreachable.
  */
 export function closeBoundSession(ledger: WatchLedger, now: number): WatchLedger {
-  if (!ledger.sessionId) return { ...ledger, endRequested: false };
+  // Even with nothing bound, per-session scratch state must not survive into
+  // the next binding: a leaked tombstone or seq would belong to a session
+  // that no longer exists.
+  if (!ledger.sessionId) {
+    return { ...ledger, processed: [], seenSeqs: [], revisions: {}, voided: [], endRequested: false };
+  }
   const closed: ClosedSession = {
     sessionId: ledger.sessionId,
     endedAt: now,
