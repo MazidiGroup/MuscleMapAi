@@ -115,7 +115,30 @@ struct IdleView: View {
 
 // MARK: - Active workout
 
+/// Two pages, no scrolling on either.
+///
+/// The logging loop — read the load, set the reps, log — has to be doable at
+/// arm's length mid-set, so it owns one screen that never moves under the
+/// thumb. Everything that is not that loop (pause, undo, end, sync state) lives
+/// one swipe left, which is where the Workout app puts the same class of
+/// control. A screen the user has to scroll to reach "Log set" is a screen that
+/// loses sets.
 struct ActiveWorkoutView: View {
+  @ObservedObject private var store = WatchStore.shared
+  @State private var page = 0
+
+  var body: some View {
+    TabView(selection: $page) {
+      LoggingPage().tag(0)
+      SessionPage(onDone: { page = 0 }).tag(1)
+    }
+    .tabViewStyle(.page)
+  }
+}
+
+// MARK: page 1 — the loop
+
+struct LoggingPage: View {
   @ObservedObject private var store = WatchStore.shared
   @State private var crown: Double = 0
   @State private var reps: Int = 8
@@ -127,35 +150,32 @@ struct ActiveWorkoutView: View {
   private var resting: RestClock? { snapshot.rest }
 
   var body: some View {
-    ScrollView {
-      VStack(spacing: 8) {
+    // Every height is derived, never fixed: the same layout has to fit a 40mm
+    // SE and a 49mm Ultra without a scroll view rescuing it.
+    GeometryReader { geo in
+      let h = geo.size.height
+      let w = geo.size.width
+      let dial = max(76, min(min(h * 0.475, 124), w - 68))
+      let control = max(30, min(h * 0.155, 38))
+      let gap = max(3, min(h * 0.022, 7))
+
+      VStack(spacing: gap) {
         header
-        // One dial, two jobs: the load before a set, the rest countdown after.
-        // Swapping the dial's contents rather than stacking a second control
-        // keeps the screen to a single glanceable ring on a 41mm face.
         if let clock = resting {
-          restDial(clock)
-          restStepper(clock)
-          PrimaryButton(title: "Skip rest", systemImage: nil) { store.skipRest() }
+          restDial(clock, size: dial)
+          restStepper(clock, height: control)
+          PrimaryButton(title: "Skip rest", systemImage: nil, height: control + 4) {
+            store.skipRest()
+          }
         } else {
-          weightDial
-          repsStepper
-          PrimaryButton(title: "Log set", systemImage: "checkmark") {
+          weightDial(size: dial)
+          repsStepper(height: control)
+          PrimaryButton(title: "Log set", systemImage: "checkmark", height: control + 4) {
             store.run(.logSet(reps: reps, weight: nil, warmup: false))
           }
         }
-        navRow
-        if let feedback = store.lastFeedback {
-          Text(feedback.message)
-            .font(.caption2)
-            .foregroundStyle(feedback.tone == .success ? Palette.muted : Palette.accent)
-            .accessibilityAddTraits(.updatesFrequently)
-        }
-        if store.pendingCount > 0 {
-          SyncBadge(sets: store.pendingSets, total: store.pendingCount, reachable: store.reachable)
-        }
       }
-      .padding(.horizontal, 4)
+      .frame(width: w, height: h, alignment: .top)
     }
     .onReceive(tick) { _ in now = nowMs() }
     .onAppear { reps = max(exercise?.targetReps ?? 8, WatchLimits.minReps) }
@@ -164,22 +184,49 @@ struct ActiveWorkoutView: View {
     }
   }
 
-  // MARK: header
-
+  /// Prev and Next are the chevrons flanking the name, because the name IS the
+  /// thing they move between. That reclaims a whole 40 pt row for the dial.
   private var header: some View {
-    VStack(spacing: 1) {
-      Text(exercise?.name ?? "No exercise")
-        .font(.system(size: 17, weight: .semibold))
-        .multilineTextAlignment(.center)
-        .lineLimit(2)
-        .minimumScaleFactor(0.8)
-        .foregroundStyle(Palette.text)
-      Text(subtitle)
-        .font(.caption2)
-        .foregroundStyle(Palette.muted)
+    HStack(spacing: 2) {
+      ChevronButton(systemImage: "chevron.left", label: "Previous exercise") {
+        store.run(.previousExercise)
+      }
+      VStack(spacing: 0) {
+        Text(exercise?.name ?? "No exercise")
+          .font(.system(size: 15, weight: .semibold))
+          .multilineTextAlignment(.center)
+          .lineLimit(1)
+          .minimumScaleFactor(0.65)
+          .foregroundStyle(Palette.text)
+        HStack(spacing: 3) {
+          if store.pendingCount > 0 {
+            Image(systemName: store.reachable ? "arrow.triangle.2.circlepath" : "iphone.slash")
+              .font(.system(size: 8, weight: .bold))
+              .foregroundStyle(Palette.muted)
+          }
+          // A refusal takes over this line rather than opening a banner: an
+          // overlay big enough to read is an overlay big enough to cover
+          // "Log set", and the status line is already where the eye goes.
+          Text(refusal ?? subtitle)
+            .font(.system(size: 11))
+            .foregroundStyle(refusal == nil ? Palette.muted : Palette.accent)
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .minimumScaleFactor(0.75)
+            .accessibilityAddTraits(refusal == nil ? [] : .updatesFrequently)
+        }
+      }
+      .frame(maxWidth: .infinity)
+      ChevronButton(systemImage: "chevron.right", label: "Next exercise") {
+        store.run(.nextExercise)
+      }
     }
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel(Text("\(exercise?.name ?? "No exercise"), \(subtitle)"))
+    .accessibilityElement(children: .contain)
+  }
+
+  private var refusal: String? {
+    guard let feedback = store.lastFeedback, feedback.tone != .success else { return nil }
+    return feedback.message
   }
 
   /// Reads "Set 3 · Target 8" while logging and "Set 3 logged · Resting" during
@@ -195,17 +242,16 @@ struct ActiveWorkoutView: View {
     return String(format: NSLocalizedString("Set %d · Target %d", comment: ""), n, target)
   }
 
-  // MARK: dials
-
   /// The Digital Crown drives the load because it is the one control that works
   /// with a sweaty finger and a glove. The ring is a full-travel gauge: it says
   /// "this is turnable" without pretending the load has a maximum.
-  private var weightDial: some View {
+  private func weightDial(size: CGFloat) -> some View {
     DialFace(
       caption: "WEIGHT",
       value: formatLoad(snapshot.displayedWorkingWeight),
       unit: snapshot.unit.label,
       progress: 1,
+      size: size,
       leading: DialAction(label: "minus", systemImage: "minus") { store.nudgeWeight(steps: -1) },
       trailing: DialAction(label: "plus", systemImage: "plus") { store.nudgeWeight(steps: 1) })
       .focusable(true)
@@ -223,7 +269,7 @@ struct ActiveWorkoutView: View {
       }
   }
 
-  private func restDial(_ clock: RestClock) -> some View {
+  private func restDial(_ clock: RestClock, size: CGFloat) -> some View {
     let remaining = clock.remaining(now: now)
     let fraction = clock.total > 0 ? Double(remaining) / Double(clock.total) : 0
     return DialFace(
@@ -231,6 +277,7 @@ struct ActiveWorkoutView: View {
       value: clockText(remaining),
       unit: "of \(clockText(clock.total))",
       progress: fraction,
+      size: size,
       tint: remaining == 0 ? Palette.done : Palette.accent,
       leading: DialAction(label: "minus 30 seconds", text: "-30s") { store.extendRest(seconds: -30) },
       trailing: DialAction(label: "plus 30 seconds", text: "+30s") { store.extendRest(seconds: 30) })
@@ -242,11 +289,10 @@ struct ActiveWorkoutView: View {
       }
   }
 
-  // MARK: steppers
-
-  private var repsStepper: some View {
+  private func repsStepper(height: CGFloat) -> some View {
     StepperRow(
       text: "\(reps) reps",
+      height: height,
       decrement: { reps = max(WatchLimits.minReps, reps - 1) },
       increment: { reps = min(WatchLimits.maxReps, reps + 1) })
       .accessibilityElement(children: .combine)
@@ -259,9 +305,10 @@ struct ActiveWorkoutView: View {
       }
   }
 
-  private func restStepper(_ clock: RestClock) -> some View {
+  private func restStepper(_ clock: RestClock, height: CGFloat) -> some View {
     StepperRow(
       text: "Rest \(clockText(snapshot.restSeconds))",
+      height: height,
       decrement: { store.setRestTotal(snapshot.restSeconds - 15) },
       increment: { store.setRestTotal(snapshot.restSeconds + 15) })
       .accessibilityElement(children: .combine)
@@ -271,40 +318,44 @@ struct ActiveWorkoutView: View {
         store.setRestTotal(snapshot.restSeconds + (direction == .increment ? 15 : -15))
       }
   }
+}
 
-  // MARK: nav
+// MARK: page 2 — the session
 
-  /// Prev · Pause · Next as one segmented bar. Undo and End moved below it —
-  /// destructive actions do not belong under a thumb aimed at "Next".
-  private var navRow: some View {
-    VStack(spacing: 6) {
-      HStack(spacing: 0) {
-        SegmentButton(title: "Prev", systemImage: "chevron.left", edge: .leading) {
-          store.run(.previousExercise)
-        }
-        Divider().frame(height: 22).overlay(Palette.ground)
-        SegmentButton(
-          title: nil,
+/// Pause, undo, end and the sync state. Off the logging screen on purpose:
+/// "End workout" under a thumb aimed at "Log set" is a lost session.
+struct SessionPage: View {
+  @ObservedObject private var store = WatchStore.shared
+  let onDone: () -> Void
+
+  private var snapshot: WatchSnapshot { store.snapshot }
+
+  var body: some View {
+    GeometryReader { geo in
+      let control = max(34, min(geo.size.height * 0.17, 44))
+      VStack(spacing: max(4, min(geo.size.height * 0.03, 8))) {
+        Text("Session")
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(Palette.muted)
+        SecondaryButton(
+          title: snapshot.paused ? "Resume" : "Pause",
           systemImage: snapshot.paused ? "play.fill" : "pause.fill",
-          edge: .middle,
-          label: snapshot.paused ? "Resume workout" : "Pause workout"
+          height: control
         ) {
           store.run(snapshot.paused ? .resumeWorkout : .pauseWorkout)
+          onDone()
         }
-        Divider().frame(height: 22).overlay(Palette.ground)
-        SegmentButton(title: "Next", systemImage: "chevron.right", edge: .trailing, trailingIcon: true) {
-          store.run(.nextExercise)
-        }
-      }
-      .background(Palette.surface)
-      .clipShape(RoundedRectangle(cornerRadius: Palette.radius))
-
-      HStack(spacing: 6) {
-        SecondaryButton(title: "Undo", systemImage: "arrow.uturn.backward") {
+        SecondaryButton(title: "Undo last set", systemImage: "arrow.uturn.backward", height: control) {
           store.run(.undoLastSet(confirmed: false))
         }
-        SecondaryButton(title: "End", systemImage: "stop.fill") { store.run(.endWorkout) }
+        SecondaryButton(title: "End workout", systemImage: "stop.fill", height: control, danger: true) {
+          store.run(.endWorkout)
+        }
+        if store.pendingCount > 0 {
+          SyncBadge(sets: store.pendingSets, total: store.pendingCount, reachable: store.reachable)
+        }
       }
+      .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
     }
   }
 }
@@ -383,6 +434,9 @@ struct DialFace: View {
   let unit: String
   /// 0...1 of the ring drawn in the tint. 1 is a full sweep.
   let progress: Double
+  /// Diameter, derived by the caller from the screen so one layout fits every
+  /// case size without a scroll view.
+  let size: CGFloat
   var tint: Color = Palette.accent
   let leading: DialAction
   let trailing: DialAction
@@ -390,35 +444,41 @@ struct DialFace: View {
   var body: some View {
     ZStack {
       TickRing()
+        .frame(width: size, height: size)
       Circle()
         .trim(from: 0, to: max(0, min(1, progress)) * 0.82)
-        .stroke(tint, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+        .stroke(tint, style: StrokeStyle(lineWidth: size * 0.045, lineCap: .round))
         .rotationEffect(.degrees(147))
-        .padding(6)
+        .frame(width: size - 8, height: size - 8)
       VStack(spacing: -2) {
         Text(caption)
-          .font(.system(size: 11, weight: .semibold))
+          .font(.system(size: size * 0.105, weight: .semibold))
           .foregroundStyle(Palette.muted)
         Text(value)
-          .font(.system(size: 40, weight: .bold, design: .rounded))
+          .font(.system(size: size * 0.38, weight: .bold, design: .rounded))
           .foregroundStyle(tint)
-          .minimumScaleFactor(0.5)
+          .minimumScaleFactor(0.45)
           .lineLimit(1)
         Text(unit)
-          .font(.system(size: 13, weight: .semibold))
+          .font(.system(size: size * 0.13, weight: .semibold))
           .foregroundStyle(tint.opacity(0.85))
           .lineLimit(1)
-          .minimumScaleFactor(0.7)
+          .minimumScaleFactor(0.6)
       }
-      .padding(.horizontal, 34)
-      HStack {
-        DialShoulder(action: leading, tint: tint)
-        Spacer()
-        DialShoulder(action: trailing, tint: tint)
-      }
+      .frame(width: size * 0.66)
+      // The shoulders straddle the ring rather than sitting at the screen
+      // edges: they belong to the dial, and the thumb finds them by aiming at
+      // the circle it is already looking at.
+      DialShoulder(action: leading, tint: tint, size: shoulder)
+        .offset(x: -size * 0.56)
+      DialShoulder(action: trailing, tint: tint, size: shoulder)
+        .offset(x: size * 0.56)
     }
-    .frame(height: 132)
+    .frame(height: size)
   }
+
+  /// Big enough to hit, never so big it crowds the ring on a 40mm face.
+  private var shoulder: CGFloat { max(32, min(size * 0.33, 40)) }
 }
 
 /// The minute ticks behind the ring. Purely decorative, and hidden from
@@ -432,8 +492,8 @@ private struct TickRing: View {
           let major = i % 5 == 0
           Capsule()
             .fill(Color.white.opacity(major ? 0.34 : 0.16))
-            .frame(width: major ? 2 : 1, height: major ? 8 : 5)
-            .offset(y: -r + 20)
+            .frame(width: major ? 2 : 1, height: major ? r * 0.10 : r * 0.06)
+            .offset(y: -r + r * 0.19)
             .rotationEffect(.degrees(Double(i) / 60 * 360))
         }
       }
@@ -446,17 +506,19 @@ private struct TickRing: View {
 private struct DialShoulder: View {
   let action: DialAction
   let tint: Color
+  let size: CGFloat
 
   var body: some View {
     Button(action: action.action) {
       Group {
         if let text = action.text {
-          Text(text).font(.system(size: 12, weight: .bold))
+          Text(text).font(.system(size: size * 0.29, weight: .bold)).minimumScaleFactor(0.7)
         } else {
-          Image(systemName: action.systemImage ?? "circle").font(.system(size: 16, weight: .bold))
+          Image(systemName: action.systemImage ?? "circle")
+            .font(.system(size: size * 0.38, weight: .bold))
         }
       }
-      .frame(width: 44, height: 44)
+      .frame(width: size, height: size)
     }
     .buttonStyle(.plain)
     .background(Palette.surface)
@@ -470,21 +532,23 @@ private struct DialShoulder: View {
 /// A capsule with a value in the middle and a round tap target at each end.
 struct StepperRow: View {
   let text: String
+  var height: CGFloat = 34
   let decrement: () -> Void
   let increment: () -> Void
 
   var body: some View {
     HStack(spacing: 0) {
-      StepperEnd(systemImage: "minus", action: decrement)
+      StepperEnd(systemImage: "minus", size: height - 6, action: decrement)
       Text(text)
-        .font(.system(size: 17, weight: .semibold, design: .rounded))
+        .font(.system(size: height * 0.46, weight: .semibold, design: .rounded))
         .foregroundStyle(Palette.text)
         .frame(maxWidth: .infinity)
         .lineLimit(1)
-        .minimumScaleFactor(0.7)
-      StepperEnd(systemImage: "plus", action: increment)
+        .minimumScaleFactor(0.6)
+      StepperEnd(systemImage: "plus", size: height - 6, action: increment)
     }
     .padding(3)
+    .frame(height: height)
     .background(Palette.surface)
     .clipShape(RoundedRectangle(cornerRadius: Palette.radius))
   }
@@ -492,13 +556,14 @@ struct StepperRow: View {
 
 private struct StepperEnd: View {
   let systemImage: String
+  let size: CGFloat
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
       Image(systemName: systemImage)
-        .font(.system(size: 14, weight: .bold))
-        .frame(width: 38, height: 38)
+        .font(.system(size: size * 0.44, weight: .bold))
+        .frame(width: size, height: size)
     }
     .buttonStyle(.plain)
     .background(Palette.ground.opacity(0.55))
@@ -507,28 +572,24 @@ private struct StepperEnd: View {
   }
 }
 
-/// One third of the Prev · Pause · Next bar.
-struct SegmentButton: View {
-  let title: String?
+/// The Prev/Next affordance, sized to the 44 pt minimum while drawing as a
+/// bare chevron — a filled button either side of the name would read as two
+/// more actions competing with the dial.
+struct ChevronButton: View {
   let systemImage: String
-  enum Edge { case leading, middle, trailing }
-  let edge: Edge
-  var trailingIcon: Bool = false
-  var label: String? = nil
+  let label: String
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 3) {
-        if !trailingIcon { Image(systemName: systemImage).font(.system(size: 12, weight: .bold)) }
-        if let title { Text(title).font(.system(size: 14, weight: .semibold)) }
-        if trailingIcon { Image(systemName: systemImage).font(.system(size: 12, weight: .bold)) }
-      }
-      .frame(maxWidth: .infinity, minHeight: 40)
+      Image(systemName: systemImage)
+        .font(.system(size: 13, weight: .bold))
+        .frame(width: 26, height: 40)
+        .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .foregroundStyle(Palette.text)
-    .accessibilityLabel(Text(label ?? title ?? systemImage))
+    .foregroundStyle(Palette.muted)
+    .accessibilityLabel(Text(label))
   }
 }
 
@@ -536,6 +597,7 @@ struct SegmentButton: View {
 struct PrimaryButton: View {
   let title: String
   let systemImage: String?
+  var height: CGFloat = 44
   let action: () -> Void
 
   var body: some View {
@@ -547,8 +609,10 @@ struct PrimaryButton: View {
           Text(title)
         }
       }
-      .font(.system(size: 16, weight: .semibold))
-      .frame(maxWidth: .infinity, minHeight: 44)
+      .font(.system(size: max(14, height * 0.4), weight: .semibold))
+      .lineLimit(1)
+      .minimumScaleFactor(0.7)
+      .frame(maxWidth: .infinity, minHeight: height)
     }
     .buttonStyle(.plain)
     .background(Palette.accent)
@@ -563,17 +627,23 @@ struct PrimaryButton: View {
 struct SecondaryButton: View {
   let title: String
   let systemImage: String
+  var height: CGFloat = 40
+  /// Ending a workout is the one irreversible control here, so it is the one
+  /// that is allowed to look different.
+  var danger: Bool = false
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
       Label(title, systemImage: systemImage)
-        .font(.system(size: 14, weight: .medium))
-        .frame(maxWidth: .infinity, minHeight: 40)
+        .font(.system(size: max(13, height * 0.34), weight: .medium))
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .frame(maxWidth: .infinity, minHeight: height)
     }
     .buttonStyle(.plain)
     .background(Palette.surface)
-    .foregroundStyle(Palette.text)
+    .foregroundStyle(danger ? Palette.accent : Palette.text)
     .overlay(RoundedRectangle(cornerRadius: Palette.radius).stroke(Palette.surface, lineWidth: 1))
     .clipShape(RoundedRectangle(cornerRadius: Palette.radius))
   }
