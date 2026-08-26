@@ -360,97 +360,110 @@ function SessionCard({
         )}
       </View>
 
-      <View style={styles.setHeadRow}>
-        <Text style={[styles.setHead, { width: 44, textAlign: "center" }]}>SET</Text>
-        <Text style={[styles.setHead, { flex: 1 }]}>{loadColumnLabel(unit, bodyweight)}</Text>
-        <Text style={[styles.setHead, { flex: 1 }]}>REPS</Text>
-        <Text style={[styles.setHead, { width: 88, textAlign: "center" }]}>DONE</Text>
-      </View>
+      <View style={styles.setsCard}>
+        <View style={styles.setHeadRow}>
+          <Text style={[styles.setHead, { width: 44, textAlign: "center" }]}>SET</Text>
+          <Text style={[styles.setHead, { flex: 1, textAlign: "center" }]}>{loadColumnLabel(unit, bodyweight)}</Text>
+          <Text style={[styles.setHead, { flex: 1, textAlign: "center" }]}>REPS</Text>
+          <View style={{ width: 36 }} />
+        </View>
 
-      {se.sets.map((s, idx) => {
-        const ready = canMarkDone(s);
-        const pr = setPRs[idx];
-        return (
-          <View key={s.id} style={[styles.setRow, s.done && styles.setRowDone]}>
-            {/* The set number doubles as the warm-up toggle: a warm-up is logged
-                with the session but stays out of volume and records. */}
-            <A11yControl
-              role="checkbox"
-              checked={!!s.warmup}
-              label={
-                s.warmup
-                  ? `Set ${idx + 1} is a warm-up. Tap to make it a working set.`
-                  : `Set ${idx + 1} is a working set. Tap to mark it a warm-up.`
-              }
-              onPress={() => w.toggleWarmup(se.exerciseId, s.id)}
-              style={styles.setIdxBtn}
-              testID={`warmup-${se.exerciseId}-${idx}`}
-            >
-              {s.warmup ? (
-                <View style={styles.warmPill}>
-                  <Text style={styles.warmPillText}>W</Text>
+        {se.sets.map((s, idx) => {
+          const ready = canMarkDone(s);
+          const pr = setPRs[idx];
+          // The first unlogged set is the one the lifter is on; its badge is the
+          // outlined accent ring, everything later stays muted.
+          const isNext = !s.done && se.sets.findIndex((x) => !x.done) === idx;
+          return (
+            <View key={s.id}>
+              {idx > 0 && <View style={styles.setSep} />}
+              <View style={[styles.setRow, s.done && styles.setRowDone]}>
+                {/* One badge, two gestures: tap logs the set, long-press
+                    duplicates it. A set with no reps records no work, so it
+                    cannot be ticked. */}
+                <View style={styles.setRail}>
+                  <View style={[styles.railSeg, idx === 0 && styles.railHidden]} />
+                  <A11yControl
+                    role="checkbox"
+                    checked={s.done}
+                    disabled={!s.done && !ready}
+                    label={s.done ? `Set ${idx + 1} complete` : ready ? `Mark set ${idx + 1} complete` : ZERO_REP_HINT}
+                    hint="Long-press to duplicate this set."
+                    onPress={() => onToggleDone(se.exerciseId, s.id, !s.done)}
+                    onLongPress={() => w.duplicateSet(se.exerciseId, s.id)}
+                    style={styles.setIdxBtn}
+                    testID={`done-${se.exerciseId}-${idx}`}
+                  >
+                    <View
+                      style={[
+                        styles.setBadge,
+                        s.done ? styles.setBadgeDone : isNext ? styles.setBadgeNext : styles.setBadgeIdle,
+                      ]}
+                    >
+                      {s.done ? (
+                        <Ionicons name="checkmark" size={16} color={T.bg} />
+                      ) : (
+                        <Text style={[styles.setBadgeText, isNext ? styles.setBadgeTextNext : null]}>
+                          {s.warmup ? "W" : idx + 1}
+                        </Text>
+                      )}
+                    </View>
+                  </A11yControl>
+                  <View style={[styles.railSeg, idx === se.sets.length - 1 && styles.railHidden]} />
                 </View>
-              ) : (
-                <Text style={styles.setIdx}>{idx + 1}</Text>
-              )}
-            </A11yControl>
-            <TextInput
-              style={styles.setInput}
-              keyboardType="numeric"
-              value={s.weight ? String(s.weight) : ""}
-              placeholder={loadPlaceholder(bodyweight)}
-              placeholderTextColor={T.textFaint}
-              onChangeText={(t) => w.updateSet(se.exerciseId, s.id, { weight: Number(t) || 0 })}
-              accessibilityLabel={`Set ${idx + 1} load, ${formatSetLoad(s.weight, unit, bodyweight)}`}
-              testID={`w-${se.exerciseId}-${idx}`}
-            />
-            <TextInput
-              style={styles.setInput}
-              keyboardType="numeric"
-              value={s.reps ? String(s.reps) : ""}
-              placeholder="0"
-              placeholderTextColor={T.textFaint}
-              onChangeText={(t) => w.updateSet(se.exerciseId, s.id, { reps: Number(t) || 0 })}
-              accessibilityLabel={`Set ${idx + 1} reps, ${s.reps || 0}`}
-              testID={`r-${se.exerciseId}-${idx}`}
-            />
-            <View style={styles.setActions}>
-              {pr ? (
-                <View style={styles.prFlag} testID={`pr-${se.exerciseId}-${idx}`}>
-                  <Ionicons name="trophy" size={13} color={T.pr} />
-                </View>
-              ) : (
-                <A11yControl
-                  label={`Duplicate set ${idx + 1}`}
-                  onPress={() => w.duplicateSet(se.exerciseId, s.id)}
-                  style={styles.setActionBtn}
-                  testID={`dup-${se.exerciseId}-${idx}`}
-                >
-                  <LiquidSheen tone="neutral" />
-                  <Ionicons name="copy-outline" size={18} color={T.textDim} />
-                </A11yControl>
-              )}
-              {/* A set with no reps records no work, so it cannot be ticked. */}
-              <A11yControl
-                role="checkbox"
-                checked={s.done}
-                disabled={!s.done && !ready}
-                label={s.done ? `Set ${idx + 1} complete` : ready ? `Mark set ${idx + 1} complete` : ZERO_REP_HINT}
-                onPress={() => onToggleDone(se.exerciseId, s.id, !s.done)}
-                style={styles.setActionBtn}
-                testID={`done-${se.exerciseId}-${idx}`}
-              >
-                <LiquidSheen tone={s.done ? "accent" : "neutral"} />
-                <Ionicons
-                  name={s.done ? "checkmark-circle" : "ellipse-outline"}
-                  size={24}
-                  color={s.done ? "#3DDC97" : ready ? T.textFaint : T.border}
+                <TextInput
+                  style={[styles.setInput, s.done && styles.setValueDone]}
+                  keyboardType="numeric"
+                  value={s.weight ? String(s.weight) : ""}
+                  placeholder={loadPlaceholder(bodyweight)}
+                  placeholderTextColor={T.textFaint}
+                  onChangeText={(t) => w.updateSet(se.exerciseId, s.id, { weight: Number(t) || 0 })}
+                  accessibilityLabel={`Set ${idx + 1} load, ${formatSetLoad(s.weight, unit, bodyweight)}`}
+                  testID={`w-${se.exerciseId}-${idx}`}
                 />
-              </A11yControl>
+                <TextInput
+                  style={[styles.setInput, s.done && styles.setValueDone]}
+                  keyboardType="numeric"
+                  value={s.reps ? String(s.reps) : ""}
+                  placeholder="0"
+                  placeholderTextColor={T.textFaint}
+                  onChangeText={(t) => w.updateSet(se.exerciseId, s.id, { reps: Number(t) || 0 })}
+                  accessibilityLabel={`Set ${idx + 1} reps, ${s.reps || 0}`}
+                  testID={`r-${se.exerciseId}-${idx}`}
+                />
+                {/* The warm-up toggle kept its own visible control: burying it
+                    under another gesture on the badge would make it silent. The
+                    trophy takes the slot on a PR row — a record is never a
+                    warm-up. */}
+                {pr ? (
+                  <View style={styles.prFlag} testID={`pr-${se.exerciseId}-${idx}`}>
+                    <Ionicons name="trophy" size={13} color={T.pr} />
+                  </View>
+                ) : (
+                  <A11yControl
+                    role="checkbox"
+                    checked={!!s.warmup}
+                    label={
+                      s.warmup
+                        ? `Set ${idx + 1} is a warm-up. Tap to make it a working set.`
+                        : `Set ${idx + 1} is a working set. Tap to mark it a warm-up.`
+                    }
+                    onPress={() => w.toggleWarmup(se.exerciseId, s.id)}
+                    style={styles.warmSlot}
+                    testID={`warmup-${se.exerciseId}-${idx}`}
+                  >
+                    <View style={[styles.warmPill, s.warmup && styles.warmPillOn]}>
+                      <Text style={[styles.warmPillText, s.warmup && styles.warmPillTextOn]}>W</Text>
+                    </View>
+                  </A11yControl>
+                )}
+              </View>
             </View>
-          </View>
-        );
-      })}
+          );
+        })}
+
+        <Text style={styles.setHint}>Tap the set number to log it · long-press to duplicate.</Text>
+      </View>
 
       {/* Named once per card rather than on every row, so the log stays readable. */}
       {firstPR && (
@@ -554,18 +567,33 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   },
   prNoteText: { color: T.pr, fontSize: 11.5, fontWeight: "700", flex: 1 },
 
-  setHeadRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
-  setHead: { color: T.textFaint, fontSize: 11, fontWeight: "700" },
-  setRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 3 },
-  setRowDone: { opacity: 0.85 },
+  setsCard: { borderWidth: 1, borderColor: T.border, borderRadius: 22, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 10, marginTop: 4 },
+  setHeadRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 },
+  setHead: { color: T.textFaint, fontSize: 11, fontWeight: "700", letterSpacing: 1 },
+  setRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
+  setRowDone: { opacity: 0.9 },
+  // Hairline between rows, indented so the timeline rail runs through unbroken.
+  setSep: { height: StyleSheet.hairlineWidth, backgroundColor: T.border, marginLeft: 52 },
+  // The rail: a 2px line passing behind every badge, hidden beyond the ends.
+  setRail: { width: 44, alignItems: "center" },
+  // T.border disappears against the card at 2px; the rail needs its own step up.
+  railSeg: { width: 2, flex: 1, backgroundColor: "rgba(255,255,255,0.14)" },
+  railHidden: { backgroundColor: "transparent" },
   setIdxBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  setIdx: { color: T.text, fontSize: 14, fontWeight: "700" },
-  warmPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: T.surfaceHi, },
-  warmPillText: { color: T.textDim, fontSize: 11, fontWeight: "800" },
-  setInput: { flex: 1, minWidth: 0, backgroundColor: T.surfaceHi, borderRadius: 22, paddingVertical: 8, textAlign: "center", color: T.text, fontSize: 15, fontWeight: "600", },
-  // Each control keeps its 18-24px glyph but owns a full 44x44 target.
-  setActions: { width: 88, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  setActionBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: T.surfaceHi },
+  setBadge: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  setBadgeDone: { backgroundColor: T.accent },
+  setBadgeNext: { borderWidth: 2, borderColor: T.accent },
+  setBadgeIdle: { borderWidth: 1.5, borderColor: T.border },
+  setBadgeText: { color: T.textFaint, fontSize: 14, fontWeight: "700" },
+  setBadgeTextNext: { color: T.accent },
+  warmSlot: { width: 36, alignSelf: "center", height: 44, alignItems: "center", justifyContent: "center" },
+  warmPill: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: T.surfaceHi },
+  warmPillOn: { backgroundColor: T.accent },
+  warmPillText: { color: T.textFaint, fontSize: 11, fontWeight: "800" },
+  warmPillTextOn: { color: T.bg },
+  setInput: { flex: 1, minWidth: 0, alignSelf: "center", backgroundColor: "transparent", paddingVertical: 10, textAlign: "center", color: T.text, fontSize: 17, fontWeight: "600" },
+  setValueDone: { color: T.textDim },
+  setHint: { color: T.textFaint, fontSize: 11.5, textAlign: "center", marginTop: 6, marginBottom: 2 },
   addSet: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, marginTop: 6, borderRadius: 22, backgroundColor: T.surfaceHi, overflow: "hidden", },
   addSetText: { color: T.accent, fontSize: 13, fontWeight: "700" },
   notes: { backgroundColor: T.bg2, borderRadius: 22, paddingHorizontal: 12, paddingVertical: 8, color: T.text, fontSize: 14, marginTop: 8, },

@@ -13,6 +13,7 @@ import { useSemanticTokens } from "@/src/theme/semantic";
 export function A11yControl({
   label,
   onPress,
+  onLongPress,
   role = "button",
   checked,
   selected,
@@ -25,6 +26,8 @@ export function A11yControl({
 }: {
   label: string;
   onPress: () => void;
+  /** Optional secondary action; announce it through `hint` so it is not silent. */
+  onLongPress?: () => void;
   role?: AccessibilityRole;
   checked?: boolean;
   selected?: boolean;
@@ -75,6 +78,7 @@ export function A11yControl({
       accessibilityState={{ checked, selected, disabled: !!disabled, busy: !!busy }}
       disabled={disabled}
       onPress={onPress}
+      onLongPress={onLongPress}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       testID={testID}
