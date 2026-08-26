@@ -10,6 +10,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Image, TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import Svg, { Circle as SvgCircle } from "react-native-svg";
 import { useRouter } from "expo-router";
 
 import { useTheme } from "@/src/theme/ThemeContext";
@@ -39,6 +40,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
   const w = useWorkout();
   const { resolution } = usePremium();
   const [adjusting, setAdjusting] = useState(false);
+  const [showWeek, setShowWeek] = useState(false);
   const swaps = usePlanStore(s => s.swaps);
   if (!plan) return null;
   const { answers, splitLabel, days } = plan;
@@ -72,6 +74,25 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
   // v1.2.0 carries no seed and is left alone rather than guessed at.
   const staleSession =
     hasActiveWorkout && w.sessionPlanSeed !== null && w.sessionPlanSeed !== plan.seed;
+
+  // Every muscle today's exercises train, swaps included — the same derivation
+  // the day card uses, so the two can never disagree.
+  const todayMuscles = Array.from(
+    new Set(
+      resolveDayExercises(todayDay?.rest ? [] : todayDay?.exercises, swaps, answers)
+        .map((ex) => ex.muscle)
+        .filter(Boolean),
+    ),
+  ).map((m) => MUSCLE_LABEL[m as keyof typeof MUSCLE_LABEL] || String(m));
+
+  // The next training day, wrapping past Sunday so Saturday still has a "next".
+  const nextDay = (() => {
+    for (let step = 1; step <= 7; step += 1) {
+      const index = (todayIdx + step) % 7;
+      if (!days[index].rest) return { index, day: days[index] };
+    }
+    return null;
+  })();
 
   const openSession = () => router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
   const previewPremium = () => router.push("/(tabs)/coach");
@@ -114,68 +135,134 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
         </TouchableOpacity>
       </View>
 
-      {/* Where the week actually stands, before anything is asked of the user. */}
-      <View style={[styles.summaryRow, { backgroundColor: T.card, }]} testID="today-summary">
+      {/* The week as a strip: where today sits among the days around it, and
+          the one control that moves between them. */}
+      <DateStrip todayIdx={todayIdx} days={days} onOpenDay={onOpenDay} />
+
+      {/* One card carries the whole answer to "what am I doing today": what it
+          is, how long, what it trains, the plan it came from, the action, and
+          where the week stands. */}
+      <View style={[styles.heroCard, { backgroundColor: T.card }]} testID="today-hero">
         <LiquidSheen tone="neutral" />
-        <SummaryStat value={String(week.count)} label={week.count === 1 ? "workout" : "workouts"} T={T} styles={styles} />
-        <View style={[styles.summaryDivider, { backgroundColor: T.border }]} />
-        <SummaryStat value={String(weekSets)} label="sets logged" T={T} styles={styles} />
-        <View style={[styles.summaryDivider, { backgroundColor: T.border }]} />
-        <SummaryStat value={`${weekVolume}`} label={`${w.unit} volume`} T={T} styles={styles} />
-      </View>
-
-      <View style={styles.chipsRow}>
-        <Chip label={GOAL_LABEL[answers.goal]} />
-        <Chip label={daysSummary(answers.days)} />
-        <Chip label={splitLabel} />
-        {answers.focus.map(f => (
-          <Chip key={f} label={`Focus: ${REGION_LABEL[f]}`} tone="focus" />
-        ))}
-        {answers.posture && <Chip label="Posture work" tone="posture" />}
-      </View>
-
-      {/* Resuming an active session and starting a new workout are separate actions. */}
-      <View style={{ marginTop: BLOCK_GAP }}>
-        {hasActiveWorkout ? (
-          <InterruptedSessionCard
-            title={staleSession ? "Workout from your previous plan" : "Workout in progress"}
-            body={
-              staleSession
-                ? "You rebuilt your plan while this workout was open. It is still here and every set you logged is saved — finishing it will record it to your History."
-                : "Pick up exactly where you left off — every set you logged is saved on this device."
-            }
-            facts={[
-              ["Exercises", String((w.session || []).length)],
-              ["Sets logged", `${activeDone} of ${activeSets}`],
-            ]}
-            resume={{
-              label: staleSession ? "Resume anyway" : "Resume workout",
-              onPress: openSession,
-              testID: "wp-resume-session",
-            }}
-            // Discarding is only offered for a session the current plan no longer
-            // knows about, and it is the user's explicit choice — never automatic.
-            discard={
-              staleSession
-                ? { label: "Discard it and start fresh", onPress: w.cancel, testID: "wp-discard-stale" }
-                : undefined
-            }
-            testID={staleSession ? "wp-stale-session" : "wp-active-session"}
-          />
-        ) : todayDay && !todayDay.rest ? (
-          <ActionButton
-            label={`Start today's workout · ${todayDay.typeName}`}
-            onPress={startToday}
-            testID="wp-start-today"
-          />
+        {todayDay && !todayDay.rest ? (
+          <>
+            <View style={styles.heroEyebrowRow}>
+              <Text style={[styles.heroEyebrow, { color: T.accentText }]}>TODAY</Text>
+              <Text style={[styles.heroDot, { color: T.textFaint }]}>•</Text>
+              <Text style={[styles.heroEyebrow, { color: T.textFaint }]}>~{todayDay.minutes} MIN</Text>
+            </View>
+            <Text style={[styles.heroTitle, { color: T.text }]}>{todayDay.typeName}</Text>
+            <Text style={[styles.heroMuscles, { color: T.text2 }]}>{todayMuscles.join("  ·  ")}</Text>
+            <Text style={[styles.heroMeta, { color: T.textMuted }]}>
+              {GOAL_LABEL[answers.goal]}  ·  {daysSummary(answers.days)}
+            </Text>
+          </>
         ) : (
-          <InfoBanner
-            title="Today is a rest day"
-            message="Tap any training day below to start that workout instead."
-            testID="wp-rest-today"
-          />
+          <>
+            <View style={styles.heroEyebrowRow}>
+              <Text style={[styles.heroEyebrow, { color: T.accentText }]}>TODAY</Text>
+            </View>
+            <Text style={[styles.heroTitle, { color: T.text }]}>Rest &amp; recover</Text>
+            <Text style={[styles.heroMuscles, { color: T.text2 }]}>
+              Tap a day above to train it instead.
+            </Text>
+          </>
         )}
+
+        {/* Resuming an active session and starting a new workout stay separate
+            actions: resume never rewrites what is already being logged. */}
+        <View style={{ marginTop: 14 }}>
+          {hasActiveWorkout ? (
+            <InterruptedSessionCard
+              title={staleSession ? "Workout from your previous plan" : "Workout in progress"}
+              body={
+                staleSession
+                  ? "You rebuilt your plan while this workout was open. It is still here and every set you logged is saved — finishing it will record it to your History."
+                  : "Pick up exactly where you left off — every set you logged is saved on this device."
+              }
+              facts={[
+                ["Exercises", String((w.session || []).length)],
+                ["Sets logged", `${activeDone} of ${activeSets}`],
+              ]}
+              resume={{
+                label: staleSession ? "Resume anyway" : "Resume workout",
+                onPress: openSession,
+                testID: "wp-resume-session",
+              }}
+              discard={
+                staleSession
+                  ? { label: "Discard it and start fresh", onPress: w.cancel, testID: "wp-discard-stale" }
+                  : undefined
+              }
+              testID={staleSession ? "wp-stale-session" : "wp-active-session"}
+            />
+          ) : todayDay && !todayDay.rest ? (
+            <ActionButton label="Start workout" onPress={startToday} testID="wp-start-today" />
+          ) : null}
+        </View>
+
+        <View style={[styles.heroRule, { backgroundColor: T.border }]} />
+
+        <View style={styles.heroStats}>
+          <View style={styles.heroStatCell}>
+            <ProgressRing
+              done={week.count}
+              total={Math.max(answers.days.length, week.count)}
+              T={T}
+            />
+          </View>
+          <View style={[styles.heroStatDivider, { backgroundColor: T.border }]} />
+          <View style={styles.heroStatCell}>
+            <Text style={[styles.heroStatValue, { color: T.text }]}>{weekSets}</Text>
+            <Text style={[styles.heroStatLabel, { color: T.textMuted }]}>sets</Text>
+          </View>
+          <View style={[styles.heroStatDivider, { backgroundColor: T.border }]} />
+          <View style={styles.heroStatCell}>
+            <Text style={[styles.heroStatValue, { color: T.text }]}>{weekVolume}</Text>
+            <Text style={[styles.heroStatLabel, { color: T.textMuted }]}>{w.unit} volume</Text>
+          </View>
+        </View>
       </View>
+
+      {/* What is coming, so the week reads forward from here. */}
+      {nextDay && (
+        <A11yControl
+          label={`Next, ${nextDay.day.dow}, ${nextDay.day.typeName}, about ${nextDay.day.minutes} minutes`}
+          onPress={() => onOpenDay(nextDay.index)}
+          style={styles.nextRow}
+          testID="today-next"
+        >
+          <Text style={[styles.nextCaps, { color: T.accentText }]}>NEXT</Text>
+          <Text style={[styles.nextDow, { color: T.text }]}>{nextDay.day.dow.slice(0, 3)}</Text>
+          <Text style={[styles.heroDot, { color: T.textFaint }]}>•</Text>
+          <Text style={[styles.nextName, { color: T.text }]} numberOfLines={1}>
+            {nextDay.day.typeName}
+          </Text>
+          <Text style={[styles.nextMin, { color: T.textMuted }]}>~{nextDay.day.minutes} min</Text>
+          <Ionicons name="chevron-forward" size={15} color={T.textMuted} />
+        </A11yControl>
+      )}
+
+      <A11yControl
+        label={showWeek ? "Hide the weekly plan" : "View the weekly plan"}
+        selected={showWeek}
+        onPress={() => setShowWeek((v) => !v)}
+        style={styles.weekToggle}
+        testID="today-week-toggle"
+      >
+        <Text style={[styles.weekToggleText, { color: T.text2 }]}>
+          {showWeek ? "Hide weekly plan" : "View weekly plan"}
+        </Text>
+        <Ionicons name={showWeek ? "chevron-up" : "chevron-forward"} size={14} color={T.text2} />
+      </A11yControl>
+
+      {showWeek && (
+        <View style={{ gap: 10, marginTop: 4 }} testID="today-week-list">
+          {days.map((day, i) => (
+            <DayCard key={i} day={day} onPress={() => !day.rest && onOpenDay(i)} />
+          ))}
+        </View>
+      )}
 
       {/* Discovery only appears once entitlement is actually resolved: a
           subscriber must never see a Premium pitch while RevenueCat loads. */}
@@ -189,7 +276,8 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
         </View>
       ) : null}
 
-      <View style={styles.progressRow}>
+      <View style={[styles.progressCard, { backgroundColor: T.card }]}>
+        <LiquidSheen tone="neutral" />
         <ProgressLink
           icon="calendar-outline"
           label="History"
@@ -198,6 +286,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
           T={T}
           styles={styles}
         />
+        <View style={[styles.progressCardDivider, { backgroundColor: T.border }]} />
         <ProgressLink
           icon="stats-chart-outline"
           label="Insights"
@@ -206,13 +295,6 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
           T={T}
           styles={styles}
         />
-      </View>
-
-      <Text style={[styles.sectionHead, { color: T.textFaint }]}>THIS WEEK</Text>
-      <View style={{ gap: 10 }}>
-        {days.map((day, i) => (
-          <DayCard key={i} day={day} onPress={() => !day.rest && onOpenDay(i)} />
-        ))}
       </View>
 
       <View style={styles.wpFooter}>
@@ -237,6 +319,113 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
   );
 }
 
+/// The week as seven columns: initial over date, today filled. Tapping a
+/// training day opens it — the strip is navigation, not decoration.
+function DateStrip({
+  todayIdx,
+  days,
+  onOpenDay,
+}: {
+  todayIdx: number;
+  days: PlanDay[];
+  onOpenDay: (i: number) => void;
+}) {
+  const { T } = useTheme();
+  // Monday of the current week, so the numbers line up with the plan's own
+  // Monday-first ordering rather than the locale's week start.
+  const monday = new Date();
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - todayIdx);
+  return (
+    <View style={styles.strip} testID="today-strip">
+      {days.map((day, i) => {
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + i);
+        const isToday = i === todayIdx;
+        return (
+          <A11yControl
+            key={i}
+            selected={isToday}
+            label={`${day.dow} ${date.getDate()}${day.rest ? ", rest day" : `, ${day.typeName}`}`}
+            onPress={() => !day.rest && onOpenDay(i)}
+            style={styles.stripCell}
+            testID={`strip-${i}`}
+          >
+            <View style={[styles.stripPill, isToday && { backgroundColor: T.accent }]}>
+              <Text
+                style={[
+                  styles.stripDow,
+                  { color: isToday ? T.ctaText : T.textMuted },
+                ]}
+              >
+                {day.dow[0]}
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.stripDate,
+                { color: isToday ? T.accentText : T.textMuted },
+                isToday && { fontWeight: "800" },
+              ]}
+            >
+              {date.getDate()}
+            </Text>
+          </A11yControl>
+        );
+      })}
+    </View>
+  );
+}
+
+/// Workouts completed this week against the number planned. An arc rather than
+/// a bar because it sits in a row of numbers and has to read as one glyph.
+function ProgressRing({ done, total, T }: { done: number; total: number; T: any }) {
+  const size = 52;
+  const stroke = 4;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const fraction = total > 0 ? Math.min(1, done / total) : 0;
+  return (
+    <View
+      style={{ alignItems: "center", justifyContent: "center" }}
+      accessible
+      accessibilityLabel={`${done} of ${total} planned workouts done this week`}
+      testID="today-ring"
+    >
+      <Svg width={size} height={size}>
+        <SvgCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={T.border}
+          strokeWidth={stroke}
+          fill="none"
+        />
+        <SvgCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={T.accent}
+          strokeWidth={stroke}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={`${circumference * fraction} ${circumference}`}
+          // Start the arc at twelve o'clock rather than three.
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <Text style={[styles.ringValue, { color: T.text }]}>
+            {done}/{total}
+          </Text>
+          <Text style={[styles.ringLabel, { color: T.textMuted }]}>days</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function SummaryStat({ value, label, T, styles }: { value: string; label: string; T: any; styles: any }) {
   return (
     <View style={styles.summaryStat}>
@@ -250,14 +439,15 @@ function ProgressLink({
   icon, label, onPress, testID, T, styles,
 }: { icon: any; label: string; onPress: () => void; testID: string; T: any; styles: any }) {
   return (
+    // No fill of its own: these now sit side by side inside one card, and a
+    // second card colour on top of the first reads as a seam.
     <TouchableOpacity
-      style={[styles.progressLink, { backgroundColor: T.card, }]}
+      style={[styles.progressLink, { backgroundColor: "transparent" }]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
       testID={testID}
     >
-      <LiquidSheen tone="neutral" />
       <Ionicons name={icon} size={17} color={T.accent} />
       <Text style={[styles.progressLinkText, { color: T.text }]}>{label}</Text>
       <Ionicons name="chevron-forward" size={15} color={T.textFaint} />
@@ -764,6 +954,40 @@ const SECTION_GAP = 24;
 
 const styles = StyleSheet.create({
   wpScroll: { padding: 20, paddingTop: 56, paddingBottom: 40 },
+  strip: { flexDirection: "row", justifyContent: "space-between", marginTop: 14, marginBottom: 4 },
+  stripCell: { flex: 1, alignItems: "center", gap: 4, paddingVertical: 2 },
+  stripPill: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  stripDow: { fontSize: 13, fontWeight: "700" },
+  stripDate: { fontSize: 13, fontWeight: "600" },
+
+  heroCard: { borderRadius: 24, padding: 18, marginTop: 14, overflow: "hidden" },
+  heroEyebrowRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  heroEyebrow: { fontSize: 11.5, fontWeight: "800", letterSpacing: 1.1 },
+  heroDot: { fontSize: 11.5, fontWeight: "800" },
+  heroTitle: { fontSize: 27, fontWeight: "800", marginTop: 8, letterSpacing: -0.4 },
+  heroMuscles: { fontSize: 15, marginTop: 10 },
+  heroMeta: { fontSize: 13.5, marginTop: 10 },
+  heroRule: { height: StyleSheet.hairlineWidth, marginTop: 16 },
+  heroStats: { flexDirection: "row", alignItems: "center", marginTop: 14 },
+  heroStatCell: { flex: 1, alignItems: "center", gap: 2 },
+  heroStatDivider: { width: StyleSheet.hairlineWidth, alignSelf: "stretch", marginVertical: 2 },
+  heroStatValue: { fontSize: 24, fontWeight: "800" },
+  heroStatLabel: { fontSize: 12 },
+  ringValue: { fontSize: 13, fontWeight: "800" },
+  ringLabel: { fontSize: 9.5, marginTop: -1 },
+
+  nextRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 14, paddingHorizontal: 4, marginTop: 6 },
+  nextCaps: { fontSize: 11, fontWeight: "800", letterSpacing: 1.1 },
+  nextDow: { fontSize: 14.5, fontWeight: "700" },
+  nextName: { fontSize: 14.5, fontWeight: "600", flex: 1 },
+  nextMin: { fontSize: 13 },
+
+  weekToggle: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, minHeight: 44 },
+  weekToggleText: { fontSize: 14, fontStyle: "italic" },
+
+  progressCard: { flexDirection: "row", alignItems: "center", borderRadius: 22, marginTop: 14, overflow: "hidden" },
+  progressCardDivider: { width: StyleSheet.hairlineWidth, alignSelf: "stretch", marginVertical: 12 },
+
   wpEyebrow: { fontSize: 11, fontWeight: "800", letterSpacing: 0.9 },
   sectionHead: { fontSize: 11, fontWeight: "800", letterSpacing: 0.9, marginTop: SECTION_GAP, marginBottom: 12 },
   summaryRow: {
