@@ -155,7 +155,13 @@ struct LoggingPage: View {
     GeometryReader { geo in
       let h = geo.size.height
       let w = geo.size.width
-      let dial = max(76, min(min(h * 0.475, 124), w - 68))
+      // The display is a rounded rectangle: anything flush to the edge loses a
+      // corner, and the controls nearest the bottom lose the most. Everything
+      // is inset, and the dial is sized from the INSET width so the shoulders
+      // move in with it.
+      let inset = max(8, w * 0.075)
+      let usable = w - inset * 2
+      let dial = max(74, min(min(h * 0.475, 120), usable - 8))
       let control = max(30, min(h * 0.155, 38))
       let gap = max(3, min(h * 0.022, 7))
 
@@ -175,6 +181,7 @@ struct LoggingPage: View {
           }
         }
       }
+      .padding(.horizontal, inset)
       .frame(width: w, height: h, alignment: .top)
     }
     .onReceive(tick) { _ in now = nowMs() }
@@ -333,6 +340,7 @@ struct SessionPage: View {
   var body: some View {
     GeometryReader { geo in
       let control = max(34, min(geo.size.height * 0.17, 44))
+      let inset = max(8, geo.size.width * 0.075)
       VStack(spacing: max(4, min(geo.size.height * 0.03, 8))) {
         Text("Session")
           .font(.system(size: 13, weight: .semibold))
@@ -355,6 +363,7 @@ struct SessionPage: View {
           SyncBadge(sets: store.pendingSets, total: store.pendingCount, reachable: store.reachable)
         }
       }
+      .padding(.horizontal, inset)
       .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
     }
   }
