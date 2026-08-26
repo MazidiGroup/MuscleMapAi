@@ -6,7 +6,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import Constants from "expo-constants";
 
 import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
-import { BodyDiagram } from "@/src/components/BodyDiagram";
 import { GYM_GROUPS, GYM_GROUP_ORDER, prettyName } from "@/src/anatomy/groups";
 import { MUSCLE_DATA, getMuscleInfo } from "@/src/anatomy/muscleData";
 import { LESSONS } from "@/src/anatomy/lessons";
@@ -56,9 +55,9 @@ const SEG_LABELS: Record<LibSeg, string> = {
 };
 
 /**
- * The six regions the atlas body can actually highlight. `BodyDiagram` paints
- * these keys and no others, so the grid is derived from what the drawing
- * supports rather than from the muscle groups, which are finer-grained.
+ * The six regions the directory is organised by — the words people actually
+ * use. They are coarser than the gym groups on purpose: "Legs" is one row here
+ * and five groups underneath.
  */
 type AtlasRegion = "chest" | "back" | "shoulders" | "arms" | "core" | "legs";
 const ATLAS_REGIONS: { key: AtlasRegion; label: string }[] = [
@@ -71,17 +70,35 @@ const ATLAS_REGIONS: { key: AtlasRegion; label: string }[] = [
 ];
 
 /**
- * Which shapes the DIAGRAM paints for each region. Distinct from REGION_GROUPS
- * below: the drawing knows quads and calves, the muscle groups know adductors,
- * and "legs" is a word only the button uses.
+ * The dot beside each region. Taken from the shared group palette so a region's
+ * dot here and its chip inside the muscle sheet are the same colour.
  */
-const REGION_SHAPES: Record<AtlasRegion, string[]> = {
-  chest: ["chest"],
-  back: ["back"],
-  shoulders: ["shoulders"],
-  arms: ["arms"],
-  core: ["core"],
-  legs: ["quads", "calves", "glutes", "hamstrings"],
+const REGION_COLORS: Record<AtlasRegion, string> = {
+  chest: GROUP_COLORS.chest,
+  back: GROUP_COLORS.back,
+  shoulders: GROUP_COLORS.shoulders,
+  arms: GROUP_COLORS.arms,
+  core: GROUP_COLORS.core,
+  legs: GROUP_COLORS.quads,
+};
+
+/**
+ * The pithy half of a stored function line — the part after the dash when the
+ * record has one, otherwise the line itself. Nothing new is written here, so a
+ * subtitle can never say something the anatomy data does not.
+ */
+const muscleSubtitle = (n: string) => {
+  const fn = getMuscleInfo(n)?.fn || "";
+  const dash = fn.indexOf("—");
+  let short = (dash >= 0 ? fn.slice(dash + 1) : fn).trim();
+  // Cut at the first qualifier — the clause before it is the whole claim, and
+  // the row has one line for it.
+  for (const cut of [" by ", " (", " that ", " which ", " and helps ", ", "]) {
+    const at = short.indexOf(cut);
+    if (at > 12) short = short.slice(0, at);
+  }
+  short = short.trim().replace(/[.,]$/, "");
+  return short.charAt(0).toUpperCase() + short.slice(1);
 };
 
 /** Which gym groups each atlas region stands for. */
@@ -126,12 +143,12 @@ export default function LibraryScreen() {
   const [selected, setSelected] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
-  const [atlasView, setAtlasView] = useState<"front" | "back">("front");
-  const [atlasRegion, setAtlasRegion] = useState<AtlasRegion | null>("chest");
+  const [openRegion, setOpenRegion] = useState<AtlasRegion | null>("chest");
+  const [azSort, setAzSort] = useState(false);
   // Which curated list the Exercises tab is showing, if any. Null is the
   // browse screen; every value here is a filter over the SAME catalogue.
   const [exerciseList, setExerciseList] = useState<"favourites" | "recent" | "plan" | "all" | null>(null);
-  const [muscleList, setMuscleList] = useState<"recent" | "saved" | null>(null);
+  const [muscleList, setMuscleList] = useState<"recent" | "saved" | "all" | null>(null);
 
   /**
    * Signing out while a workout is being logged needs an explicit confirmation:
@@ -257,9 +274,17 @@ export default function LibraryScreen() {
     return ids.slice(0, 6);
   }, [w.history]);
 
-  // The muscle list follows the atlas: a chosen region narrows to its groups,
-  // a search overrides it, and no region means the whole atlas A-Z.
+  /**
+   * The flat list: a search, one of the two saved lists, or every muscle A–Z.
+   * The directory below has its own shape and does not come through here.
+   */
   const visibleGroups = useMemo(() => {
+    if (muscleList === "all") {
+      const items = Object.keys(MUSCLE_DATA).sort((a, b) =>
+        (MUSCLE_DATA[a]?.label || a).localeCompare(MUSCLE_DATA[b]?.label || b),
+      );
+      return items.length ? [{ key: "all", label: "All muscles", items }] : [];
+    }
     if (muscleList) {
       const wanted = muscleList === "saved" ? bookmarks : recent;
       const items = wanted.filter((n) => MUSCLE_DATA[n]);
@@ -267,11 +292,28 @@ export default function LibraryScreen() {
         ? [{ key: muscleList, label: muscleList === "saved" ? "Saved" : "Recently viewed", items }]
         : [];
     }
-    if (query.trim()) return groups;
-    if (!atlasRegion) return groups;
-    const keys = REGION_GROUPS[atlasRegion];
-    return groups.filter((g) => keys.includes(g.key));
-  }, [groups, query, atlasRegion, muscleList, bookmarks, recent]);
+    return groups;
+  }, [groups, muscleList, bookmarks, recent]);
+
+  /**
+   * The directory: the six regions, each carrying every muscle of the gym
+   * groups it stands for. Counts are derived, never written down.
+   */
+  const directory = useMemo(
+    () =>
+      ATLAS_REGIONS.map((r) => {
+        const items = REGION_GROUPS[r.key].flatMap((g) => GYM_GROUPS[g]?.nodes ?? []).filter((n) => MUSCLE_DATA[n]);
+        return {
+          key: r.key,
+          label: r.label,
+          color: REGION_COLORS[r.key],
+          items: azSort
+            ? [...items].sort((a, b) => (MUSCLE_DATA[a]?.label || a).localeCompare(MUSCLE_DATA[b]?.label || b))
+            : items,
+        };
+      }),
+    [azSort],
+  );
 
   // Facet counts come from the catalogue itself, so the browse tiles can never
   // advertise a number the filter sheet does not deliver.
@@ -305,13 +347,6 @@ export default function LibraryScreen() {
       : planExercises;
     return base.filter((e) => ids.includes(e.id));
   }, [query, filters, exerciseList, exerciseBookmarks, recentExercises, planExercises]);
-  const atlasHighlight = useMemo(
-    () =>
-      atlasRegion
-        ? Object.fromEntries(REGION_SHAPES[atlasRegion].map((k) => [k, "highlight"]))
-        : {},
-    [atlasRegion],
-  );
 
   const open = (n: string) => setSelected(n);
   const closeSheet = () => {
@@ -382,164 +417,173 @@ export default function LibraryScreen() {
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {seg === "muscles" && (
           <>
-            {/* The atlas is the entry point: a body reads faster than a list of
-                names, and tapping a region is how someone who does not know the
-                Latin finds the muscle they mean. */}
+            {/* Two ways back into something already looked at, before the
+                directory — they are shortcuts, and a shortcut below the list it
+                shortcuts is not one. */}
+            {!query.trim() && !muscleList && (
+              <View style={styles.duoRow}>
+                <DuoLink
+                  icon="time-outline"
+                  label="Recently viewed"
+                  disabled={recent.length === 0}
+                  onPress={() => setMuscleList("recent")}
+                  styles={styles}
+                  T={T}
+                  testID="muscles-recent"
+                />
+                <DuoLink
+                  icon="bookmark-outline"
+                  label="Saved muscles"
+                  disabled={bookmarks.length === 0}
+                  onPress={() => setMuscleList("saved")}
+                  styles={styles}
+                  T={T}
+                  testID="muscles-saved"
+                />
+              </View>
+            )}
+
+            {/* The directory. Six regions everyone has a word for, each opening
+                to the muscles it contains — a body drawing was a second way to
+                say the same six words, and it said them less clearly. */}
             {!query.trim() && !muscleList && (
               <>
-                <Text style={styles.sectionCaps}>ANATOMY ATLAS</Text>
-                <View style={styles.atlasCard}>
-                  <LiquidSheen tone="neutral" />
-                  <View style={styles.atlasToggleRow}>
-                    <View style={styles.atlasToggle}>
-                      {(["front", "back"] as const).map((v) => (
-                        <TouchableOpacity
-                          key={v}
-                          style={styles.atlasToggleBtn}
-                          onPress={() => setAtlasView(v)}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: atlasView === v }}
-                          accessibilityLabel={v === "front" ? "Show the front of the body" : "Show the back of the body"}
-                          testID={`atlas-${v}`}
-                        >
-                          <Text
-                            style={[
-                              styles.atlasToggleText,
-                              { color: atlasView === v ? T.accent : T.textDim },
-                            ]}
-                          >
-                            {v === "front" ? "Front" : "Back"}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                  <View style={styles.atlasBodies}>
-                    <BodyDiagram
-                      view={atlasView}
-                      muscles={atlasHighlight}
-                      onPressMuscle={(m) => setAtlasRegion(m as AtlasRegion)}
-                      size={128}
-                    />
-                    <BodyDiagram
-                      view={atlasView === "front" ? "back" : "front"}
-                      muscles={{}}
-                      size={96}
-                    />
-                  </View>
-                  <Text style={styles.atlasHint}>Tap a region to explore</Text>
-                  <View style={styles.regionGrid}>
-                    {ATLAS_REGIONS.map((r) => {
-                      const on = atlasRegion === r.key;
-                      return (
-                        <TouchableOpacity
-                          key={r.key}
-                          style={[styles.regionBtn, on && { borderColor: T.accent }]}
-                          onPress={() => setAtlasRegion(on ? null : r.key)}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: on }}
-                          accessibilityLabel={`${r.label}${on ? ", showing" : ""}`}
-                          testID={`region-${r.key}`}
-                        >
-                          <Text style={[styles.regionText, { color: on ? T.accent : T.text }]}>
-                            {r.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                <View style={styles.dirHead}>
+                  <Text style={[styles.sectionCaps, { flex: 1, marginBottom: 0 }]}>MUSCLE DIRECTORY</Text>
+                  <Pressable
+                    style={styles.sortBtn}
+                    onPress={() => setAzSort((v) => !v)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: azSort }}
+                    accessibilityLabel={azSort ? "Sorted A to Z. Switch to anatomical order." : "Sort each region A to Z"}
+                    testID="muscles-sort"
+                  >
+                    <Text style={[styles.sortText, { color: azSort ? T.accent : T.textDim }]}>A–Z</Text>
+                  </Pressable>
                 </View>
+
+                <View style={styles.dirCard}>
+                  <LiquidSheen tone="neutral" />
+                  {directory.map((r, ri) => {
+                    const open_ = openRegion === r.key;
+                    return (
+                      <View
+                        key={r.key}
+                        style={[styles.dirGroup, open_ && { borderColor: T.accent }]}
+                      >
+                        {ri > 0 && !open_ && <View style={styles.mgSep} />}
+                        <TouchableOpacity
+                          style={styles.dirRow}
+                          onPress={() => setOpenRegion(open_ ? null : r.key)}
+                          accessibilityRole="button"
+                          accessibilityState={{ expanded: open_ }}
+                          accessibilityLabel={`${r.label}, ${r.items.length} muscles`}
+                          testID={`dir-${r.key}`}
+                        >
+                          <View style={[styles.dirDot, { backgroundColor: r.color }]} />
+                          <Text style={styles.dirName}>{r.label}</Text>
+                          <Text style={[styles.dirCount, { color: open_ ? T.accent : T.textDim }]}>
+                            {r.items.length}
+                          </Text>
+                          <Ionicons
+                            name={open_ ? "chevron-up" : "chevron-down"}
+                            size={18}
+                            color={open_ ? T.accent : T.textFaint}
+                          />
+                        </TouchableOpacity>
+                        {open_ &&
+                          r.items.map((n) => (
+                            <View key={n}>
+                              <View style={styles.mgSep} />
+                              <TouchableOpacity
+                                style={styles.dirMuscleRow}
+                                onPress={() => open(n)}
+                                accessibilityRole="button"
+                                accessibilityLabel={getMuscleInfo(n)?.label || prettyName(n)}
+                                testID={`lib-${n}`}
+                              >
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.dirMuscleName}>
+                                    {getMuscleInfo(n)?.label || prettyName(n)}
+                                  </Text>
+                                  <Text style={styles.dirMuscleSub} numberOfLines={1}>
+                                    {muscleSubtitle(n)}
+                                  </Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={17} color={T.textFaint} />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <TouchableOpacity
+                  style={styles.azRow}
+                  onPress={() => setMuscleList("all")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Browse every muscle A to Z"
+                  testID="muscles-az"
+                >
+                  <Text style={styles.azText}>Browse all muscles</Text>
+                  <Text style={styles.azTag}>A–Z</Text>
+                  <View style={{ flex: 1 }} />
+                  <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+                </TouchableOpacity>
               </>
             )}
 
-            {/* The named muscles of whatever is selected — or every group when
-                the atlas has no region chosen and nothing is being searched. */}
+            {/* A search, a saved list or the flat A–Z: one plain list, because
+                none of them belong to a single region. */}
             {muscleList && (
               <TouchableOpacity
                 style={styles.backRow}
                 onPress={() => setMuscleList(null)}
                 accessibilityRole="button"
-                accessibilityLabel="Back to the anatomy atlas"
+                accessibilityLabel="Back to the muscle directory"
                 testID="lib-muscle-back"
               >
                 <Ionicons name="chevron-back" size={16} color={T.accent} />
                 <Text style={styles.backText}>
-                  {muscleList === "saved" ? "Saved muscles" : "Recently viewed"}
+                  {muscleList === "saved" ? "Saved muscles" : muscleList === "all" ? "All muscles A–Z" : "Recently viewed"}
                 </Text>
               </TouchableOpacity>
             )}
-            {visibleGroups.map((g) => (
-              <View key={g.key} style={{ marginBottom: 14 }}>
-                <View style={styles.mgHead}>
-                  <Text style={styles.sectionCaps}>{g.label.toUpperCase()}</Text>
-                  <Text style={styles.mgCount}>
-                    {g.items.length} {g.items.length === 1 ? "muscle" : "muscles"}
-                  </Text>
+            {(query.trim() || muscleList) &&
+              visibleGroups.map((g) => (
+                <View key={g.key} style={{ marginBottom: 14 }}>
+                  <View style={styles.mgHead}>
+                    <Text style={styles.sectionCaps}>{g.label.toUpperCase()}</Text>
+                    <Text style={styles.mgCount}>
+                      {g.items.length} {g.items.length === 1 ? "muscle" : "muscles"}
+                    </Text>
+                  </View>
+                  <View style={styles.mgCard}>
+                    <LiquidSheen tone="neutral" />
+                    {g.items.map((n, i) => {
+                      const info = getMuscleInfo(n);
+                      return (
+                        <View key={n}>
+                          {i > 0 && <View style={styles.mgSep} />}
+                          <TouchableOpacity
+                            style={styles.mgRow}
+                            onPress={() => open(n)}
+                            accessibilityRole="button"
+                            accessibilityLabel={info?.label || prettyName(n)}
+                            testID={`lib-${n}`}
+                          >
+                            <Text style={styles.mgName}>{info?.label || prettyName(n)}</Text>
+                            <Ionicons name="chevron-forward" size={17} color={T.textFaint} />
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
-                <View style={styles.mgCard}>
-                  <LiquidSheen tone="neutral" />
-                  {g.items.map((n, i) => {
-                    const info = getMuscleInfo(n);
-                    return (
-                      <View key={n}>
-                        {i > 0 && <View style={styles.mgSep} />}
-                        <TouchableOpacity
-                          style={styles.mgRow}
-                          onPress={() => open(n)}
-                          accessibilityRole="button"
-                          accessibilityLabel={info?.label || prettyName(n)}
-                          testID={`lib-${n}`}
-                        >
-                          <Text style={[styles.mgName, i === 0 && !query.trim() && { color: T.accent }]}>
-                            {info?.label || prettyName(n)}
-                          </Text>
-                          <Ionicons name="chevron-forward" size={17} color={T.textFaint} />
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
-            {visibleGroups.length === 0 && (
+              ))}
+            {(query.trim() || muscleList) && visibleGroups.length === 0 && (
               <Text style={styles.empty}>No muscles match “{query}”.</Text>
-            )}
-
-            {!query.trim() && !muscleList && (
-              <>
-                <View style={styles.duoCard}>
-                  <LiquidSheen tone="neutral" />
-                  <DuoLink
-                    icon="time-outline"
-                    label="Recently viewed"
-                    disabled={recent.length === 0}
-                    onPress={() => setMuscleList("recent")}
-                    styles={styles}
-                    T={T}
-                    testID="muscles-recent"
-                  />
-                  <View style={styles.duoDivider} />
-                  <DuoLink
-                    icon="bookmark-outline"
-                    label="Saved muscles"
-                    disabled={bookmarks.length === 0}
-                    onPress={() => setMuscleList("saved")}
-                    styles={styles}
-                    T={T}
-                    testID="muscles-saved"
-                  />
-                </View>
-                <TouchableOpacity
-                  style={styles.azRow}
-                  onPress={() => setAtlasRegion(null)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Browse every muscle A to Z"
-                  testID="muscles-az"
-                >
-                  <Text style={styles.azText}>Browse muscles A–Z</Text>
-                  <Ionicons name="chevron-forward" size={14} color={T.textDim} />
-                </TouchableOpacity>
-              </>
             )}
           </>
         )}
@@ -915,7 +959,7 @@ export default function LibraryScreen() {
 
       <Modal visible={!!selected} transparent animationType="slide" onRequestClose={closeSheet}>
         <Pressable style={styles.backdrop} onPress={closeSheet} />
-        <View style={styles.modalBottom}>{selected && <MuscleSheet nodeName={selected} onClose={closeSheet} />}</View>
+        <View style={styles.modalBottom}>{selected && <MuscleSheet nodeName={selected} onClose={closeSheet} variant="preview" />}</View>
       </Modal>
 
       <DestructiveConfirm
@@ -1027,9 +1071,10 @@ function DuoLink({
       accessibilityLabel={label}
       testID={testID}
     >
-      <Ionicons name={icon} size={17} color={disabled ? T.textFaint : T.accent} />
-      <Text style={[styles.duoText, disabled && { color: T.textDim }]}>{label}</Text>
-      <Ionicons name="chevron-forward" size={14} color={T.textFaint} />
+      <Ionicons name={icon} size={18} color={disabled ? T.textFaint : T.accent} />
+      <Text style={[styles.duoText, disabled && { color: T.textDim }]} numberOfLines={1}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -1083,19 +1128,22 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   backText: { color: T.accent, fontSize: 15, fontWeight: "700" },
   sectionCaps: { color: T.textFaint, fontSize: 11, fontWeight: "800", letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
 
-  // --- Muscles: anatomy atlas ---
-  atlasCard: { backgroundColor: T.surface, borderRadius: 22, padding: 14, marginBottom: 18, overflow: "hidden" },
-  atlasToggleRow: { flexDirection: "row", justifyContent: "flex-end" },
-  atlasToggle: { flexDirection: "row", borderWidth: 1, borderColor: T.border, borderRadius: 20, overflow: "hidden" },
-  atlasToggleBtn: { paddingHorizontal: 16, paddingVertical: 7, minHeight: 34, justifyContent: "center" },
-  atlasToggleText: { fontSize: 13.5, fontWeight: "700" },
-  // The second body is a smaller reference of the opposite side, so the card
-  // shows the whole person without a second toggle.
-  atlasBodies: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 2 },
-  atlasHint: { color: T.textDim, fontSize: 12.5, textAlign: "center", marginTop: 6, marginBottom: 12 },
-  regionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  regionBtn: { flexGrow: 1, flexBasis: "30%", minHeight: 44, borderRadius: 20, borderWidth: 1, borderColor: T.border, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
-  regionText: { fontSize: 14, fontWeight: "600" },
+  // --- Muscles: the directory ---
+  dirHead: { flexDirection: "row", alignItems: "center", marginTop: 16, marginBottom: 8 },
+  sortBtn: { minHeight: 32, paddingHorizontal: 8, justifyContent: "center" },
+  sortText: { fontSize: 13, fontWeight: "800", letterSpacing: 0.3 },
+  dirCard: { backgroundColor: T.surface, borderRadius: 20, overflow: "hidden" },
+  // An open region is outlined in the accent; the fill never changes, so the
+  // row does not jump when it opens.
+  dirGroup: { borderWidth: 1.5, borderColor: "transparent", borderRadius: 20 },
+  dirRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, minHeight: 58 },
+  dirDot: { width: 14, height: 14, borderRadius: 7 },
+  dirName: { color: T.text, fontSize: 17, fontWeight: "700", flex: 1 },
+  dirCount: { fontSize: 15, fontWeight: "700" },
+  dirMuscleRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingLeft: 16, paddingRight: 16, paddingVertical: 11, minHeight: 58 },
+  dirMuscleName: { color: T.text, fontSize: 15.5, fontWeight: "600" },
+  dirMuscleSub: { color: T.textDim, fontSize: 13, marginTop: 2 },
+  azTag: { color: T.accent, fontSize: 14, fontWeight: "800", marginLeft: 8 },
 
   // --- shared list card ---
   mgHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -1106,12 +1154,17 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   mgRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, minHeight: 52 },
   mgName: { color: T.text, fontSize: 15.5, fontWeight: "600", flex: 1 },
 
-  duoCard: { flexDirection: "row", alignItems: "center", backgroundColor: T.surface, borderRadius: 20, overflow: "hidden", marginTop: 2 },
-  duoDivider: { width: StyleSheet.hairlineWidth, alignSelf: "stretch", backgroundColor: T.border, marginVertical: 10 },
-  duoLink: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, minHeight: 54 },
-  duoText: { color: T.text, fontSize: 14, fontWeight: "600", flex: 1 },
-  azRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 48, marginTop: 6 },
-  azText: { color: T.textDim, fontSize: 14, fontWeight: "600" },
+  duoRow: { flexDirection: "row", gap: 10, marginTop: 2 },
+  duoLink: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    paddingHorizontal: 10, minHeight: 56, borderRadius: 18, backgroundColor: T.surface, overflow: "hidden",
+  },
+  duoText: { color: T.text, fontSize: 14.5, fontWeight: "600", flexShrink: 1 },
+  azRow: {
+    flexDirection: "row", alignItems: "center", minHeight: 56, marginTop: 14,
+    paddingHorizontal: 16, borderRadius: 20, backgroundColor: T.surface, overflow: "hidden",
+  },
+  azText: { color: T.text, fontSize: 15.5, fontWeight: "600" },
 
   // --- Exercises: quick access + browse ---
   quickCard: { flexDirection: "row", alignItems: "stretch", backgroundColor: T.surface, borderRadius: 20, overflow: "hidden", marginBottom: 18 },

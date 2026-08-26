@@ -475,3 +475,132 @@ export const HISTORY_COPY = {
 export function performanceUnitSafe(value: number, unit: string): string {
   return `${value} ${unit}`;
 }
+
+// --- week navigation and routine grouping (History redesign) ---------------
+//
+// History is browsed one Monday–Sunday week at a time, and a day that holds
+// several runs of the same routine shows one card rather than three near
+// identical ones. Everything below is derived from the same completed-set rule
+// as the totals above — no new counting rule is introduced here.
+
+const FULL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/** "24–30 Aug", or "29 Aug – 4 Sep" when the week crosses a month boundary. */
+export function weekShortLabel(weekStart: number): string {
+  const a = new Date(weekStart);
+  const b = new Date(weekStart + 6 * DAY_MS);
+  return a.getMonth() === b.getMonth()
+    ? `${a.getDate()}–${b.getDate()} ${MONTHS[b.getMonth()]}`
+    : `${a.getDate()} ${MONTHS[a.getMonth()]} – ${b.getDate()} ${MONTHS[b.getMonth()]}`;
+}
+
+/** "Week of Mon 24 Aug – Sun 30 Aug". The storage claim stays in weekSummary. */
+export function weekRangeLabel(weekStart: number): string {
+  return `Week of ${absoluteDate(weekStart)} – ${absoluteDate(weekStart + 6 * DAY_MS)}`;
+}
+
+/** "This week", "Last week", "3 weeks ago" — never a bare relative date alone. */
+export function weekRelativeLabel(weekStart: number, now: number = Date.now()): string {
+  const n = Math.round((startOfWeek(now) - startOfWeek(weekStart)) / WEEK_MS);
+  if (n === 0) return "This week";
+  if (n === 1) return "Last week";
+  if (n < 0) return `In ${-n} week${n === -1 ? "" : "s"}`;
+  return `${n} weeks ago`;
+}
+
+/** "Wednesday, 26 Aug" — the selected day's own heading. */
+export const dayHeading = (ts: number) => {
+  const d = new Date(ts);
+  return `${FULL_DAYS[(d.getDay() + 6) % 7]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+};
+
+/** A duration sized for a chip: "45s", "17m", "13h 03m". */
+export function compactDuration(sec: number): string {
+  if (!sec || sec < 60) return `${Math.max(0, Math.round(sec))}s`;
+  const m = Math.round(sec / 60);
+  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+}
+
+export type WeekTotals = {
+  weekStart: number;
+  sessions: number;
+  completedSets: number;
+  totalSets: number;
+  volume: number;
+  /** Monday-first: completed sessions recorded on each day of the week. */
+  perDay: number[];
+  daysTrained: number;
+};
+
+/** Totals for one explicit Monday-start week, so History can be paged backwards. */
+export function weekTotals(workouts: Workout[], weekStart: number): WeekTotals {
+  const end = weekStart + WEEK_MS;
+  const perDay = [0, 0, 0, 0, 0, 0, 0];
+  let sessions = 0;
+  let completedSets = 0;
+  let totalSets = 0;
+  let volume = 0;
+  for (const w of workouts || []) {
+    if (w.date < weekStart || w.date >= end) continue;
+    sessions++;
+    const slot = Math.floor((startOfDay(w.date) - weekStart) / DAY_MS);
+    if (slot >= 0 && slot < 7) perDay[slot]++;
+    const t = workoutTotals(w.exercises);
+    completedSets += t.completedSets;
+    totalSets += t.totalSets;
+    volume += t.volume;
+  }
+  return {
+    weekStart,
+    sessions,
+    completedSets,
+    totalSets,
+    volume,
+    perDay,
+    daysTrained: perDay.filter((n) => n > 0).length,
+  };
+}
+
+/** The routine's stored Plan-day name, or "Workout" when the record has none. */
+export function routineName(w: Workout): string {
+  const planName = (w.exercises || []).map((e) => e.planLink?.planName).find((n) => !!n && n.trim() !== "");
+  return planName ? planName.trim() : "Workout";
+}
+
+export type RoutineSummary = {
+  key: string;
+  name: string;
+  /** Latest first. One entry means one session; several mean repeats that day. */
+  sessions: Workout[];
+  completedSets: number;
+  totalSets: number;
+  volume: number;
+  /** Entered sets were left uncompleted, so the record is worth re-checking. */
+  needsReview: boolean;
+};
+
+/** Repeats of one routine within the same list collapse into a single card. */
+export function groupSessionsByRoutine(workouts: Workout[]): RoutineSummary[] {
+  const byName = new Map<string, RoutineSummary>();
+  for (const w of [...(workouts || [])].sort((a, b) => b.date - a.date)) {
+    const name = routineName(w);
+    const t = workoutTotals(w.exercises);
+    const g =
+      byName.get(name) ??
+      { key: name, name, sessions: [], completedSets: 0, totalSets: 0, volume: 0, needsReview: false };
+    g.sessions.push(w);
+    g.completedSets += t.completedSets;
+    g.totalSets += t.totalSets;
+    g.volume += t.volume;
+    if (t.completedSets < t.totalSets) g.needsReview = true;
+    byName.set(name, g);
+  }
+  return [...byName.values()];
+}
+
+/** "Wednesday 26 August", with the year only when it is not the current one. */
+export function sessionDateLabel(ts: number, now: number = Date.now()): string {
+  const d = new Date(ts);
+  const sameYear = d.getFullYear() === new Date(now).getFullYear();
+  return `${FULL_DAYS[(d.getDay() + 6) % 7]} ${d.getDate()} ${LONG_MONTHS[d.getMonth()]}${sameYear ? "" : ` ${d.getFullYear()}`}`;
+}

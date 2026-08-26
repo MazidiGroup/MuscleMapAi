@@ -797,11 +797,11 @@ export const UNDERTRAINED_DAYS = 10;
 
 /** The key to the colours. Rendered verbatim so the model is never unexplained. */
 export const RECOVERY_LEGEND: { state: RecoveryState; label: string; help: string }[] = [
-  { state: "fatigued", label: "Fatigued", help: "Trained recently — still early in recovery" },
-  { state: "recovering", label: "Recovering", help: "Part-way through its recovery window" },
-  { state: "ready", label: "Ready", help: "Recovered and ready to train again" },
-  { state: "undertrained", label: "Undertrained", help: `No completed sets in ${UNDERTRAINED_DAYS} days` },
-  { state: "untrained", label: "Not tracked", help: "No completed sets recorded yet" },
+  { state: "fatigued", label: "Fatigued", help: "Trained recently" },
+  { state: "recovering", label: "Recovering", help: "Recovery underway" },
+  { state: "ready", label: "Ready", help: "Ready to train" },
+  { state: "undertrained", label: "Undertrained", help: `${UNDERTRAINED_DAYS}+ days without training` },
+  { state: "untrained", label: "Not tracked", help: "No recorded data" },
 ];
 
 export const RECOVERY_NOTE =
@@ -874,14 +874,15 @@ export function computeRecovery(
 
 export type GroupVolume = { group: string; label: string; sets: number };
 
-export function weeklySetsByGroup(history: Workout[], days = 7): { list: GroupVolume[]; neglected: string[]; totalSets: number; workouts: number } {
-  const cutoff = Date.now() - days * 24 * 3.6e6;
+/**
+ * Sets per muscle group for an explicit list of records. One counting rule —
+ * completed working sets, attributed to the prime movers' groups — shared by
+ * the rolling Insights window and any other list of workouts.
+ */
+export function setsByGroup(workouts: Workout[]): { list: GroupVolume[]; neglected: string[]; totalSets: number } {
   const counts: Record<string, number> = {};
   let totalSets = 0;
-  let workouts = 0;
-  for (const wk of history) {
-    if (wk.date < cutoff) continue;
-    workouts++;
+  for (const wk of workouts) {
     for (const e of wk.exercises) {
       const done = e.sets.filter(isWorkingSet).length;
       if (done === 0) continue;
@@ -898,7 +899,13 @@ export function weeklySetsByGroup(history: Workout[], days = 7): { list: GroupVo
   }
   const list = GYM_GROUP_ORDER.map((g) => ({ group: g, label: GYM_GROUPS[g].label, sets: counts[g] || 0 }));
   const neglected = list.filter((g) => g.sets === 0).map((g) => g.label);
-  return { list, neglected, totalSets, workouts };
+  return { list, neglected, totalSets };
+}
+
+export function weeklySetsByGroup(history: Workout[], days = 7): { list: GroupVolume[]; neglected: string[]; totalSets: number; workouts: number } {
+  const cutoff = Date.now() - days * 24 * 3.6e6;
+  const inWindow = history.filter((wk) => wk.date >= cutoff);
+  return { ...setsByGroup(inWindow), workouts: inWindow.length };
 }
 
 export type WeekPoint = { label: string; volume: number; workouts: number };

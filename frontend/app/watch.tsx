@@ -13,7 +13,7 @@
 // decides what to show.
 
 import React, { useMemo } from "react";
-import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -63,9 +63,9 @@ export default function WatchScreen() {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.back} onPress={() => router.back()} testID="watch-back">
+        <Pressable style={styles.back} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" testID="watch-back">
           <Ionicons name="chevron-back" size={24} color={T.text} />
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.headerTitle}>Apple Watch</Text>
         <View style={styles.backPlaceholder} />
       </View>

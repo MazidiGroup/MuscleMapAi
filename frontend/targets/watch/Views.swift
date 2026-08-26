@@ -23,6 +23,12 @@ enum Palette {
   static let muted = Color.white.opacity(0.62)
   static let done = Color(red: 0.24, green: 0.86, blue: 0.59)
   static let radius: CGFloat = 22
+
+  /// watchOS reserves a generous top inset for the system clock, and a dial-led
+  /// layout sitting inside all of it reads as pinned to the bottom of the
+  /// display. A few points are reclaimed at the root so every screen moves
+  /// together — this is the one number to change if it wants more or less.
+  static let topLift: CGFloat = 10
 }
 
 struct RootView: View {
@@ -42,6 +48,10 @@ struct RootView: View {
     // watch's true black, and applied to a Group it painted only the content's
     // own frame — which read as a grey band floating on the black bezel rather
     // than as a screen. watchOS already gives us black.
+    //
+    // Applied here rather than per screen: Locked, Idle and both workout pages
+    // all sat low, and one root offset keeps them level with each other.
+    .padding(.top, -Palette.topLift)
     .confirmationDialog(
       store.lastFeedback?.message ?? "",
       isPresented: Binding(

@@ -5,13 +5,12 @@
 // live session, and History is reached from Today, where progress belongs.
 
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
-import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { HistoryView } from "@/src/history/HistoryView";
 
@@ -25,9 +24,9 @@ export default function HistoryScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.back} onPress={() => router.back()} testID="history-back">
+        <Pressable style={styles.back} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" testID="history-back">
           <Ionicons name="chevron-back" size={24} color={T.text} />
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.headerTitle}>History</Text>
         <View style={styles.back} />
       </View>
@@ -40,6 +39,6 @@ const makeStyles = (T: LegacyPalette) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: T.bg },
     header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingBottom: 6 },
-    back: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+    back: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
     headerTitle: { flex: 1, textAlign: "center", color: T.text, fontSize: 17, fontWeight: "800" },
   });

@@ -17,16 +17,23 @@ type Props = {
   maxHeight: number;
   /** "half" starts the sheet resting midway between collapsed and expanded. */
   initial?: SheetState | "half";
+  /**
+   * Paints the panel on an opaque fill. A translucent sheet lets the 3D model
+   * show through its own text, which is unreadable once the panel is mostly
+   * prose rather than a short list.
+   */
+  opaque?: boolean;
   onSnap?: (s: SheetState) => void;
   children: React.ReactNode;
 };
 
 export const DraggableSheet = forwardRef<DraggableSheetHandle, Props>(function DraggableSheet(
-  { peekHeight, maxHeight, initial = "collapsed", onSnap, children },
+  { peekHeight, maxHeight, initial = "collapsed", opaque = false, onSnap, children },
   ref,
 ) {
   const { mode } = useTheme();
-  const styles = useMemo(() => makeStyles(legacyPalette(mode)), [mode]);
+  const T = useMemo(() => legacyPalette(mode), [mode]);
+  const styles = useMemo(() => makeStyles(T), [T]);
   // translateY travels between 0 (fully expanded, top at maxHeight) and `range`
   // (collapsed, only `peekHeight` visible). Free dragging rests anywhere in between.
   const range = Math.max(1, maxHeight - peekHeight);
@@ -83,7 +90,13 @@ export const DraggableSheet = forwardRef<DraggableSheetHandle, Props>(function D
   ).current;
 
   return (
-    <Animated.View style={[styles.sheet, { height: maxHeight, transform: [{ translateY }] }]}>
+    <Animated.View
+      style={[
+        styles.sheet,
+        opaque && { backgroundColor: T.surfaceSolid },
+        { height: maxHeight, transform: [{ translateY }] },
+      ]}
+    >
       <View
         style={styles.handleZone}
         {...pan.panHandlers}
