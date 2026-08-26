@@ -590,6 +590,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       const run = watchQueue.current.then(async (): Promise<WatchAck> => {
         const empty: WatchAck = { schema: WATCH_SCHEMA_VERSION, envelopeId: "", accepted: [], rejected: [] };
         if (!token || !owner) return empty;
+        // Nothing may be applied until this owner's scope has been READ. A
+        // queued transfer is delivered within moments of launch, while the
+        // active session is still coming off disk — and applying then means the
+        // applier is handed a null session and rebuilds the workout from the
+        // events alone, silently dropping every set already persisted. Refusing
+        // to acknowledge is the safe answer: the watch keeps the events and
+        // retries, which is exactly what the outbox is for.
+        if (hydratedFor !== ownerKey) return empty;
 
         const ledger = await readWatchLedger(store, owner);
         // Deliberately NOT minting an id when one is missing. This callback
@@ -675,7 +683,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       watchQueue.current = run.catch(() => undefined);
       return run;
     },
-    [commitSession, owner, session, sessionPlanSeed, setSessionId, startedAt, store, token, unit],
+    [commitSession, hydratedFor, owner, ownerKey, session, sessionPlanSeed, setSessionId, startedAt, store, token, unit],
   );
 
   // Keep the Plan tick in sync with the Session in BOTH directions: a plan-linked

@@ -353,6 +353,39 @@ test("a revision for a set that has not arrived is held, not invented", () => {
   assert.equal(allSets(out.session).length, 0);
 });
 
+test("the drill: an online set, an offline set, then End — all in the commit", () => {
+  // Reproduces the simulator drill exactly. The phone starts the workout, the
+  // watch logs one set while connected, the phone goes away, the watch logs a
+  // second set and ends, and everything arrives in ONE batch on reconnect.
+  const online = logEv(0, "setOnline", 8);
+  const first = applyWatchEvents(null, emptyLedger(), [startEv(), online], ctx());
+  assert.equal(allSets(first.session).length, 1, "the online set is in the live session");
+
+  // The phone persists that session and rebuilds it on the next envelope, which
+  // is what `buildActiveSession` does in the store.
+  const live = first.session;
+
+  const offline = logEv(1, "setOffline", 9);
+  const end = ev("session.end", 2, { endedAt: NOW + 126_000 });
+  const out = applyWatchEvents(live, first.ledger, [offline, end], ctx({ now: NOW + 600_000 }));
+
+  assert.equal(out.finished, true, "the workout ends");
+  assert.deepEqual(
+    out.rejected,
+    [],
+    "nothing is refused — ordering is no longer the problem",
+  );
+  assert.deepEqual(
+    allSets(out.session).map((x) => x.id).sort(),
+    ["setOffline", "setOnline"],
+    "BOTH sets must be in the session the caller commits",
+  );
+  assert.ok(
+    [online.eventId, offline.eventId, end.eventId].every((id) => out.ledger.processed.includes(id)),
+    "and the ledger agrees about what it applied",
+  );
+});
+
 // --- finishing --------------------------------------------------------------
 
 test("a workout is not committed while part of it is still queued", () => {
