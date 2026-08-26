@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from "react";
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Image,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Image, TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -22,6 +22,7 @@ import { AdjustPlanSheet } from "./AdjustPlanSheet";
 import { daysSummary } from "./onboarding";
 import { entryFor, alternativesFor, MUSCLE_LABEL, GOAL_LABEL, REGION_LABEL } from "./planAdapter";
 import type { PlanDay, PlanExerciseEntry } from "./exercises";
+import { EXERCISES } from "./exercises";
 import { posterUrl } from "@/src/anatomy/media";
 import { useWorkout } from "@/src/anatomy/workoutStore";
 import { isCountableSet } from "@/src/anatomy/setRules";
@@ -375,17 +376,23 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
   const w = useWorkout();
   const plan = usePlanStore(s => s.plan);
   const completions = usePlanStore(s => s.completions);
+  // The screen owns which day it shows: the strip below switches days without
+  // bouncing back through the weekly view.
+  const [idx, setIdx] = useState(dayIndex);
   const [swapId, setSwapId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [startFailed, setStartFailed] = useState(false);
   const swaps = usePlanStore(s => s.swaps);
   const setSwap = usePlanStore(s => s.setSwap);
+  const removeDayExercise = usePlanStore(s => s.removeDayExercise);
+  const addDayExercise = usePlanStore(s => s.addDayExercise);
   const answers = usePlanStore(s => s.answers);
   if (!plan) return null;
-  const day = plan.days[dayIndex];
-  if (day.rest) return null;
+  const day = plan.days[idx];
   const dateKey = todayISO();
 
-  const planned = day.exercises || [];
+  const planned = day.rest ? [] : day.exercises || [];
   const items = resolveDayExercises(planned, swaps, answers);
   const hasActiveWorkout = w.session !== null;
 
@@ -408,40 +415,45 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
-      <View style={styles.dayHeader}>
+      <View style={styles.dayHeadRow}>
         <TouchableOpacity
-          style={[styles.headerBtn, { backgroundColor: T.card, }]}
           onPress={onBack}
           accessibilityRole="button"
           accessibilityLabel="Back to my weekly plan"
           testID="day-back"
+          style={styles.dayBackBtn}
         >
-          <LiquidSheen tone="neutral" />
-          <Ionicons name="chevron-back" size={18} color={T.text2} />
+          <Ionicons name="chevron-back" size={22} color={T.text2} />
         </TouchableOpacity>
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={[styles.dayHeaderTitle, { color: T.text }]}>
-            {day.dow} · {day.typeName}
-          </Text>
-          <Text style={[styles.dayHeaderMeta, { color: T.textMuted }]}>
-            {items.length} exercises
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.startAllBtn, { backgroundColor: T.accent }]}
-          onPress={hasActiveWorkout ? resumeWorkout : startWorkout}
-          accessibilityRole="button"
-          accessibilityLabel={hasActiveWorkout ? "Resume active workout" : "Start this workout"}
-          testID={hasActiveWorkout ? "resume-session" : "start-session"}
-        >
-          <LiquidSheen tone="accent" />
-          <Text style={{ color: T.ctaText, fontWeight: "800", fontSize: 12 }}>
-            {hasActiveWorkout ? "Resume" : "Start"}
-          </Text>
-        </TouchableOpacity>
+        <Text style={[styles.dayBigTitle, { color: T.text }]} numberOfLines={1}>
+          {day.dow}
+        </Text>
+        <Text style={[styles.dayHeadMeta, { color: T.textMuted }]}>
+          {day.rest ? "Rest day" : `${items.length} exercises · ${day.minutes} min`}
+        </Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      {/* Every day of the week is reachable from here; the letters follow the
+          plan's Monday-first order. */}
+      <View style={styles.dowStrip}>
+        {plan.days.map((d, i) => (
+          <A11yControl
+            key={d.dow}
+            selected={i === idx}
+            label={`${d.dow}${d.rest ? ", rest day" : ""}`}
+            onPress={() => {
+              setIdx(i);
+              setEditing(false);
+            }}
+            style={[styles.dowPill, i === idx && { backgroundColor: T.accent }]}
+            testID={`dow-${i}`}
+          >
+            <Text style={[styles.dowPillText, { color: i === idx ? T.ctaText : T.textMuted }]}>{d.dow[0]}</Text>
+          </A11yControl>
+        ))}
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 130 }}>
         {startFailed && (
           <View style={{ marginBottom: 16 }}>
             <RetryPanel
@@ -454,91 +466,142 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
             />
           </View>
         )}
-        {items.map((ex, exIdx) => {
-          // Swaps are keyed by the PLANNED id, which is what survives regeneration.
-          const plannedId = planned[exIdx]?.id ?? ex.id;
-          // Swapped when the resolved exercise is no longer the planned one.
-          const swappedFrom = swaps[plannedId] && swaps[plannedId] !== plannedId ? planned[exIdx] : null;
-          const sessionEx = w.session?.find((s) => s.exerciseId === ex.id);
-          const sessionDone = !!sessionEx && sessionEx.sets.length > 0 && sessionEx.sets.every(isCountableSet);
-          const done = sessionDone || !!completions[`${dateKey}:${ex.id}`];
-          const inSession = !!sessionEx;
-          return (
-            <View key={ex.id} style={[styles.exCard, { backgroundColor: T.card, }]}>
-              <LiquidSheen tone="neutral" />
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={[styles.exMuscleCap, { color: T.textCaps }]}>
-                    {MUSCLE_LABEL[ex.muscle].toUpperCase()}
-                  </Text>
-                  {ex.badge && (
-                    <View style={[
-                      styles.exBadge,
-                      { backgroundColor: ex.badge === "FOCUS" ? T.focusRedBg : T.accent + "22" },
-                    ]}>
-                      <Text style={{
-                        fontSize: 9.5, fontWeight: "800",
-                        color: ex.badge === "FOCUS" ? T.focusRed : T.accentText,
-                      }}>{ex.badge}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={[styles.exName, { color: T.text }]}>{ex.name}</Text>
-                <Text style={[styles.exMeta, { color: T.textMuted }]}>
-                  {ex.sets} sets · {ex.repsOrTime}
-                </Text>
-                {/* Says what was replaced and undoes it in one tap. Clearing the
-                    swap restores the planned exercise; nothing logged is touched. */}
-                {swappedFrom && (
-                  <TouchableOpacity
-                    style={[styles.swappedRow, { backgroundColor: T.cardAlt }]}
-                    onPress={() => setSwap(plannedId, plannedId)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Swapped from ${swappedFrom.name}. Restore ${swappedFrom.name}.`}
-                    testID={`restore-${plannedId}`}
+
+        {day.rest ? (
+          <View style={[styles.restDayCard, { backgroundColor: T.card }]}>
+            <LiquidSheen tone="subtle" />
+            <Text style={[styles.restText, { color: T.textMuted }]}>Rest &amp; recover</Text>
+          </View>
+        ) : (
+          <View style={[styles.dayListCard, { backgroundColor: T.card }]}>
+            <LiquidSheen tone="neutral" />
+            {items.map((ex, exIdx) => {
+              // Swaps are keyed by the PLANNED id, which is what survives regeneration.
+              const plannedId = planned[exIdx]?.id ?? ex.id;
+              const swappedFrom = swaps[plannedId] && swaps[plannedId] !== plannedId ? planned[exIdx] : null;
+              const sessionEx = w.session?.find((s) => s.exerciseId === ex.id);
+              const sessionDone = !!sessionEx && sessionEx.sets.length > 0 && sessionEx.sets.every(isCountableSet);
+              const done = sessionDone || !!completions[`${dateKey}:${ex.id}`];
+              return (
+                <View key={plannedId}>
+                  {exIdx > 0 && <View style={[styles.dayListSep, { backgroundColor: T.border }]} />}
+                  <View
+                    style={styles.dayExRow}
+                    accessible
+                    accessibilityLabel={`${ex.name}, ${MUSCLE_LABEL[ex.muscle]}, ${ex.sets} sets of ${ex.repsOrTime}${done ? ", completed" : ""}`}
                   >
-                    <Ionicons name="swap-horizontal" size={11} color={T.textCaps} />
-                    <Text style={[styles.swappedText, { color: T.text2 }]} numberOfLines={1}>
-                      Swapped from {swappedFrom.name}
-                    </Text>
-                    <Text style={[styles.swappedUndo, { color: T.accentText }]}>Restore</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              <View style={{ gap: 8, alignItems: "center" }}>
-                {/* Read-only tick — becomes solid once every set is completed in Session. */}
-                <View style={[
-                  styles.tickBtn,
-                  { borderColor: done ? T.accent : "transparent", backgroundColor: done ? T.accent : "transparent" },
-                ]}>
-                  <Ionicons name={done ? "checkmark" : "ellipse-outline"} size={18} color={done ? T.ctaText : T.textMuted} />
+                    <View
+                      style={[
+                        styles.dayTick,
+                        done ? { backgroundColor: T.accent } : { borderWidth: 1.5, borderColor: T.border },
+                      ]}
+                    >
+                      {done && <Ionicons name="checkmark" size={15} color={T.ctaText} />}
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.dayExName,
+                          { color: done ? T.textMuted : T.text },
+                          done && { textDecorationLine: "line-through" as const },
+                        ]}
+                      >
+                        {ex.name}
+                      </Text>
+                      <Text style={[styles.dayExMuscle, { color: T.accentText }]}>
+                        {MUSCLE_LABEL[ex.muscle].toUpperCase()}
+                      </Text>
+                      {/* Says what was replaced and undoes it in one tap. Clearing the
+                          swap restores the planned exercise; nothing logged is touched. */}
+                      {swappedFrom && (
+                        <TouchableOpacity
+                          style={styles.swappedInline}
+                          onPress={() => setSwap(plannedId, plannedId)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Swapped from ${swappedFrom.name}. Restore ${swappedFrom.name}.`}
+                          testID={`restore-${plannedId}`}
+                        >
+                          <Ionicons name="swap-horizontal" size={11} color={T.textCaps} />
+                          <Text style={[styles.swappedText, { color: T.text2 }]} numberOfLines={1}>
+                            Swapped from {swappedFrom.name}
+                          </Text>
+                          <Text style={[styles.swappedUndo, { color: T.accentText }]}>Restore</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {editing ? (
+                      <View style={{ flexDirection: "row", gap: 4 }}>
+                        <A11yControl
+                          label={`Swap ${ex.name} for an alternative`}
+                          onPress={() => setSwapId(plannedId)}
+                          style={styles.rowEditBtn}
+                          testID={`swap-${ex.id}`}
+                        >
+                          <Ionicons name="swap-horizontal" size={17} color={T.text2} />
+                        </A11yControl>
+                        <A11yControl
+                          label={`Remove ${ex.name} from ${day.dow}`}
+                          onPress={() => removeDayExercise(idx, plannedId)}
+                          style={styles.rowEditBtn}
+                          testID={`remove-${ex.id}`}
+                        >
+                          <Ionicons name="trash-outline" size={17} color={T.focusRed} />
+                        </A11yControl>
+                      </View>
+                    ) : (
+                      <Text style={[styles.dayExDose, { color: done ? T.textMuted : T.text2 }]}>
+                        {ex.sets}×{ex.repsOrTime}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-                <TouchableOpacity
-                  style={[
-                    styles.addBtn,
-                    { borderColor: inSession ? T.accent : "transparent" },
-                  ]}
-                  onPress={() => {
-                    if (!inSession) w.addExerciseFromPlan(ex.id, dateKey, ex.sets, day.typeName, ex.repsOrTime);
-                  }}
-                  testID={`add-${ex.id}`}
-                >
-                  <LiquidSheen tone={inSession ? "accent" : "neutral"} />
-                  <Ionicons name={inSession ? "checkmark-circle" : "add"} size={16} color={inSession ? T.accent : T.text2} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.swapBtn]}
-                  onPress={() => setSwapId(plannedId)}
-                  testID={`swap-${ex.id}`}
-                >
-                  <LiquidSheen tone="neutral" />
-                  <Ionicons name="swap-horizontal" size={16} color={T.text2} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })}
+              );
+            })}
+            {items.length === 0 && (
+              <Text style={{ color: T.textMuted, padding: 16 }}>
+                No exercises on this day yet — add one with the + button below.
+              </Text>
+            )}
+          </View>
+        )}
       </ScrollView>
+
+      {!day.rest && (
+        <View style={[styles.dayBottomBar, { backgroundColor: T.bg }]}>
+          <TouchableOpacity
+            style={[styles.dayCta, { backgroundColor: T.accent }]}
+            onPress={hasActiveWorkout ? resumeWorkout : startWorkout}
+            accessibilityRole="button"
+            accessibilityLabel={hasActiveWorkout ? "Continue workout" : "Start workout"}
+            testID={hasActiveWorkout ? "resume-session" : "start-session"}
+          >
+            <LiquidSheen tone="accent" />
+            <Text style={[styles.dayCtaText, { color: T.ctaText }]}>
+              {hasActiveWorkout ? "Continue workout" : "Start workout"}
+            </Text>
+          </TouchableOpacity>
+          <A11yControl
+            label={`Add an exercise to ${day.dow}`}
+            onPress={() => setAdding(true)}
+            style={[styles.dayRoundBtn, { backgroundColor: T.card }]}
+            testID="day-add"
+          >
+            <LiquidSheen tone="neutral" />
+            <Ionicons name="add" size={22} color={T.text} />
+          </A11yControl>
+          <A11yControl
+            label={editing ? "Done editing this day" : "Edit this day: remove or swap exercises"}
+            selected={editing}
+            onPress={() => setEditing((e) => !e)}
+            style={[styles.dayRoundBtn, { backgroundColor: editing ? T.accent : T.card }]}
+            testID="day-edit"
+          >
+            {!editing && <LiquidSheen tone="neutral" />}
+            <Ionicons name={editing ? "checkmark" : "trash-outline"} size={20} color={editing ? T.ctaText : T.text} />
+          </A11yControl>
+        </View>
+      )}
 
       <SwapSheet
         visible={swapId !== null}
@@ -552,7 +615,92 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
           setSwapId(null);
         }}
       />
+      <AddExerciseSheet
+        visible={adding}
+        excludeIds={items.map(i => i.id)}
+        onDismiss={() => setAdding(false)}
+        onPick={(id) => {
+          addDayExercise(idx, id);
+          setAdding(false);
+        }}
+      />
     </View>
+  );
+}
+
+function AddExerciseSheet({ visible, excludeIds, onDismiss, onPick }: {
+  visible: boolean;
+  excludeIds: string[];
+  onDismiss: () => void;
+  onPick: (id: string) => void;
+}) {
+  const { T } = useTheme();
+  const answers = usePlanStore(s => s.answers);
+  const [query, setQuery] = useState("");
+  // Only exercises the user can actually perform: their equipment, plus
+  // bodyweight, which needs none. The raw library rows carry COMPACT keys
+  // (m, eq) — exercises.d.ts declares the normalised shape entryFor returns,
+  // not what EXERCISES actually holds — so both spellings are read here.
+  const candidates = useMemo(() => {
+    const equip = new Set([...(answers.equip || []), "bw"]);
+    const q = query.trim().toLowerCase();
+    return EXERCISES.map((raw) => ({
+      id: raw.id,
+      name: raw.name,
+      muscle: raw.muscle ?? (raw as unknown as { m: string }).m,
+      equipment: raw.equipment ?? (raw as unknown as { eq: string }).eq,
+    }))
+      .filter(
+        (e) =>
+          !excludeIds.includes(e.id) &&
+          (answers.equip?.length ? equip.has(e.equipment as never) : true) &&
+          (!q || e.name.toLowerCase().includes(q)),
+      )
+      .slice(0, 30);
+  }, [answers.equip, excludeIds, query]);
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
+      <Pressable style={styles.sheetBackdrop} onPress={onDismiss} accessibilityLabel="Close" />
+      <View style={[styles.sheet, { backgroundColor: T.card }]}>
+        <LiquidSheen tone="neutral" />
+        <Text style={[styles.sheetTitle, { color: T.text }]}>Add an exercise</Text>
+        <TextInput
+          style={[styles.addSearch, { backgroundColor: T.cardAlt, color: T.text }]}
+          placeholder="Search exercises…"
+          placeholderTextColor={T.textMuted}
+          value={query}
+          onChangeText={setQuery}
+          accessibilityLabel="Search exercises to add"
+          testID="add-search"
+        />
+        <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled">
+          {candidates.length === 0 && (
+            <Text style={{ color: T.textMuted, paddingVertical: 20 }}>Nothing matches that search.</Text>
+          )}
+          {candidates.map((e) => (
+            <TouchableOpacity
+              key={e.id}
+              style={[styles.altRow, { borderBottomColor: T.border }]}
+              onPress={() => onPick(e.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${e.name}, ${MUSCLE_LABEL[e.muscle]}`}
+              testID={`addpick-${e.id}`}
+            >
+              <View style={[styles.altPoster, { backgroundColor: T.posterBg }]}>
+                <Image source={{ uri: posterUrl(e.id) }} style={{ width: "100%", height: "100%" }} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ color: T.textCaps, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 }}>
+                  {MUSCLE_LABEL[e.muscle].toUpperCase()}
+                </Text>
+                <Text style={{ color: T.text, fontSize: 14.5, fontWeight: "600" }}>{e.name}</Text>
+              </View>
+              <Ionicons name="add-circle" size={22} color={T.accentText} />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
@@ -699,6 +847,30 @@ const styles = StyleSheet.create({
   addBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   swapBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   startAllBtn: { paddingHorizontal: 18, minHeight: 44, justifyContent: "center", borderRadius: R.pill, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
+
+  // ---- redesigned day view ----
+  dayHeadRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 4 },
+  dayBackBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  dayBigTitle: { fontSize: 28, fontWeight: "800", flexShrink: 1 },
+  dayHeadMeta: { fontSize: 13, fontWeight: "600", marginLeft: "auto" },
+  dowStrip: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 10 },
+  dowPill: { width: 42, height: 34, borderRadius: R.pill, alignItems: "center", justifyContent: "center" },
+  dowPillText: { fontSize: 13, fontWeight: "800" },
+  dayListCard: { borderRadius: 22, paddingHorizontal: 4, overflow: "hidden" },
+  dayListSep: { height: StyleSheet.hairlineWidth, marginLeft: 62 },
+  dayExRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 12, paddingVertical: 14 },
+  dayTick: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  dayExName: { fontSize: 16.5, fontWeight: "700" },
+  dayExMuscle: { fontSize: 10.5, fontWeight: "800", letterSpacing: 1.2, marginTop: 2 },
+  dayExDose: { fontSize: 14.5, fontWeight: "600" },
+  rowEditBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  swappedInline: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 5 },
+  restDayCard: { borderRadius: 22, alignItems: "center", paddingVertical: 48, overflow: "hidden" },
+  dayBottomBar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 28 },
+  dayCta: { flex: 1, minHeight: 52, borderRadius: R.pill, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
+  dayCtaText: { fontSize: 15.5, fontWeight: "800" },
+  dayRoundBtn: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  addSearch: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 8 },
 
   sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
   sheet: {

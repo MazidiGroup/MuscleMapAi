@@ -14,6 +14,9 @@ import { OwnerToken, ScopedStore } from "@/src/owner/scopedStore";
 
 import { AdjustOutcome, previewAdjustedPlan } from "./adjustPlan";
 import { Answers, Plan } from "./exercises";
+// planAdapter's entryFor, not the raw library's: the raw one returns the
+// compact row shape (m/eq), and a day must only ever hold normalised entries.
+import { entryFor } from "./planAdapter";
 import { normalizeAnswers } from "./onboarding";
 import { buildPlan } from "./planAdapter";
 
@@ -68,6 +71,10 @@ type PlanStore = {
   publishAdjusted: (plan: Plan) => Promise<boolean>;
   /** Records or updates one swap. Swapping back to the original removes the entry. */
   setSwap: (plannedId: string, replacementId: string) => void;
+  /** Removes one exercise from one day of the plan, permanently. */
+  removeDayExercise: (dayIndex: number, plannedId: string) => void;
+  /** Appends one exercise to one day of the plan. */
+  addDayExercise: (dayIndex: number, exerciseId: string) => void;
   rebuildFromAnswers: (final: Answers) => void;
   resetAll: () => void;
   toggleCompletion: (dateISO: string, exId: string, done: boolean) => void;
@@ -139,6 +146,37 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     else next[plannedId] = replacementId;
     set({ swaps: next });
     persist([["planSwaps", next]]);
+  },
+
+  // Day edits rewrite the PLAN itself — unlike a swap, which is an overlay —
+  // so they survive a schedule adjust the same way the rest of the week does,
+  // and a brand-new program (rebuildFromAnswers) replaces them wholesale.
+  removeDayExercise: (dayIndex, plannedId) => {
+    const { plan } = get();
+    const day = plan?.days[dayIndex];
+    if (!plan || !day || day.rest || !day.exercises) return;
+    const exercises = day.exercises.filter((e) => e.id !== plannedId);
+    if (exercises.length === day.exercises.length) return;
+    const next: Plan = { ...plan, days: plan.days.map((d, i) => (i === dayIndex ? { ...d, exercises } : d)) };
+    set({ plan: next });
+    persist([["plan", next]]);
+  },
+
+  addDayExercise: (dayIndex, exerciseId) => {
+    const { plan, answers } = get();
+    const day = plan?.days[dayIndex];
+    if (!plan || !day || day.rest) return;
+    if ((day.exercises || []).some((e) => e.id === exerciseId)) return;
+    let entry;
+    try {
+      entry = entryFor(exerciseId, answers as Answers);
+    } catch {
+      return; // an id we cannot resolve must never blank the day
+    }
+    const exercises = [...(day.exercises || []), entry];
+    const next: Plan = { ...plan, days: plan.days.map((d, i) => (i === dayIndex ? { ...d, exercises } : d)) };
+    set({ plan: next });
+    persist([["plan", next]]);
   },
 
   previewAdjust: (hasActiveWorkout) => {
