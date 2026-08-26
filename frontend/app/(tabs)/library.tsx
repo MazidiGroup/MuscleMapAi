@@ -1,5 +1,8 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, Modal, Pressable, Linking, Alert, Platform } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  View, Text, StyleSheet, ScrollView, TextInput, Modal, Pressable, Linking, Alert, Platform,
+  NativeScrollEvent, NativeSyntheticEvent,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -120,6 +123,11 @@ const LIST_TITLES: Record<string, string> = {
 
 /** Derived from the catalogue, never hardcoded in user-facing copy. */
 const CATALOGUE_COUNT = catalogIntegrity().count;
+
+/** Rows mounted per batch in the flat exercise list — a screenful and change. */
+const EXERCISE_ROW_WINDOW = 28;
+/** How far above the bottom the next batch starts mounting. */
+const GROW_AHEAD_PX = 600;
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
@@ -348,6 +356,27 @@ export default function LibraryScreen() {
     return base.filter((e) => ids.includes(e.id));
   }, [query, filters, exerciseList, exerciseBookmarks, recentExercises, planExercises]);
 
+  // First paint mounts a screenful of rows, not the whole catalogue: "Browse
+  // all A–Z" over 208 entries meant ~208 row components, ~208 effects and up
+  // to 208 poster requests before anything appeared. The window grows ahead
+  // of the scroll and resets whenever the result set changes.
+  const [rowWindow, setRowWindow] = useState(EXERCISE_ROW_WINDOW);
+  useEffect(() => {
+    setRowWindow(EXERCISE_ROW_WINDOW);
+  }, [query, filters, exerciseList]);
+  const visibleResults = useMemo(() => results.slice(0, rowWindow), [results, rowWindow]);
+  const growRowWindow = useCallback(
+    ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, layoutMeasurement, contentSize } = nativeEvent;
+      if (contentOffset.y + layoutMeasurement.height > contentSize.height - GROW_AHEAD_PX) {
+        setRowWindow((w) => (w < results.length ? Math.min(w + EXERCISE_ROW_WINDOW, results.length) : w));
+      }
+    },
+    [results.length],
+  );
+
+  const openExercise = useCallback((id: string) => router.push(`/exercise/${id}`), [router]);
+
   const open = (n: string) => setSelected(n);
   const closeSheet = () => {
     setSelected(null);
@@ -414,7 +443,12 @@ export default function LibraryScreen() {
           <View />
         </PremiumGate>
       ) : (
-      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+        onScroll={seg === "exercises" && rowWindow < results.length ? growRowWindow : undefined}
+        scrollEventThrottle={128}
+      >
         {seg === "muscles" && (
           <>
             {/* Two ways back into something already looked at, before the
@@ -692,7 +726,7 @@ export default function LibraryScreen() {
                             {i > 0 && <View style={styles.mgSep} />}
                             <ExerciseRow
                               e={e}
-                              onPress={() => router.push(`/exercise/${id}`)}
+                              onPress={openExercise}
                               styles={styles}
                               T={T}
                               testID={`lib-recent-${id}`}
@@ -772,12 +806,12 @@ export default function LibraryScreen() {
                   </View>
                 ) : (
                   <View style={styles.mgCard}>
-                    {results.map((e, i) => (
+                    {visibleResults.map((e, i) => (
                       <View key={e.id}>
                         {i > 0 && <View style={styles.mgSep} />}
                         <ExerciseRow
                           e={e}
-                          onPress={() => router.push(`/exercise/${e.id}`)}
+                          onPress={openExercise}
                           styles={styles}
                           T={T}
                           testID={`lib-ex-${e.id}`}
@@ -1024,14 +1058,17 @@ function BrowseTile({
   );
 }
 
-function ExerciseRow({
+// Memoised: the flat list repeats this row up to 208 times, and without the
+// memo every keystroke in search re-rendered all of them. `onPress` takes the
+// id so the parent can pass ONE stable callback instead of a closure per row.
+const ExerciseRow = React.memo(function ExerciseRow({
   e, onPress, styles, T, testID,
-}: { e: any; onPress: () => void; styles: any; T: LegacyPalette; testID: string }) {
+}: { e: any; onPress: (id: string) => void; styles: any; T: LegacyPalette; testID: string }) {
   const meta = getExerciseMeta(e.id);
   return (
     <TouchableOpacity
       style={styles.exRow}
-      onPress={onPress}
+      onPress={() => onPress(e.id)}
       accessibilityRole="button"
       accessibilityLabel={`${e.name}, ${e.equipment}, ${(e.primaryMuscles || []).join(", ")}`}
       testID={testID}
@@ -1056,7 +1093,7 @@ function ExerciseRow({
       <Ionicons name="chevron-forward" size={17} color={T.textFaint} />
     </TouchableOpacity>
   );
-}
+});
 
 function DuoLink({
   icon, label, disabled, onPress, styles, T, testID,

@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TextInput,
   KeyboardAvoidingView,
   Platform,
@@ -51,6 +51,29 @@ function buildSuggestions(history: Workout[], prs: PRs, unit: string): string[] 
 // Auto-linkify http(s) URLs in coach responses so citation links are tappable.
 // Guideline 1.4.1 requires citations to be "easy for the user to find".
 const URL_RE = /(https?:\/\/[^\s)]+)(?=[\s)]|$)/g;
+// One bubble, memoised. During streaming only the LAST message object is
+// replaced per delta, so every earlier bubble keeps its reference and skips
+// its re-render — the whole-history repaint per token is what this removes.
+// Virtualization from the FlatList covers long histories at rest.
+const Bubble = React.memo(function Bubble({
+  m, thinking, styles, T,
+}: { m: CoachTurn; thinking: boolean; styles: any; T: LegacyPalette }) {
+  return (
+    <View style={[styles.bubbleRow, m.role === "user" ? styles.rowRight : styles.rowLeft]}>
+      <View style={[styles.bubble, m.role === "user" ? styles.userBubble : styles.aiBubble]}>
+        <LiquidSheen tone={m.role === "user" ? "accent" : "neutral"} />
+        {thinking ? (
+          <ThinkingDots />
+        ) : m.role === "assistant" ? (
+          renderMessageWithLinks(m.content, styles.bubbleText, styles.linkText)
+        ) : (
+          <Text style={[styles.bubbleText, { color: T.bg }]}>{m.content}</Text>
+        )}
+      </View>
+    </View>
+  );
+});
+
 function renderMessageWithLinks(text: string, baseStyle: any, linkStyle: any) {
   if (!text) return null;
   const parts: React.ReactNode[] = [];
@@ -96,7 +119,7 @@ function CoachContent() {
   const [messages, setMessages] = useState<CoachTurn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<FlatList<CoachTurn>>(null);
   const sentQ = useRef<string | null>(null);
   const reqRef = useRef<CoachRequestHandle | null>(null);
   const stoppedRef = useRef(false);
@@ -195,8 +218,16 @@ function CoachContent() {
         </View>
       </View>
 
-      <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 20 }}>
-        {messages.length === 0 ? (
+      <FlatList
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+        data={messages}
+        keyExtractor={(_, i) => String(i)}
+        renderItem={({ item, index }) => (
+          <Bubble m={item} thinking={busy && index === messages.length - 1 && item.content === ""} styles={styles} T={T} />
+        )}
+        ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="chatbubbles-outline" size={36} color={T.textFaint} />
             <Text style={styles.emptyText}>Ask me anything about muscles, anatomy or training.</Text>
@@ -207,23 +238,8 @@ function CoachContent() {
               </TouchableOpacity>
             ))}
           </View>
-        ) : (
-          messages.map((m, i) => (
-            <View key={i} style={[styles.bubbleRow, m.role === "user" ? styles.rowRight : styles.rowLeft]}>
-              <View style={[styles.bubble, m.role === "user" ? styles.userBubble : styles.aiBubble]}>
-                <LiquidSheen tone={m.role === "user" ? "accent" : "neutral"} />
-                {m.content === "" && busy ? (
-                  <ThinkingDots />
-                ) : m.role === "assistant" ? (
-                  renderMessageWithLinks(m.content, styles.bubbleText, styles.linkText)
-                ) : (
-                  <Text style={[styles.bubbleText, { color: T.bg }]}>{m.content}</Text>
-                )}
-              </View>
-            </View>
-          ))
-        )}
-      </ScrollView>
+        }
+      />
 
       <View style={[styles.inputBar, { paddingBottom: insets.bottom + 8 }]}>
         <TextInput
