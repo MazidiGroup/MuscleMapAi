@@ -365,7 +365,7 @@ function SessionCard({
           <Text style={[styles.setHead, { width: 44, textAlign: "center" }]}>SET</Text>
           <Text style={[styles.setHead, { flex: 1, textAlign: "center" }]}>{loadColumnLabel(unit, bodyweight)}</Text>
           <Text style={[styles.setHead, { flex: 1, textAlign: "center" }]}>REPS</Text>
-          <View style={{ width: 36 }} />
+          <View style={{ width: 24 }} />
         </View>
 
         {se.sets.map((s, idx) => {
@@ -407,7 +407,7 @@ function SessionCard({
                         <Ionicons name="checkmark" size={16} color={T.bg} />
                       ) : (
                         <Text style={[styles.setBadgeText, isNext ? styles.setBadgeTextNext : null]}>
-                          {s.warmup ? "W" : idx + 1}
+                          {idx + 1}
                         </Text>
                       )}
                     </View>
@@ -433,32 +433,15 @@ function SessionCard({
                   accessibilityLabel={`Set ${idx + 1} reps, ${s.reps || 0}`}
                   testID={`r-${se.exerciseId}-${idx}`}
                 />
-                {/* The warm-up toggle kept its own visible control: burying it
-                    under another gesture on the badge would make it silent. The
-                    trophy takes the slot on a PR row — a record is never a
-                    warm-up. */}
-                {pr ? (
-                  <View style={styles.prFlag} testID={`pr-${se.exerciseId}-${idx}`}>
-                    <Ionicons name="trophy" size={13} color={T.pr} />
-                  </View>
-                ) : (
-                  <A11yControl
-                    role="checkbox"
-                    checked={!!s.warmup}
-                    label={
-                      s.warmup
-                        ? `Set ${idx + 1} is a warm-up. Tap to make it a working set.`
-                        : `Set ${idx + 1} is a working set. Tap to mark it a warm-up.`
-                    }
-                    onPress={() => w.toggleWarmup(se.exerciseId, s.id)}
-                    style={styles.warmSlot}
-                    testID={`warmup-${se.exerciseId}-${idx}`}
-                  >
-                    <View style={[styles.warmPill, s.warmup && styles.warmPillOn]}>
-                      <Text style={[styles.warmPillText, s.warmup && styles.warmPillTextOn]}>W</Text>
+                {/* A fixed slot keeps the value columns aligned whether or not
+                    the row earned a trophy. */}
+                <View style={styles.prSlot}>
+                  {pr && (
+                    <View testID={`pr-${se.exerciseId}-${idx}`}>
+                      <Ionicons name="trophy" size={13} color={T.pr} />
                     </View>
-                  </A11yControl>
-                )}
+                  )}
+                </View>
               </View>
             </View>
           );
@@ -562,7 +545,6 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   suggestCardEmpty: { backgroundColor: T.surfaceHi, borderColor: T.border },
   overloadNote: { color: T.textFaint, fontSize: 10.5, lineHeight: 15, marginTop: 8 },
 
-  prFlag: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   prNote: {
     flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8,
     backgroundColor: T.pr + "1F", borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 7,
@@ -591,11 +573,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   setBadgeIdle: { borderWidth: 1.5, borderColor: T.border },
   setBadgeText: { color: T.textFaint, fontSize: 14, fontWeight: "700" },
   setBadgeTextNext: { color: T.accent },
-  warmSlot: { width: 36, alignSelf: "center", height: 44, alignItems: "center", justifyContent: "center" },
-  warmPill: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: T.surfaceHi },
-  warmPillOn: { backgroundColor: T.accent },
-  warmPillText: { color: T.textFaint, fontSize: 11, fontWeight: "800" },
-  warmPillTextOn: { color: T.bg },
+  prSlot: { width: 24, alignSelf: "center", height: 44, alignItems: "center", justifyContent: "center" },
   setInput: { flex: 1, minWidth: 0, alignSelf: "center", backgroundColor: "transparent", paddingVertical: 10, textAlign: "center", color: T.text, fontSize: 17, fontWeight: "600" },
   setValueDone: { color: T.textDim },
   setHint: { color: T.textFaint, fontSize: 11.5, textAlign: "center", marginTop: 6, marginBottom: 2 },
