@@ -14,11 +14,10 @@ import { OwnerToken, ScopedStore } from "@/src/owner/scopedStore";
 
 import { AdjustOutcome, previewAdjustedPlan } from "./adjustPlan";
 import { Answers, Plan } from "./exercises";
+import { normalizeAnswers } from "./onboarding";
 // planAdapter's entryFor, not the raw library's: the raw one returns the
 // compact row shape (m/eq), and a day must only ever hold normalised entries.
-import { entryFor } from "./planAdapter";
-import { normalizeAnswers } from "./onboarding";
-import { buildPlan } from "./planAdapter";
+import { buildPlan, entryFor } from "./planAdapter";
 
 const newSeed = () => Math.floor(Math.random() * 2_147_483_647);
 
@@ -152,12 +151,24 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
   // so they survive a schedule adjust the same way the rest of the week does,
   // and a brand-new program (rebuildFromAnswers) replaces them wholesale.
   removeDayExercise: (dayIndex, plannedId) => {
-    const { plan } = get();
+    const { plan, swaps } = get();
     const day = plan?.days[dayIndex];
     if (!plan || !day || day.rest || !day.exercises) return;
     const exercises = day.exercises.filter((e) => e.id !== plannedId);
     if (exercises.length === day.exercises.length) return;
     const next: Plan = { ...plan, days: plan.days.map((d, i) => (i === dayIndex ? { ...d, exercises } : d)) };
+    // The row's swap goes with it — but only when NO OTHER day still holds
+    // this planned id, since swaps are keyed per program, not per day. Left
+    // behind, the orphan would resurrect "Swapped from · Restore" on a row
+    // added fresh later.
+    const stillPlanned = next.days.some((d) => d.exercises?.some((e) => e.id === plannedId));
+    if (!stillPlanned && swaps[plannedId]) {
+      const nextSwaps = { ...swaps };
+      delete nextSwaps[plannedId];
+      set({ plan: next, swaps: nextSwaps });
+      persist([["plan", next], ["planSwaps", nextSwaps]]);
+      return;
+    }
     set({ plan: next });
     persist([["plan", next]]);
   },
