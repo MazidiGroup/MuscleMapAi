@@ -153,6 +153,16 @@ export function confirmSetLine(exerciseName: string, reps: number, weight: numbe
   return `${warmup ? "Warm-up: " : ""}${reps} reps at ${load}, ${exerciseName}.`;
 }
 
+/**
+ * Drops a trailing full stop so a description can be embedded in a question.
+ *
+ * `confirmSetLine` ends in a full stop because it is normally read as its own
+ * sentence. Quoting it inside "Undo …?" then produced "Dumbbell Situp.?".
+ */
+export function asClause(sentence: string): string {
+  return sentence.replace(/[.!]+$/, "");
+}
+
 /** Trims the trailing zeros a converted load picks up (85.0 kg reads wrong). */
 export function formatLoadNumber(value: number): string {
   if (!Number.isFinite(value)) return "0";
@@ -170,7 +180,7 @@ export const WATCH_COPY = {
   nothingToRevise: "There is no set to change yet.",
   ambiguousExercise: (spoken: string) => `More than one exercise matches "${spoken}". Which one?`,
   unknownExercise: (spoken: string) => `I could not find "${spoken}" in this workout or the exercise library.`,
-  confirmUndo: (description: string) => `Undo ${description}?`,
+  confirmUndo: (description: string) => `Undo ${asClause(description)}?`,
   undone: (description: string) => `Undone: ${description}.`,
   paused: "Workout paused.",
   resumed: "Workout resumed.",

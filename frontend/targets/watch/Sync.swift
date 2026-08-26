@@ -73,6 +73,29 @@ struct Outbox: Codable {
     return now - entry.lastAttemptAt >= backoffMs(entry.attempts)
   }
 
+  /// Whether an event must wait, whatever else is due.
+  ///
+  /// `session.end` is the only event whose early arrival DESTROYS later work:
+  /// the phone commits the workout, closes the session, and every set that
+  /// turns up afterwards has nowhere left to go. Ordering by `seq` inside a
+  /// batch is not enough, because a command rides two channels — a queued
+  /// transfer and, when both apps are awake, a live message — and FIFO does not
+  /// hold across them. An end sent in a later envelope can beat a set still
+  /// sitting in the queue, which is exactly what was observed.
+  ///
+  /// Events travelling in the SAME batch do not count as outstanding, so the
+  /// common case still finishes in one round trip. A REJECTED entry never
+  /// blocks: the phone has refused it permanently, and waiting on something
+  /// that will never be accepted would strand the end for ever.
+  func blockedByEarlierWork(_ event: WatchEvent, travellingWith: Set<String>) -> Bool {
+    guard event.kind == .sessionEnd else { return false }
+    return pending.contains { other in
+      other.event.sessionId == event.sessionId
+        && other.event.seq < event.seq
+        && !travellingWith.contains(other.event.eventId)
+    }
+  }
+
   /// The next batch, in the watch's own sequence order.
   func nextBatch(now: Double, limit: Int = WatchLimits.maxBatch) -> WatchEnvelope? {
     let due = entries.filter { isDue($0, now: now) }
@@ -80,8 +103,11 @@ struct Outbox: Codable {
     let ordered = due.map(\.event).sorted {
       ($0.seq, $0.at, $0.eventId) < ($1.seq, $1.at, $1.eventId)
     }
-    return WatchEnvelope(
-      envelopeId: IdMint.next("env"), sentAt: now, events: Array(ordered.prefix(limit)))
+    let capped = Array(ordered.prefix(limit))
+    let travellingWith = Set(capped.map(\.eventId))
+    let events = capped.filter { !blockedByEarlierWork($0, travellingWith: travellingWith) }
+    guard !events.isEmpty else { return nil }
+    return WatchEnvelope(envelopeId: IdMint.next("env"), sentAt: now, events: events)
   }
 
   mutating func markAttempted(_ envelope: WatchEnvelope, now: Double) {

@@ -110,8 +110,16 @@ enum WatchCopy {
       formatLoad(unit.max), unit.label)
   }
 
+  /// `confirmSetLine` ends in a full stop because it normally reads as its own
+  /// sentence. Quoting it inside a question produced "Dumbbell Situp.?".
+  static func asClause(_ sentence: String) -> String {
+    var trimmed = sentence
+    while let last = trimmed.last, last == "." || last == "!" { trimmed.removeLast() }
+    return trimmed
+  }
+
   static func confirmUndo(_ description: String) -> String {
-    String(format: NSLocalizedString("Undo %@?", comment: ""), description)
+    String(format: NSLocalizedString("Undo %@?", comment: ""), asClause(description))
   }
 
   static func undone(_ description: String) -> String {

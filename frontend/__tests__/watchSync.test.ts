@@ -202,6 +202,75 @@ test("a rejection is surfaced once and then dropped, never retried forever", () 
   assert.equal(dropRejected(res.outbox).entries.length, 0);
 });
 
+test("the end of a workout waits for earlier work still in the queue", () => {
+  // The failure this prevents, seen twice on the simulator: a set logged offline
+  // and an end sent afterwards travel in separate envelopes over two channels —
+  // a queued transfer and a live message — and FIFO does not hold across them.
+  // The end arrived first, the phone committed and closed, and the set was
+  // refused because there was nowhere left to put it.
+  const set = logEv(1, "set1", 8);
+  const end = ev("session.end", 2, { endedAt: NOW + 1000 });
+
+  let box = enqueue(emptyOutbox(), [set], NOW);
+  const first = nextBatch(box, NOW)!;
+  box = markAttempted(box, first, NOW);
+  assert.deepEqual(first.events.map((e) => e.kind), ["set.log"]);
+
+  // The end is queued while the set is still unacknowledged, so it must not go.
+  box = enqueue(box, [end], NOW + 10);
+  assert.equal(nextBatch(box, NOW + 10), null, "nothing may be sent that would overtake the set");
+
+  // Once the set is acknowledged the end is free.
+  box = applyAck(box, {
+    schema: WATCH_SCHEMA_VERSION,
+    envelopeId: first.envelopeId,
+    accepted: [set.eventId],
+    rejected: [],
+  }).outbox;
+  const second = nextBatch(box, NOW + 20)!;
+  assert.deepEqual(second.events.map((e) => e.kind), ["session.end"]);
+});
+
+test("an end travelling WITH its own earlier work still goes in one trip", () => {
+  // Same envelope means same arrival and the phone sorts by seq, so holding it
+  // back here would cost a round trip for nothing.
+  const box = enqueue(emptyOutbox(), [logEv(1, "set1", 8), ev("session.end", 2, { endedAt: NOW })], NOW);
+  const batch = nextBatch(box, NOW)!;
+  assert.deepEqual(batch.events.map((e) => e.kind), ["set.log", "session.end"]);
+});
+
+test("a permanently refused set does not strand the end for ever", () => {
+  const set = logEv(1, "setBad", 8);
+  const end = ev("session.end", 2, { endedAt: NOW + 1000 });
+  let box = enqueue(emptyOutbox(), [set, end], NOW);
+  const first = nextBatch(box, NOW)!;
+  box = markAttempted(box, first, NOW);
+
+  box = applyAck(box, {
+    schema: WATCH_SCHEMA_VERSION,
+    envelopeId: first.envelopeId,
+    accepted: [],
+    rejected: [{ eventId: set.eventId, reason: "unknown_exercise" }],
+  }).outbox;
+
+  const second = nextBatch(box, NOW + 999_999)!;
+  assert.ok(second, "a refusal is resolved, not outstanding");
+  assert.deepEqual(second.events.map((e) => e.kind), ["session.end"]);
+});
+
+test("a rejected event settles its sequence number so the end is not deferred", () => {
+  // The phone-side mirror of the same guard. Without it, contiguity would wait
+  // for a set that is never going to be applied.
+  const bad = logEv(1, "setBad", 8);
+  const end = ev("session.end", 2, { endedAt: NOW + 1000 });
+  const out = applyWatchEvents(null, emptyLedger(), [startEv(), bad, end], ctx({
+    knowsExercise: (id) => id !== "bench-press",
+  }));
+  assert.equal(out.rejected.length, 1, "the set is refused");
+  assert.equal(out.finished, true, "and the workout still ends");
+  assert.deepEqual(out.deferred, []);
+});
+
 // --- exactly-once apply ------------------------------------------------------
 
 test("a duplicated delivery does not duplicate the set", () => {

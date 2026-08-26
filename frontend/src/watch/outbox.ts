@@ -129,6 +129,40 @@ export function isDue(entry: OutboxEntry, now: number): boolean {
 export const MAX_BATCH = 25;
 
 /**
+ * Whether an event must wait, whatever else is due.
+ *
+ * `session.end` is the only event whose early arrival DESTROYS later work: the
+ * phone commits the workout, closes the session, and every set that turns up
+ * afterwards has nowhere left to go. Ordering by `seq` inside a batch is not
+ * enough of a guard, because a command can ride two channels — a queued
+ * transfer and, when both apps are awake, a live message — and FIFO does not
+ * hold across them. An end sent in a later envelope can beat a set still
+ * sitting in the queue, which is exactly what was observed.
+ *
+ * So the end waits here until nothing earlier in its session is outstanding.
+ * Events travelling in the SAME batch do not count as outstanding — they arrive
+ * together and the phone applies them in sequence order — so the common case
+ * still finishes in one round trip.
+ *
+ * A REJECTED entry never blocks. The phone has refused it permanently, and
+ * waiting on something that will never be accepted would strand the end for
+ * ever, which is a worse failure than the one this prevents.
+ */
+export function blockedByEarlierWork(
+  outbox: Outbox,
+  event: WatchEvent,
+  travellingWith: ReadonlySet<string>,
+): boolean {
+  if (event.kind !== "session.end") return false;
+  return pending(outbox).some(
+    (other) =>
+      other.event.sessionId === event.sessionId &&
+      other.event.seq < event.seq &&
+      !travellingWith.has(other.event.eventId),
+  );
+}
+
+/**
  * The next batch to send, in the watch's own `seq` order.
  *
  * Ordering the wire matches ordering on arrival in the common case, which keeps
@@ -138,7 +172,12 @@ export const MAX_BATCH = 25;
 export function nextBatch(outbox: Outbox, now: number, limit = MAX_BATCH): WatchEnvelope | null {
   const due = outbox.entries.filter((e) => isDue(e, now));
   if (due.length === 0) return null;
-  const events = orderEvents(due.map((e) => e.event)).slice(0, limit);
+
+  const ordered = orderEvents(due.map((e) => e.event)).slice(0, limit);
+  const travellingWith = new Set(ordered.map((e) => e.eventId));
+  const events = ordered.filter((e) => !blockedByEarlierWork(outbox, e, travellingWith));
+  if (events.length === 0) return null;
+
   return {
     schema: events[0].schema,
     envelopeId: mintId("env", () => now),

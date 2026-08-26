@@ -284,6 +284,14 @@ export function applyWatchEvents(
       }
     } else if (result.verdict.kind === "reject") {
       rejected.push({ eventId: event.eventId, reason: result.verdict.reason });
+      // A refusal RESOLVES the sequence number even though nothing was applied.
+      // Contiguity asks "has everything earlier been settled", not "has
+      // everything earlier been written" — without this, one permanently
+      // rejected set would defer the end of the workout for ever.
+      next = {
+        ...next,
+        seenSeqs: next.seenSeqs.includes(event.seq) ? next.seenSeqs : [...next.seenSeqs, event.seq],
+      };
     } else {
       deferred.push(event.eventId);
     }

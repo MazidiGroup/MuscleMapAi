@@ -286,6 +286,15 @@ test("undo asks before it removes anything", () => {
   assert.ok(asked.feedback.message.includes("8 reps at 80 kg"), asked.feedback.message);
 });
 
+test("the undo question does not collide with the sentence it quotes", () => {
+  // Seen on the watch: "Undo 9 reps at 15 kg, Dumbbell Situp.?"
+  const line = confirmSetLine("Dumbbell Situp", 9, 15, "kg");
+  assert.ok(line.endsWith("."), "the description is a sentence on its own");
+  const question = WATCH_COPY.confirmUndo(line);
+  assert.ok(!question.includes(".?"), question);
+  assert.ok(question.endsWith("Dumbbell Situp?"), question);
+});
+
 test("a confirmed undo tombstones the set rather than deleting it", () => {
   const logged = mustApply(running(), { kind: "logSet", reps: 8 }).snapshot as WatchSnapshot;
   const out = mustApply(logged, { kind: "undoLastSet", confirmed: true });
