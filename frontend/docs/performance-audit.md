@@ -208,11 +208,25 @@ grep -c "GET /api/exercise-media/" <backend log>
 
 ---
 
-## 9. Open items owned elsewhere
+## 9. Open items — status as of 2026-08-27 afternoon
 
-- **Watch offline-set data-loss bug** — unresolved, gates release; the
-  discriminating re-drill (device/simulator, Mac-only) never ran; Windows
-  session holds a written `sessionRef` fix pending the trace.
-- **~16 modified files uncommitted** on `claude/apple-watch-companion` at the
-  time of writing, spanning all the redesigns + both perf fixes. Largest
-  standing risk in the repo: commit before further large edits.
+- **Watch offline-set data-loss bug — RESOLVED.** The Windows zombie-binding
+  fix (`bc5aad3`, merged in `56bd9dd`) closes a ledger binding whose session
+  the phone no longer owns and clears per-session scratch on release; its
+  test fixture reconstructs the captured deadlock. An instrumented
+  end-to-end re-drill on paired simulators then validated the fix: an
+  offline `set.log` queued during a phone kill was delivered on reconnect
+  (via WCSession background wake), applied into the live session, and
+  committed (workout `ij0lcl06`, 17 sets, offline set included; ledger
+  released empty). Hardware pass per `docs/apple-watch.md` still pending.
+- **CORRECTION — watch outbox persist-ordering.** An earlier session report
+  claimed "hard evidence" that the on-disk outbox held 0 entries while
+  events were pending. That was an inspection-script bug: the script read
+  keys `events`/`pending`; the real key is `entries`. The watch code
+  persists before confirming on BOTH paths (enqueue: persist before
+  announce, `Store.swift`; ack: save before count/announce) and has since
+  the feature landed. Any termination race collapses to a duplicate resend,
+  which the phone dedupes by event id. No code change made — and none
+  should be, absent new measurement.
+- **Uncommitted-tree risk — CLOSED.** All work is committed in categorised
+  commits and pushed; checkpoint tag `checkpoint/pre-drill-2026-08-27`.
