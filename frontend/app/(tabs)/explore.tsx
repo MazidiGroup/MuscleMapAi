@@ -33,6 +33,7 @@ function ExploreContent() {
 
   const [selected, setSelected] = useState<string | null>(null);
   const [isolate, setIsolate] = useState<string | null>(null);
+  const [system, setSystem] = useState<string>("muscular");
   const [hidden, setHidden] = useState<string[]>([]);
 
   const peek = 158;
@@ -82,6 +83,7 @@ function ExploreContent() {
             nodeName={selected}
             showHandle={false}
             fill
+            variant="preview"
             onClose={() => {
               setSelected(null);
               viewer.current?.resetView();
@@ -91,43 +93,83 @@ function ExploreContent() {
         ) : (
           <View style={styles.controls}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+              <View style={styles.panelHead}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.panelTitle}>Body layers</Text>
+                  <Text style={styles.panelSub}>Choose a system, then isolate a region</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.panelClose}
+                  onPress={showAll}
+                  accessibilityRole="button"
+                  accessibilityLabel="Show the whole body and clear any isolation"
+                  testID="panel-close"
+                >
+                  <Ionicons name="close" size={20} color={T.text} />
+                </TouchableOpacity>
+              </View>
+
+              {/* System first: the model can only show one at a time, so this is
+                  a choice, not two independent toggles. */}
+              <View style={styles.systemSeg}>
                 {EXPLORER.map((section) => {
-                  const sysHidden = hidden.includes(section.container);
+                  const on = system === section.key;
                   return (
-                    <View key={section.key} style={{ marginBottom: 8 }}>
-                      <View style={styles.sectionHead}>
-                        <Text style={styles.sectionTitle}>{section.label}</Text>
-                        <TouchableOpacity onPress={() => toggleHidden(section.container)} style={styles.eyeBtn} testID={`toggle-${section.key}`}>
-                          <Ionicons name={sysHidden ? "eye-off-outline" : "eye-outline"} size={18} color={sysHidden ? T.textFaint : T.accent} />
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.chipWrap}>
-                        {section.children.map((c) => {
-                          const active = isolate === c.container;
-                          const chHidden = hidden.includes(c.container);
-                          return (
-                            <TouchableOpacity
-                              key={c.key}
-                              style={[styles.chip, active && styles.chipActive, chHidden && styles.chipHidden]}
-                              onPress={() => focusCategory(c.container)}
-                              onLongPress={() => toggleHidden(c.container)}
-                              testID={`cat-${c.key}`}
-                            >
-                              <Ionicons name={c.icon as any} size={15} color={active ? T.accent : chHidden ? T.textFaint : T.accent} />
-                              <Text style={[styles.chipText, active && styles.chipTextActive, chHidden && { color: T.textFaint }]}>{c.label}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
+                    <TouchableOpacity
+                      key={section.key}
+                      style={[styles.systemBtn, on && styles.systemBtnActive]}
+                      onPress={() => setSystem(section.key)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      testID={`system-${section.key}`}
+                    >
+                      <Ionicons name="eye-outline" size={16} color={on ? T.bg : T.text} />
+                      <Text style={[styles.systemText, on && styles.systemTextActive]}>
+                        {section.key === "muscular" ? "Muscular" : "Skeletal"}
+                      </Text>
+                    </TouchableOpacity>
                   );
                 })}
-                <Text style={styles.hint}>Tap a region to isolate it · long-press to hide</Text>
-                <TouchableOpacity style={styles.showAll} onPress={showAll} testID="show-all-btn">
-                  <Ionicons name="scan-outline" size={16} color={T.text} />
-                  <Text style={styles.showAllText}>Show Full Body</Text>
-                </TouchableOpacity>
-              </ScrollView>
+              </View>
+
+              <View style={styles.regionGrid}>
+                {(EXPLORER.find((x) => x.key === system)?.children ?? []).map((c) => {
+                  const active = isolate === c.container;
+                  const chHidden = hidden.includes(c.container);
+                  return (
+                    <TouchableOpacity
+                      key={c.key}
+                      style={[styles.region, active && styles.regionActive, chHidden && styles.chipHidden]}
+                      onPress={() => focusCategory(c.container)}
+                      onLongPress={() => toggleHidden(c.container)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={`${c.label}${chHidden ? ", hidden" : ""}`}
+                      accessibilityHint="Long-press to hide this region"
+                      testID={`cat-${c.key}`}
+                    >
+                      <Ionicons
+                        name={c.icon as any}
+                        size={17}
+                        color={chHidden ? T.textFaint : T.accent}
+                      />
+                      <Text
+                        style={[styles.regionText, active && { color: T.accent }, chHidden && { color: T.textFaint }]}
+                        numberOfLines={1}
+                      >
+                        {c.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity style={styles.showAll} onPress={showAll} testID="show-all-btn">
+                <Ionicons name="scan-outline" size={16} color={T.text} />
+                <Text style={styles.showAllText}>Show full body</Text>
+              </TouchableOpacity>
+              <Text style={styles.hint}>Long-press a region to hide</Text>
+            </ScrollView>
           </View>
         )}
       </DraggableSheet>
@@ -142,6 +184,31 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
   controls: { flex: 1, paddingHorizontal: 16, paddingTop: 2 },
   segment: { flexDirection: "row", backgroundColor: T.bg2, borderRadius: 22, padding: 4, marginBottom: 12, gap: 4 },
+  panelHead: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 16 },
+  panelTitle: { color: T.text, fontSize: 24, fontWeight: "800" },
+  panelSub: { color: T.textDim, fontSize: 13.5, marginTop: 2 },
+  panelClose: {
+    width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
+    backgroundColor: T.bg2,
+  },
+  // The system is a single choice, so the selected half is filled rather than
+  // outlined — two outlined halves would read as two independent toggles.
+  systemSeg: { flexDirection: "row", gap: 10, marginBottom: 14 },
+  systemBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    minHeight: 48, borderRadius: 22, backgroundColor: T.bg2,
+  },
+  systemBtnActive: { backgroundColor: T.accent },
+  systemText: { color: T.text, fontSize: 15, fontWeight: "700" },
+  systemTextActive: { color: T.bg },
+  regionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  region: {
+    width: "48%", flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 10,
+    minHeight: 54, paddingHorizontal: 14, borderRadius: 18, backgroundColor: T.bg2,
+    borderWidth: 1.5, borderColor: "transparent",
+  },
+  regionActive: { borderColor: T.accent },
+  regionText: { color: T.text, fontSize: 14, fontWeight: "600", flex: 1 },
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   sectionTitle: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   // No fill of its own, and a full 44 pt target rather than a 4 pt pad.
@@ -155,7 +222,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   chipHidden: { opacity: 0.5 },
   chipText: { color: T.text, fontSize: 13, fontWeight: "600" },
   chipTextActive: { color: T.accent, fontWeight: "700" },
-  hint: { color: T.textFaint, fontSize: 12, marginTop: 8, marginBottom: 4 },
+  hint: { color: T.textFaint, fontSize: 12.5, textAlign: "center", marginTop: 12 },
   shrinkHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   shrinkTitle: { color: T.text, fontSize: 16, fontWeight: "700" },
   shrinkPct: { color: T.accent, fontSize: 16, fontWeight: "800" },

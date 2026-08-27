@@ -16,7 +16,7 @@ import { LayoutSkeleton, StatusAnnouncement } from "@/src/ui/state";
 
 import { Paywall } from "./Paywall";
 import { usePremium } from "./PremiumContext";
-import { PREMIUM_AREA_NAMES, PREMIUM_ENTRY_COPY, Surface, gate, isPremiumSurface } from "./entitlement";
+import { PREMIUM_AREA_NAMES, Surface, gate, isPremiumSurface } from "./entitlement";
 
 /** Every surface that has locked-state copy, so the two can never drift apart. */
 export type GateableSurface = Extract<Surface, keyof typeof PREMIUM_AREA_NAMES>;
@@ -51,14 +51,13 @@ export function PremiumGate({
     );
   }
 
-  const entry = PREMIUM_ENTRY_COPY[surface];
+  // The paywall carries ONE header on every surface. It used to be overridden
+  // per surface from PREMIUM_ENTRY_COPY, which meant the screen introduced
+  // itself differently depending on which lock you touched — and made the
+  // shared title in PAYWALL_COPY dead copy that never rendered.
   return (
     <View style={{ flex: 1, backgroundColor: t.color.bg }} testID={`locked-${surface}`}>
-      <Paywall
-        title={entry.title}
-        body={entry.body}
-        headerOffset={headerOffset}
-      />
+      <Paywall headerOffset={headerOffset} />
     </View>
   );
 }

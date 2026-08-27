@@ -281,8 +281,28 @@ export function classifyRestore(input: { threw?: boolean; entitlementActive?: bo
  * or raw error text may appear here, and no copy may promise an automatic retry.
  */
 export const PAYWALL_COPY = {
-  title: "Understand every workout",
-  subtitle: "Turn your plan into guidance you can question, adapt and see on the body.",
+  /** The wordmark above the promise. Says which product is being sold. */
+  eyebrow: "Muscle Map Premium",
+  title: "Your training explained",
+  subtitle: "Insight | Logs on your wrist | Coach at hand",
+  /**
+   * The lead benefit gets a worked example rather than a claim: the reader sees
+   * the actual primary/secondary split before paying for it. Labels only — the
+   * example carries no numbers it would have to keep true.
+   */
+  lead: {
+    eyebrow: "Muscle insight",
+    headline: "See what every movement trains",
+    primaryLabel: "Primary",
+    secondaryLabel: "Secondary",
+  },
+  /** The two supporting areas, stated plainly beneath the lead. */
+  supporting: [
+    { icon: "watch", label: "Watch logging", desc: "Log sets straight from your wrist" },
+    { icon: "sparkles", label: "Coach insight", desc: "Guidance shaped by your training" },
+  ],
+  /** Opens the full value list, the free promise and the billing terms. */
+  upgradeToggle: "What changes when you upgrade",
   // Must describe the free tier EXACTLY as the app behaves. Free History and
   // Insights are capped (see freeLimits.ts), so this no longer promises all of
   // either — an inaccurate free promise is an App Store risk, not just bad copy.
