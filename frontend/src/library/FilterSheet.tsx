@@ -20,6 +20,7 @@ import {
   filterEmptyMessage,
   movementFacets,
   muscleFacets,
+  difficultyFacets,
   queryCatalogue,
   toggleFilter,
 } from "./catalogQuery";
@@ -43,6 +44,7 @@ export function FilterSheet({
   const equipment = useMemo(() => equipmentFacets(), []);
   const muscles = useMemo(() => muscleFacets(), []);
   const movements = useMemo(() => movementFacets(), []);
+  const levels = useMemo(() => difficultyFacets(), []);
   const resultCount = useMemo(() => queryCatalogue(query, filters).length, [query, filters]);
   const active = activeFilterCount(filters);
 
@@ -74,6 +76,7 @@ export function FilterSheet({
           <Group title="Equipment" facets={equipment} selected={filters.equipment} onToggle={(v) => onChange(toggleFilter(filters, "equipment", v))} />
           <Group title="Muscle group" facets={muscles} selected={filters.muscle} onToggle={(v) => onChange(toggleFilter(filters, "muscle", v))} />
           <Group title="Movement pattern" facets={movements} selected={filters.movement} onToggle={(v) => onChange(toggleFilter(filters, "movement", v))} />
+          <Group title="Difficulty" facets={levels} selected={filters.difficulty} onToggle={(v) => onChange(toggleFilter(filters, "difficulty", v))} />
         </ScrollView>
 
         {resultCount === 0 ? (

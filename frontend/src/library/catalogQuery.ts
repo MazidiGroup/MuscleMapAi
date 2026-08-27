@@ -16,6 +16,8 @@ export type CatalogFilters = {
   equipment?: string[];
   muscle?: string[];
   movement?: string[];
+  /** Beginner / Intermediate / Advanced, as normalised by the catalogue. */
+  difficulty?: string[];
 };
 
 export const EMPTY_FILTERS: CatalogFilters = {};
@@ -83,6 +85,7 @@ export function searchHaystack(ex: CatalogExercise): string {
 function matchesFilters(ex: CatalogExercise, f: CatalogFilters): boolean {
   if (f.equipment?.length && !f.equipment.includes(ex.equipment)) return false;
   if (f.movement?.length && !f.movement.includes(ex.movementPattern)) return false;
+  if (f.difficulty?.length && !f.difficulty.includes(ex.difficulty)) return false;
   if (f.muscle?.length) {
     const muscles = ex.primaryMuscles || [];
     if (!f.muscle.some((m) => muscles.includes(m))) return false;
@@ -133,8 +136,20 @@ export function muscleFacets(list: CatalogExercise[] = FULL_CATALOG): Facet[] {
   return facetsFor((ex) => ex.primaryMuscles || [], [], list);
 }
 
+/** Easiest first — the order someone browsing by difficulty expects. */
+export const DIFFICULTY_ORDER = ["Beginner", "Intermediate", "Advanced"];
+
+export function difficultyFacets(list: CatalogExercise[] = FULL_CATALOG): Facet[] {
+  return facetsFor((ex) => [ex.difficulty], DIFFICULTY_ORDER, list);
+}
+
 export function activeFilterCount(f: CatalogFilters): number {
-  return (f.equipment?.length || 0) + (f.muscle?.length || 0) + (f.movement?.length || 0);
+  return (
+    (f.equipment?.length || 0) +
+    (f.muscle?.length || 0) +
+    (f.movement?.length || 0) +
+    (f.difficulty?.length || 0)
+  );
 }
 
 export function toggleFilter(f: CatalogFilters, key: keyof CatalogFilters, value: string): CatalogFilters {

@@ -108,6 +108,15 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
 
   const onToggleBookmark = async () => setMarked(await toggleBookmark(nodeName));
 
+  // This sheet can be hosted inside a Modal (the Library). A push from inside a
+  // Modal navigates the stack UNDERNEATH it, so the destination renders but the
+  // modal stays on top and the tap looks like it did nothing. Closing first is
+  // what `askAtlas` already does, and sources needs the same.
+  const openSources = () => {
+    onClose?.();
+    router.push("/references");
+  };
+
   const askAtlas = () => {
     onClose?.();
     router.push({
@@ -307,7 +316,7 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
 
             {/* Citations — Guideline 1.4.1. Present on every tab, not buried
                 behind one of them. */}
-            <Pressable style={styles.srcRow} onPress={() => router.push("/references")} testID="muscle-view-sources">
+            <Pressable style={styles.srcRow} onPress={openSources} testID="muscle-view-sources">
               <Ionicons name="library-outline" size={14} color={T.textFaint} />
               <Text style={styles.srcText}>
                 Anatomy and recovery data sourced from Gray&apos;s Anatomy, ACSM, NIH/NCBI and Kenhub.
@@ -429,11 +438,7 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
         </TouchableOpacity>
 
         {/* Citations — Guideline 1.4.1: sources for anatomical & recovery info */}
-        <TouchableOpacity
-          style={styles.srcRow}
-          onPress={() => router.push("/references")}
-          testID="muscle-view-sources"
-        >
+        <TouchableOpacity style={styles.srcRow} onPress={openSources} testID="muscle-view-sources">
           <Ionicons name="library-outline" size={14} color={T.textFaint} />
           <Text style={styles.srcText}>
             Anatomy and recovery data sourced from Gray&apos;s Anatomy, ACSM, NIH/NCBI and Kenhub.

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, Modal, Pressable, Linking, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, FlatList, TextInput, Modal, Pressable, Linking, Alert, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -9,7 +9,7 @@ import { MuscleSheet } from "@/src/anatomy/MuscleSheet";
 import { GYM_GROUPS, GYM_GROUP_ORDER, prettyName } from "@/src/anatomy/groups";
 import { MUSCLE_DATA, getMuscleInfo } from "@/src/anatomy/muscleData";
 import { LESSONS } from "@/src/anatomy/lessons";
-import { getCatalogExercise } from "@/src/anatomy/exerciseCatalog";
+import { CatalogExercise, getCatalogExercise } from "@/src/anatomy/exerciseCatalog";
 import { useWorkout } from "@/src/anatomy/workoutStore";
 import {
   CatalogFilters,
@@ -19,6 +19,7 @@ import {
   equipmentFacets,
   movementFacets,
   muscleFacets,
+  difficultyFacets,
   queryCatalogue,
   resultCountLabel,
   searchPlaceholder,
@@ -111,6 +112,16 @@ const REGION_GROUPS: Record<AtlasRegion, string[]> = {
   legs: ["glutes", "quads", "hamstrings", "adductors", "calves"],
 };
 
+type BrowseCat = "muscle" | "equipment" | "movement" | "difficulty";
+
+/** Each browse tile's own category: its title, its facets and the filter key it writes. */
+const BROWSE_CATS: Record<BrowseCat, { title: string; key: keyof CatalogFilters; noun: string }> = {
+  muscle: { title: "By muscle", key: "muscle", noun: "muscle group" },
+  equipment: { title: "By equipment", key: "equipment", noun: "equipment type" },
+  movement: { title: "By movement", key: "movement", noun: "movement pattern" },
+  difficulty: { title: "By difficulty", key: "difficulty", noun: "level" },
+};
+
 const LIST_TITLES: Record<string, string> = {
   favourites: "Favourites",
   recent: "Recent",
@@ -145,6 +156,10 @@ export default function LibraryScreen() {
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [openRegion, setOpenRegion] = useState<AtlasRegion | null>("chest");
   const [azSort, setAzSort] = useState(false);
+  // Which browse category is open. Each tile has its OWN screen: before this
+  // all four opened the same undifferentiated filter sheet, and difficulty was
+  // not a filter at all.
+  const [browseCat, setBrowseCat] = useState<BrowseCat | null>(null);
   // Which curated list the Exercises tab is showing, if any. Null is the
   // browse screen; every value here is a filter over the SAME catalogue.
   const [exerciseList, setExerciseList] = useState<"favourites" | "recent" | "plan" | "all" | null>(null);
@@ -317,6 +332,16 @@ export default function LibraryScreen() {
 
   // Facet counts come from the catalogue itself, so the browse tiles can never
   // advertise a number the filter sheet does not deliver.
+  const difficultyFacetList = useMemo(() => difficultyFacets(), []);
+  /** The facet rows for whichever browse category is open. */
+  const browseFacets = useMemo(() => {
+    if (!browseCat) return [];
+    if (browseCat === "muscle") return muscleFacets();
+    if (browseCat === "equipment") return equipmentFacets();
+    if (browseCat === "movement") return movementFacets();
+    return difficultyFacetList;
+  }, [browseCat, difficultyFacetList]);
+
   const muscleFacetCount = useMemo(() => muscleFacets().length, []);
   const equipmentFacetCount = useMemo(() => equipmentFacets().length, []);
   const movementFacetCount = useMemo(() => movementFacets().length, []);
@@ -347,6 +372,14 @@ export default function LibraryScreen() {
       : planExercises;
     return base.filter((e) => ids.includes(e.id));
   }, [query, filters, exerciseList, exerciseBookmarks, recentExercises, planExercises]);
+
+  /**
+   * True when the flat catalogue list is on screen. In that state the list IS
+   * the scroll container — see the FlatList below — so the browse hub's
+   * ScrollView must not also render.
+   */
+  const listMode =
+    seg === "exercises" && !browseCat && (query.trim() !== "" || activeFilters > 0 || !!exerciseList);
 
   const open = (n: string) => setSelected(n);
   const closeSheet = () => {
@@ -413,6 +446,112 @@ export default function LibraryScreen() {
         <PremiumGate surface={seg === "learn" ? "library.learn" : "library.muscles"}>
           <View />
         </PremiumGate>
+      ) : listMode ? (
+        <>
+        {/* The catalogue is virtualised, and is the scroll container rather than
+            living inside one: a VirtualizedList nested in a ScrollView renders
+            every row and silently loses the windowing entirely. */}
+        <FlatList
+          data={results}
+          keyExtractor={(e: CatalogExercise) => e.id}
+          contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={12}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews
+          keyboardShouldPersistTaps="handled"
+          testID="lib-exercise-list"
+          ListHeaderComponent={
+            <>
+
+                {exerciseList && (
+                  <Pressable
+                    style={styles.backRow}
+                    onPress={() => {
+                      setExerciseList(null);
+                      // A list reached from a browse category carries that
+                      // category's filter; leaving it must not strand the filter.
+                      setFilters({});
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Back to browsing exercises"
+                    testID="lib-list-back"
+                  >
+                    <Ionicons name="chevron-back" size={16} color={T.accent} />
+                    <Text style={styles.backText}>{LIST_TITLES[exerciseList]}</Text>
+                  </Pressable>
+                )}
+                <View style={styles.filterRow}>
+                  <TouchableOpacity
+                    style={[styles.filterBtn, activeFilters > 0 && styles.filterBtnActive]}
+                    onPress={() => setFiltersOpen(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      activeFilters > 0 ? `Filters, ${activeFilters} applied` : "Filters, none applied"
+                    }
+                    testID="lib-filters"
+                  >
+                    <Ionicons name="options-outline" size={15} color={activeFilters > 0 ? T.accent : T.text} />
+                    <Text style={[styles.filterBtnText, activeFilters > 0 && { color: T.accent }]}>
+                      {activeFilters > 0 ? `Filters · ${activeFilters}` : "Filters"}
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.resultCount} accessibilityLiveRegion="polite" testID="lib-result-count">
+                    {query.trim()
+                      ? resultCountLabel(results.length, query.trim())
+                      : `${results.length} of ${CATALOGUE_COUNT} exercises`}
+                  </Text>
+                </View>
+            </>
+          }
+          ListEmptyComponent={
+            <View style={{ paddingVertical: 12 }} testID="lib-no-results">
+                    <EmptyState
+                      icon="search-outline"
+                      title={query.trim() ? "No matches" : "No exercises match these filters"}
+                      body={query.trim() ? noMatchCopy(query.trim()) : "Remove a filter to see more of the catalogue."}
+                      primary={
+                        activeFilters > 0
+                          ? { label: "Clear all filters", onPress: () => setFilters({}), testID: "lib-clear-filters" }
+                          : undefined
+                      }
+                      secondary={
+                        query.trim()
+                          ? { label: "Clear search", onPress: () => setQuery(""), testID: "lib-clear-search" }
+                          : undefined
+                      }
+                    />
+                  </View>
+          }
+          renderItem={({ item, index }: { item: CatalogExercise; index: number }) => (
+            <View
+              style={[
+                styles.listRow,
+                index === 0 && styles.listFirst,
+                index === results.length - 1 && styles.listLast,
+              ]}
+            >
+              {index > 0 && <View style={styles.mgSep} />}
+              <ExerciseRow
+                e={item}
+                onPress={() => router.push(`/exercise/${item.id}`)}
+                styles={styles}
+                T={T}
+                testID={`lib-ex-${item.id}`}
+              />
+            </View>
+          )}
+        />
+            <FilterSheet
+              visible={filtersOpen}
+              filters={filters}
+              query={query}
+              onChange={setFilters}
+              onClear={() => setFilters({})}
+              onClose={() => setFiltersOpen(false)}
+            />
+        </>
       ) : (
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {seg === "muscles" && (
@@ -537,7 +676,7 @@ export default function LibraryScreen() {
             {/* A search, a saved list or the flat A–Z: one plain list, because
                 none of them belong to a single region. */}
             {muscleList && (
-              <TouchableOpacity
+              <Pressable
                 style={styles.backRow}
                 onPress={() => setMuscleList(null)}
                 accessibilityRole="button"
@@ -548,7 +687,7 @@ export default function LibraryScreen() {
                 <Text style={styles.backText}>
                   {muscleList === "saved" ? "Saved muscles" : muscleList === "all" ? "All muscles A–Z" : "Recently viewed"}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             )}
             {(query.trim() || muscleList) &&
               visibleGroups.map((g) => (
@@ -594,7 +733,49 @@ export default function LibraryScreen() {
                 screen offers routes IN — what you already use, then the four
                 ways the catalogue is actually organised. The flat 208-row list
                 only appears once you have asked for something. */}
-            {!query.trim() && activeFilters === 0 && !exerciseList ? (
+            {browseCat ? (
+              /* One category, its own screen. Every row carries the count it
+                 will actually return, derived from the catalogue. */
+              <>
+                <Pressable
+                  style={styles.backRow}
+                  onPress={() => setBrowseCat(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Back to browsing exercises"
+                  testID="browse-cat-back"
+                >
+                  <Ionicons name="chevron-back" size={16} color={T.accent} />
+                  <Text style={styles.backText}>{BROWSE_CATS[browseCat].title}</Text>
+                </Pressable>
+                <Text style={styles.sectionCaps}>
+                  {`${browseFacets.length} ${BROWSE_CATS[browseCat].noun}${browseFacets.length === 1 ? "" : "s"}`.toUpperCase()}
+                </Text>
+                <View style={styles.mgCard}>
+                  <LiquidSheen tone="neutral" />
+                  {browseFacets.map((f, i) => (
+                    <View key={f.value}>
+                      {i > 0 && <View style={styles.mgSep} />}
+                      <TouchableOpacity
+                        style={styles.mgRow}
+                        onPress={() => {
+                          const key = BROWSE_CATS[browseCat].key;
+                          setFilters({ [key]: [f.value] });
+                          setBrowseCat(null);
+                          setExerciseList("all");
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${f.value}, ${f.count} exercise${f.count === 1 ? "" : "s"}`}
+                        testID={`browse-facet-${f.value}`}
+                      >
+                        <Text style={styles.mgName}>{f.value}</Text>
+                        <Text style={styles.facetCount}>{f.count}</Text>
+                        <Ionicons name="chevron-forward" size={17} color={T.textFaint} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : !query.trim() && activeFilters === 0 && !exerciseList ? (
               <>
                 <Text style={styles.sectionCaps}>QUICK ACCESS</Text>
                 <View style={styles.quickCard}>
@@ -636,7 +817,7 @@ export default function LibraryScreen() {
                     icon="body-outline"
                     title="By muscle"
                     sub={`${muscleFacetCount} groups`}
-                    onPress={() => setFiltersOpen(true)}
+                    onPress={() => setBrowseCat("muscle")}
                     styles={styles}
                     T={T}
                     testID="browse-muscle"
@@ -645,7 +826,7 @@ export default function LibraryScreen() {
                     icon="barbell-outline"
                     title="By equipment"
                     sub={`${equipmentFacetCount} types`}
-                    onPress={() => setFiltersOpen(true)}
+                    onPress={() => setBrowseCat("equipment")}
                     styles={styles}
                     T={T}
                     testID="browse-equipment"
@@ -654,7 +835,7 @@ export default function LibraryScreen() {
                     icon="git-branch-outline"
                     title="By movement"
                     sub={`${movementFacetCount} patterns`}
-                    onPress={() => setFiltersOpen(true)}
+                    onPress={() => setBrowseCat("movement")}
                     styles={styles}
                     T={T}
                     testID="browse-movement"
@@ -662,8 +843,8 @@ export default function LibraryScreen() {
                   <BrowseTile
                     icon="speedometer-outline"
                     title="By difficulty"
-                    sub="3 levels"
-                    onPress={() => setFiltersOpen(true)}
+                    sub={`${difficultyFacetList.length} levels`}
+                    onPress={() => setBrowseCat("difficulty")}
                     styles={styles}
                     T={T}
                     testID="browse-difficulty"
@@ -716,78 +897,7 @@ export default function LibraryScreen() {
                   <Ionicons name="chevron-forward" size={16} color={T.accent} />
                 </TouchableOpacity>
               </>
-            ) : (
-              <>
-                {exerciseList && (
-                  <TouchableOpacity
-                    style={styles.backRow}
-                    onPress={() => setExerciseList(null)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Back to browsing exercises"
-                    testID="lib-list-back"
-                  >
-                    <Ionicons name="chevron-back" size={16} color={T.accent} />
-                    <Text style={styles.backText}>{LIST_TITLES[exerciseList]}</Text>
-                  </TouchableOpacity>
-                )}
-                <View style={styles.filterRow}>
-                  <TouchableOpacity
-                    style={[styles.filterBtn, activeFilters > 0 && styles.filterBtnActive]}
-                    onPress={() => setFiltersOpen(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      activeFilters > 0 ? `Filters, ${activeFilters} applied` : "Filters, none applied"
-                    }
-                    testID="lib-filters"
-                  >
-                    <Ionicons name="options-outline" size={15} color={activeFilters > 0 ? T.accent : T.text} />
-                    <Text style={[styles.filterBtnText, activeFilters > 0 && { color: T.accent }]}>
-                      {activeFilters > 0 ? `Filters · ${activeFilters}` : "Filters"}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.resultCount} accessibilityLiveRegion="polite" testID="lib-result-count">
-                    {query.trim()
-                      ? resultCountLabel(results.length, query.trim())
-                      : `${results.length} of ${CATALOGUE_COUNT} exercises`}
-                  </Text>
-                </View>
-
-                {results.length === 0 ? (
-                  <View style={{ paddingVertical: 12 }} testID="lib-no-results">
-                    <EmptyState
-                      icon="search-outline"
-                      title={query.trim() ? "No matches" : "No exercises match these filters"}
-                      body={query.trim() ? noMatchCopy(query.trim()) : "Remove a filter to see more of the catalogue."}
-                      primary={
-                        activeFilters > 0
-                          ? { label: "Clear all filters", onPress: () => setFilters({}), testID: "lib-clear-filters" }
-                          : undefined
-                      }
-                      secondary={
-                        query.trim()
-                          ? { label: "Clear search", onPress: () => setQuery(""), testID: "lib-clear-search" }
-                          : undefined
-                      }
-                    />
-                  </View>
-                ) : (
-                  <View style={styles.mgCard}>
-                    {results.map((e, i) => (
-                      <View key={e.id}>
-                        {i > 0 && <View style={styles.mgSep} />}
-                        <ExerciseRow
-                          e={e}
-                          onPress={() => router.push(`/exercise/${e.id}`)}
-                          styles={styles}
-                          T={T}
-                          testID={`lib-ex-${e.id}`}
-                        />
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </>
-            )}
+            ) : null}
 
             <FilterSheet
               visible={filtersOpen}
@@ -957,6 +1067,7 @@ export default function LibraryScreen() {
       </ScrollView>
       )}
 
+
       <Modal visible={!!selected} transparent animationType="slide" onRequestClose={closeSheet}>
         <Pressable style={styles.backdrop} onPress={closeSheet} />
         <View style={styles.modalBottom}>{selected && <MuscleSheet nodeName={selected} onClose={closeSheet} variant="preview" />}</View>
@@ -1024,7 +1135,12 @@ function BrowseTile({
   );
 }
 
-function ExerciseRow({
+/**
+ * Memoised: the catalogue list re-renders on every keystroke and filter change,
+ * and each row mounts media of its own. Without this, typing one character
+ * rebuilds every visible row.
+ */
+const ExerciseRow = React.memo(function ExerciseRow({
   e, onPress, styles, T, testID,
 }: { e: any; onPress: () => void; styles: any; T: LegacyPalette; testID: string }) {
   const meta = getExerciseMeta(e.id);
@@ -1056,7 +1172,7 @@ function ExerciseRow({
       <Ionicons name="chevron-forward" size={17} color={T.textFaint} />
     </TouchableOpacity>
   );
-}
+});
 
 function DuoLink({
   icon, label, disabled, onPress, styles, T, testID,
@@ -1150,9 +1266,15 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   mgCount: { color: T.textDim, fontSize: 12.5, marginBottom: 8, marginTop: 4 },
   seeAll: { color: T.accent, fontSize: 13, fontWeight: "700", marginBottom: 8, marginTop: 4 },
   mgCard: { backgroundColor: T.surface, borderRadius: 20, overflow: "hidden", marginBottom: 14 },
+  // The virtualised list cannot sit inside one rounded card, so each row
+  // carries the fill and the ends carry the curve.
+  listRow: { backgroundColor: T.surface },
+  listFirst: { borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: "hidden" },
+  listLast: { borderBottomLeftRadius: 20, borderBottomRightRadius: 20, overflow: "hidden", marginBottom: 14 },
   mgSep: { height: StyleSheet.hairlineWidth, backgroundColor: T.border, marginLeft: 16 },
   mgRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, minHeight: 52 },
   mgName: { color: T.text, fontSize: 15.5, fontWeight: "600", flex: 1 },
+  facetCount: { color: T.textDim, fontSize: 14, fontWeight: "700", marginRight: 8 },
 
   duoRow: { flexDirection: "row", gap: 10, marginTop: 2 },
   duoLink: {
