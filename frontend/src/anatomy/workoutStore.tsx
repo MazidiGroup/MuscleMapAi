@@ -19,7 +19,6 @@ import { getExercise } from "./exercises";
 import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS, GYM_GROUP_ORDER } from "./groups";
 import { usePlanStore } from "@/src/plan/planStore";
-import * as FileSystem from "expo-file-system/legacy";
 import { canMarkDone, isCountableSet, isWorkingSet, setVolume } from "./setRules";
 import { openingSets, plannedRepsFrom } from "./progression";
 import { exercisePerformances } from "@/src/history/metrics";
@@ -206,24 +205,6 @@ export type FinishResult =
   | { ok: false; reason: "empty_session" | "unresolved_owner" | "history_write_failed" | "prs_write_failed" };
 
 const WorkoutContext = createContext<Ctx | null>(null);
-
-// ============================ DRILL INSTRUMENTATION ============================
-// UNCOMMITTED. Remove before any commit. Appends one JSON line per envelope to
-// <documentDirectory>/watch-drill.log so the trace survives a phone-app kill,
-// which the drill performs on purpose.
-const DRILL_LOG = `${FileSystem.documentDirectory}watch-drill.log`;
-async function drill(tag: string, data: Record<string, unknown>) {
-  const line = JSON.stringify({ t: new Date().toISOString(), tag, ...data });
-  // eslint-disable-next-line no-console
-  console.log("DRILL", line);
-  try {
-    const prev = await FileSystem.readAsStringAsync(DRILL_LOG).catch(() => "");
-    await FileSystem.writeAsStringAsync(DRILL_LOG, `${prev}${line}\n`);
-  } catch {}
-}
-const setIdsOf = (exs: SessionExercise[] | null | undefined) =>
-  (exs ?? []).flatMap((e) => (e.sets ?? []).map((st) => st.id));
-// ==========================================================================
 
 export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const { owner, token, ready, store } = useOwner();
@@ -608,10 +589,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     (raw: unknown, entitled: boolean): Promise<WatchAck> => {
       const run = watchQueue.current.then(async (): Promise<WatchAck> => {
         const empty: WatchAck = { schema: WATCH_SCHEMA_VERSION, envelopeId: "", accepted: [], rejected: [] };
-        if (!token || !owner) {
-          await drill("EARLY-RETURN", { why: "no token/owner", envelopeId: (raw as { envelopeId?: string })?.envelopeId ?? null });
-          return empty;
-        }
+        if (!token || !owner) return empty;
         // Nothing may be applied until this owner's scope has been READ. A
         // queued transfer is delivered within moments of launch, while the
         // active session is still coming off disk — and applying then means the
@@ -619,10 +597,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         // events alone, silently dropping every set already persisted. Refusing
         // to acknowledge is the safe answer: the watch keeps the events and
         // retries, which is exactly what the outbox is for.
-        if (hydratedFor !== ownerKey) {
-          await drill("EARLY-RETURN", { why: "not hydrated", hydratedFor, ownerKey, envelopeId: (raw as { envelopeId?: string })?.envelopeId ?? null });
-          return empty;
-        }
+        if (hydratedFor !== ownerKey) return empty;
 
         const ledger = await readWatchLedger(store, owner);
         // Deliberately NOT minting an id when one is missing. This callback
@@ -645,36 +620,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
               )
             : null;
 
-        // ---- DRILL INSTRUMENTATION (uncommitted) ----
-        const rawEnv = raw as { envelopeId?: string; events?: { eventId?: string; kind?: string; seq?: number; sessionId?: string; payload?: { setId?: string } }[] };
-        await drill("ENVELOPE-IN", {
-          envelopeId: rawEnv?.envelopeId ?? null,
-          events: (rawEnv?.events ?? []).map((e) => ({
-            eventId: e?.eventId ?? null,
-            kind: e?.kind ?? null,
-            seq: e?.seq ?? null,
-            sessionId: e?.sessionId ?? null,
-            setId: e?.kind === "set.log" ? (e?.payload?.setId ?? null) : undefined,
-          })),
-          // The EXACT object handed to routeEnvelope, not the store.
-          currentIsNull: current === null,
-          currentSessionId: current?.sessionId ?? null,
-          currentStartedAt: current?.startedAt ?? null,
-          currentSetIds: current ? setIdsOf(current.exercises) : null,
-          // The ledger as read off disk, this call.
-          ledgerSessionId: ledger.sessionId,
-          ledgerProcessed: ledger.processed,
-          ledgerVoided: ledger.voided,
-          ledgerSeenSeqs: ledger.seenSeqs,
-          ledgerEndRequested: (ledger as { endRequested?: unknown }).endRequested ?? null,
-          // Closure-vs-ref divergence, the thing under suspicion.
-          closureSessionSetIds: setIdsOf(session),
-          refSessionId: sessionIdRef.current,
-          hydratedFor,
-          ownerKey,
-        });
-        // ---- END DRILL INSTRUMENTATION ----
-
         const result = routeEnvelope(raw, {
           session: current,
           ledger,
@@ -687,26 +632,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
             now: Date.now(),
           },
         });
-
-        // ---- DRILL INSTRUMENTATION (uncommitted) ----
-        // Set ids read from result.session on the line the call returns —
-        // never from the store, which has not re-rendered yet.
-        await drill("ROUTE-OUT", {
-          envelopeId: result.ack.envelopeId,
-          accepted: result.ack.accepted,
-          rejected: result.ack.rejected,
-          deferred: result.deferred,
-          finished: result.finished,
-          endedAt: result.endedAt,
-          resultSessionIsNull: result.session === null,
-          resultSessionId: result.session?.sessionId ?? null,
-          resultSetIds: result.session ? setIdsOf(result.session.exercises) : null,
-          resultLedgerProcessed: result.ledger.processed,
-          resultLedgerSeenSeqs: result.ledger.seenSeqs,
-          resultLedgerVoided: result.ledger.voided,
-          resultLedgerEndRequested: (result.ledger as { endRequested?: unknown }).endRequested ?? null,
-        });
-        // ---- END DRILL INSTRUMENTATION ----
 
         let nextLedger = result.ledger;
 
@@ -727,13 +652,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
             // leaving it live in the store is what produced a session that
             // showed as in progress for ever and was re-adopted by the watch on
             // every push.
-            await drill("WATCH-COMMIT", {
-              ok: outcome.ok,
-              reason: outcome.ok ? null : outcome.reason,
-              fromApplierSetIds: setIdsOf(result.session.exercises),
-              committedSetIds: outcome.ok ? setIdsOf(outcome.workout.exercises) : null,
-              workoutId: outcome.ok ? outcome.workout.id : null,
-            });
             const released = outcome.ok || outcome.reason === "empty_session";
             if (released) {
               if (!outcome.ok) {
@@ -758,14 +676,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         // The ledger is written BEFORE the acknowledgement goes back, so a crash
         // between the two costs a retry the phone recognises rather than a set
         // the watch has already forgotten.
-        await drill("LEDGER-PERSIST", {
-          envelopeId: result.ack.envelopeId,
-          sessionId: nextLedger.sessionId,
-          processed: nextLedger.processed,
-          voided: nextLedger.voided,
-          seenSeqs: nextLedger.seenSeqs,
-          endRequested: (nextLedger as { endRequested?: unknown }).endRequested ?? null,
-        });
         await persistWatchLedger(store, token, nextLedger).catch(() => {});
         return result.ack;
       });
