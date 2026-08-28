@@ -2220,6 +2220,61 @@ async def exercise_poster(exercise_id: str):
     return _media_response(exercise_id, poster=True)
 
 
+# ------------------ Watch frame packs ------------------
+# Pre-extracted flipbook frames for the Apple Watch, which has no video player.
+# One directory per exercise: NN.jpg frames plus pack.json describing the loop.
+# Generated offline by the batch exporter; never rendered on demand.
+WATCH_FRAMES_DIR = STATIC_DIR / "watch_frames"
+
+
+def _safe_exercise_dir(exercise_id: str) -> Path:
+    """Rejects any id that could escape the pack directory."""
+    if not re.fullmatch(r"[a-z0-9-]{1,80}", exercise_id or ""):
+        raise HTTPException(status_code=404, detail="Unknown exercise")
+    return WATCH_FRAMES_DIR / exercise_id
+
+
+@api_router.get("/watch-frames/manifest")
+async def watch_frames_manifest():
+    """exercise id -> {frames, loopSeconds}. The watch asks once, then knows
+    which exercises have a preview and how to play each one."""
+    out: Dict[str, Dict[str, Any]] = {}
+    if WATCH_FRAMES_DIR.exists():
+        for d in WATCH_FRAMES_DIR.iterdir():
+            meta = d / "pack.json"
+            if not (d.is_dir() and meta.is_file()):
+                continue
+            try:
+                data = json.loads(meta.read_text())
+                out[d.name] = {
+                    "frames": int(data.get("frames", 0)),
+                    "loopSeconds": float(data.get("loopSeconds", 0)),
+                }
+            except Exception:
+                continue
+    return out
+
+
+@api_router.get("/watch-frames/{exercise_id}/pack.json")
+async def watch_frames_meta(exercise_id: str):
+    meta = _safe_exercise_dir(exercise_id) / "pack.json"
+    if not meta.is_file():
+        raise HTTPException(status_code=404, detail="No pack for this exercise")
+    return FileResponse(str(meta), media_type="application/json")
+
+
+@api_router.get("/watch-frames/{exercise_id}/{frame}")
+async def watch_frames_frame(exercise_id: str, frame: str):
+    if not re.fullmatch(r"\d{2}\.jpg", frame or ""):
+        raise HTTPException(status_code=404, detail="Not found")
+    f = _safe_exercise_dir(exercise_id) / frame
+    if not f.is_file():
+        raise HTTPException(status_code=404, detail="Not found")
+    # Immutable: a pack is regenerated under a new exercise id, never edited.
+    return FileResponse(str(f), media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
 # ------------------ Indexes ------------------
 @app.on_event("startup")
 async def startup():
