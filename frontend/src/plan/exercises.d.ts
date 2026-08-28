@@ -10,7 +10,7 @@ export type MuscleKey =
   | "chest" | "back" | "shoulders" | "biceps" | "triceps" | "forearms"
   | "core" | "lowback" | "glutes" | "quads" | "hams" | "calves" | "traps" | "full";
 export type Equipment =
-  | "db" | "bb" | "kb" | "band" | "cable" | "machine" | "pullup" | "bw";
+  | "db" | "bb" | "kb" | "band" | "cable" | "machine" | "pullup" | "dip" | "bw";
 export type Answers = {
   goal: Goal;
   exp: Experience;
@@ -58,6 +58,7 @@ export type RawPlanEntry = {
   sets: number;
   reps: string;
   rest: string;
+  restSeconds: number;
   setsLabel: string;
   focus: boolean;
   finisher: boolean;
@@ -74,6 +75,8 @@ export type PlanExerciseEntry = {
   sets: number;
   repsOrTime: string;
   rest: string;
+  /** The rest prescription as seconds the session timer can run. */
+  restSeconds?: number;
   badge?: "FOCUS" | "FINISHER" | "POSTURE";
 };
 
@@ -91,6 +94,8 @@ export type PlanDay = {
 export type Plan = {
   answers: Answers;
   seed: number;
+  /** Generator version that produced this plan. Absent/1 = the pre-level generator. */
+  generator?: number;
   splitLabel: string;
   splitName: string;
   days: PlanDay[];         // length 7 (Mon–Sun)

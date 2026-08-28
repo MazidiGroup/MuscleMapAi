@@ -18,9 +18,11 @@ import { computePRUpdate, commitFinishedWorkout } from "./finishWorkout";
 import { getExercise } from "./exercises";
 import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS, GYM_GROUP_ORDER } from "./groups";
-import { usePlanStore } from "@/src/plan/planStore";
+import { usePlanStore, todayISO } from "@/src/plan/planStore";
+import { normalizeAnswers } from "@/src/plan/onboarding";
+import { entryFor as planEntryFor } from "@/src/plan/planAdapter";
 import { canMarkDone, isCountableSet, isWorkingSet, setVolume } from "./setRules";
-import { openingSets, plannedRepsFrom } from "./progression";
+import { openingSets, plannedCountFrom } from "./progression";
 import { exercisePerformances } from "@/src/history/metrics";
 import { WATCH_SCHEMA_VERSION, WatchAck } from "@/src/watch/protocol";
 import { routeEnvelope } from "@/src/watch/bridge";
@@ -46,6 +48,9 @@ export type SessionExercise = {
   /** When the exercise was added via the Plan tab, this remembers the plan-day
    *  it belongs to so we can auto-tick it once every set is done. */
   planLink?: { planDate: string; planName?: string };
+  /** The plan's rest prescription in seconds — the rest timer prefers it over
+   *  the global preference, so a strength compound rests longer than a curl. */
+  restSeconds?: number;
   /** v1.2.0. Exercises sharing an id are alternated as a superset. */
   supersetId?: string;
 };
@@ -168,7 +173,7 @@ type Ctx = {
    * Add an exercise from a Plan day, carrying the planned set count into the
    * session. Auto-ticks the Plan when all sets complete.
    */
-  addExerciseFromPlan: (id: string, planDate: string, plannedSets?: number, planName?: string, repsOrTime?: string) => void;
+  addExerciseFromPlan: (id: string, planDate: string, plannedSets?: number, planName?: string, repsOrTime?: string, restSeconds?: number) => void;
   hasExercise: (id: string) => boolean;
   addSet: (exId: string) => void;
   updateSet: (exId: string, setId: string, patch: Partial<LoggedSet>) => void;
@@ -210,8 +215,48 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const { owner, token, ready, store } = useOwner();
   const ownerKey = token ? `${token.kind}:${token.id}:${token.generation}` : "none";
 
-  const [session, setSession] = useState<SessionExercise[] | null>(null);
-  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [sessionState, setSessionState] = useState<SessionExercise[] | null>(null);
+  const session = sessionState;
+  // Mirrors `session` SYNCHRONOUSLY, for the same reason `sessionIdRef` exists.
+  //
+  // The watch sends every batch twice by design — queued for the guarantee,
+  // live for the latency — so `receiveWatchEnvelope` runs twice in a row, and
+  // its queue serialises the runs without React re-rendering between them. Both
+  // runs therefore closed over the SAME pre-apply `session`. The first applied
+  // the set and committed it; the second correctly deduplicated the event, then
+  // wrote its own stale session back — deleting the set that had just been
+  // added. The phone's set count went 2 → 1 and the watch, mirroring it
+  // faithfully, put the set counter back a set.
+  const sessionRef = useRef<SessionExercise[] | null>(null);
+  const setSession = useCallback(
+    (
+      next:
+        | SessionExercise[]
+        | null
+        | ((prev: SessionExercise[] | null) => SessionExercise[] | null),
+    ) => {
+      sessionRef.current =
+        typeof next === "function"
+          ? (next as (prev: SessionExercise[] | null) => SessionExercise[] | null)(sessionRef.current)
+          : next;
+      setSessionState(sessionRef.current);
+    },
+    [],
+  );
+  const [startedAt, setStartedAtState] = useState<number | null>(null);
+  // Read alongside `sessionRef` in the same envelope run, so it cannot describe
+  // a different moment than the session it is paired with.
+  const startedAtRef = useRef<number | null>(null);
+  const setStartedAt = useCallback(
+    (next: number | null | ((prev: number | null) => number | null)) => {
+      startedAtRef.current =
+        typeof next === "function"
+          ? (next as (prev: number | null) => number | null)(startedAtRef.current)
+          : next;
+      setStartedAtState(startedAtRef.current);
+    },
+    [],
+  );
   const [restPref, setRestPrefState] = useState(60);
   const [history, setHistory] = useState<Workout[]>([]);
   const [prs, setPRs] = useState<PRs>(EMPTY_PRS);
@@ -349,7 +394,19 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     stampPlanSeed();
   }, [stampPlanSeed, history, unit]);
 
-  const addExerciseFromPlan = useCallback((id: string, planDate: string, plannedSets = 1, planName?: string, repsOrTime?: string) => {
+  const addExerciseFromPlan = useCallback((id: string, planDate: string, plannedSets = 1, planName?: string, repsOrTime?: string, restSeconds?: number) => {
+    // The stored plan's prescription when it carries one; otherwise computed
+    // fresh from the current generator. Stored plans are never rewritten, so a
+    // plan generated before `restSeconds` existed would otherwise pin every
+    // session it starts to the 60-second fallback until the user rebuilds.
+    let rest = restSeconds && restSeconds > 0 ? restSeconds : undefined;
+    if (!rest) {
+      try {
+        rest = planEntryFor(id, normalizeAnswers(usePlanStore.getState().answers)).restSeconds;
+      } catch {
+        rest = undefined;
+      }
+    }
     setSession((prev) => {
       const base = prev || [];
       if (base.some((e) => e.exerciseId === id)) {
@@ -369,9 +426,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           // The Plan day promises N sets at a rep target for this goal, so the
           // session opens with N rows at that target, loaded from the last time
           // this exercise was logged.
-          sets: openingSetRows(history, id, "plan", plannedSetCount(plannedSets), plannedRepsFrom(repsOrTime), unit),
+          sets: openingSetRows(history, id, "plan", plannedSetCount(plannedSets), plannedCountFrom(repsOrTime), unit),
           notes: "",
           planLink: { planDate, planName },
+          ...(rest && rest > 0 ? { restSeconds: rest } : {}),
         },
       ];
     });
@@ -585,6 +643,45 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
    * the watch ended the workout. `entitled` is the phone's answer — the watch's
    * claim about its own entitlement is never taken at face value.
    */
+  /**
+   * Today's plan day as ready-to-train session exercises, or null when there is
+   * nothing to seed (no plan, a rest day, an empty day). The same rows the
+   * phone's own "Start today's workout" creates: planned set counts, pre-filled
+   * loads from history, swaps honoured, rest prescriptions attached.
+   */
+  const seedFromTodaysPlan = useCallback((): SessionExercise[] | null => {
+    const { plan, swaps, answers } = usePlanStore.getState();
+    if (!plan) return null;
+    const todayIdx = (new Date().getDay() + 6) % 7;
+    const day = plan.days[todayIdx];
+    if (!day || day.rest || !day.exercises || day.exercises.length === 0) return null;
+    const dateKey = todayISO();
+    const normalized = normalizeAnswers(answers);
+    const out: SessionExercise[] = [];
+    for (const raw of day.exercises) {
+      // Swaps replace the planned exercise, exactly as the Plan tab resolves
+      // them; an unresolvable swap keeps the original rather than blanking it.
+      let entry = raw;
+      const to = swaps[raw.id];
+      if (to && to !== raw.id) {
+        try {
+          entry = { ...planEntryFor(to, normalized), badge: raw.badge };
+        } catch {
+          entry = raw;
+        }
+      }
+      out.push({
+        exerciseId: entry.id,
+        idSpace: "plan",
+        sets: openingSetRows(history, entry.id, "plan", plannedSetCount(entry.sets), plannedCountFrom(entry.repsOrTime), unit),
+        notes: "",
+        planLink: { planDate: dateKey, planName: day.typeName },
+        ...(entry.restSeconds && entry.restSeconds > 0 ? { restSeconds: entry.restSeconds } : {}),
+      });
+    }
+    return out.length ? out : null;
+  }, [history, unit]);
+
   const receiveWatchEnvelope = useCallback(
     (raw: unknown, entitled: boolean): Promise<WatchAck> => {
       const run = watchQueue.current.then(async (): Promise<WatchAck> => {
@@ -608,13 +705,18 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         // watch re-adopting the corpse. With no id there is no active session
         // to describe, and the applier rebuilds one from the watch's own events
         // under the watch's own session id, which is the correct identity.
+        // From the REFS, never the closure: two envelopes run back to back
+        // without a render between them, so `session` here would still be the
+        // pre-apply value on the second run and writing it back would delete
+        // the set the first run just applied.
+        const live = sessionRef.current;
         const current =
-          session && sessionIdRef.current
+          live && sessionIdRef.current
             ? buildActiveSession(
                 token,
                 sessionIdRef.current,
-                startedAt ?? Date.now(),
-                session,
+                startedAtRef.current ?? Date.now(),
+                live,
                 Date.now,
                 sessionPlanSeed ?? undefined,
               )
@@ -668,7 +770,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
               setStartedAt(result.session.startedAt);
             }
           } else {
-            setSession(result.session.exercises);
+            // A session the WATCH started arrives empty — the watch has no
+            // plan. Filling it with today's plan day here is what makes the
+            // watch's "Start workout" mean the same thing as the phone's,
+            // instead of opening a blank session beside today's programme.
+            // Today being a rest day, or no plan at all, keeps it blank.
+            const seeded =
+              result.session.exercises.length === 0 ? seedFromTodaysPlan() : null;
+            setSession(seeded ?? result.session.exercises);
             setStartedAt(result.session.startedAt);
           }
         }
@@ -683,7 +792,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       watchQueue.current = run.catch(() => undefined);
       return run;
     },
-    [commitSession, hydratedFor, owner, ownerKey, session, sessionPlanSeed, setSessionId, startedAt, store, token, unit],
+    [commitSession, hydratedFor, owner, ownerKey, seedFromTodaysPlan, session, sessionPlanSeed, setSessionId, startedAt, store, token, unit],
   );
 
   // Keep the Plan tick in sync with the Session in BOTH directions: a plan-linked

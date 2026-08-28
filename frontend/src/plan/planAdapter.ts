@@ -38,6 +38,7 @@ function toEntry(rawEx: any): PlanExerciseEntry {
     sets: rawEx.sets ?? 3,
     repsOrTime: rawEx.reps ?? "10",
     rest: rawEx.rest ?? "60 sec",
+    restSeconds: typeof rawEx.restSeconds === "number" ? rawEx.restSeconds : undefined,
     badge: badgeOf(rawEx),
   };
 }
@@ -47,7 +48,7 @@ function toEntry(rawEx: any): PlanExerciseEntry {
  */
 export function buildPlan(answers: Answers, seed: number): Plan {
   const rawPlan = (raw as any).buildPlan(answers, seed) as {
-    days: any[]; split: string; goalLabel: string; tip: string;
+    days: any[]; split: string; goalLabel: string; tip: string; generator: number;
   };
 
   const trainingByDow: Record<string, any> = {};
@@ -83,6 +84,9 @@ export function buildPlan(answers: Answers, seed: number): Plan {
   return {
     answers,
     seed,
+    // A stored plan is never rewritten by a new generator; regeneration under a
+    // newer version is EXPECTED to differ, and this number is what says so.
+    generator: rawPlan.generator ?? 1,
     splitLabel: rawPlan.split || "Custom split",
     splitName: rawPlan.split || "Custom split",
     days,

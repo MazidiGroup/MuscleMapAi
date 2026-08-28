@@ -43,11 +43,15 @@ export function repRangeFor(goal: Goal | undefined | null): RepRange {
  * realistic one.
  */
 export function loadIncrement(unit: string, currentWeight: number): number {
-  if (unit === "lb") return currentWeight >= 100 ? 10 : 5;
-  return currentWeight >= 40 ? 5 : 2.5;
+  // The bigger step only once it is a modest RELATIVE jump: 5 kg on a 40 kg
+  // lift is 12.5%, far too coarse for upper-body work. At 60 kg it is 8.3%,
+  // and 10 lb at 150 lb is 6.7% — the plate maths still works, the leap no
+  // longer outruns what a session actually earns.
+  if (unit === "lb") return currentWeight >= 150 ? 10 : 5;
+  return currentWeight >= 60 ? 5 : 2.5;
 }
 
-export type SuggestionKind = "add_load" | "add_reps" | "hold" | "first_time";
+export type SuggestionKind = "add_load" | "add_reps" | "hold" | "reduce_load" | "first_time";
 
 export type Suggestion = {
   kind: SuggestionKind;
@@ -115,6 +119,28 @@ export function suggestNext(input: SuggestInput): Suggestion | null {
       headline: `Try ${next} ${unit} × ${range.min}`,
       basis: `${lastLabel} — you cleared ${range.max} reps`,
     };
+  }
+
+  // Two matching sessions stuck at the same load with no rep progress is a
+  // stall, not a queue for a third identical attempt. One increment down and
+  // rebuild — judged on a short trend, never on one poor day.
+  const prev = performances[1];
+  if (prev && prev.completedSets.length > 0 && topWeight > 0) {
+    const prevTop = Math.max(0, ...prev.completedSets.map((s) => s.weight));
+    const prevAtLoad = prev.completedSets.filter((s) => s.weight === prevTop);
+    const prevMin = Math.min(...prevAtLoad.map((s) => s.reps));
+    if (prevTop === topWeight && minReps <= prevMin && minReps < range.max) {
+      const down = Math.max(0, Math.round((topWeight - loadIncrement(unit, topWeight)) * 100) / 100);
+      if (down > 0) {
+        return {
+          kind: "reduce_load",
+          targetWeight: down,
+          targetReps: range.max,
+          headline: `Drop to ${down} ${unit} and rebuild`,
+          basis: `Two sessions stuck at ${topWeight} ${unit} \u00d7 ${minReps}`,
+        };
+      }
+    }
   }
 
   // Still inside the range: one more rep at the same load.
@@ -212,6 +238,26 @@ export function plannedRepsFrom(repsOrTime: string | null | undefined): number {
   if (/sec|min|\d\s*s\b/i.test(text)) return 0;
   const match = /^(\d+)/.exec(text);
   return match ? Math.max(0, parseInt(match[1], 10)) : 0;
+}
+
+/**
+ * The planned COUNT for a set row: reps for rep work, seconds for timed work.
+ *
+ * `plannedRepsFrom` deliberately answers 0 for "30–45 sec" — seconds are not
+ * reps — but a row opened at 0 can never be ticked Done (`canMarkDone` needs a
+ * count), which made every planned plank, carry and hold uncompletable without
+ * typing a number first. The seconds go into the same count field the user was
+ * already typing them into; minutes are converted so "2 min" opens as 120.
+ */
+export function plannedCountFrom(repsOrTime: string | null | undefined): number {
+  const reps = plannedRepsFrom(repsOrTime);
+  if (reps > 0) return reps;
+  if (!repsOrTime) return 0;
+  const text = String(repsOrTime).trim();
+  const match = /^(\d+)/.exec(text);
+  if (!match) return 0;
+  const n = Math.max(0, parseInt(match[1], 10));
+  return /min/i.test(text) ? n * 60 : n;
 }
 
 /**

@@ -29,6 +29,8 @@ export type ActiveExercise = {
   sets: ActiveSet[];
   notes: string;
   planLink?: { planDate: string; planName?: string };
+  /** The plan's rest prescription in seconds, carried so the watch can run it. */
+  restSeconds?: number;
   /** v1.2.0. Shared id marking adjacent exercises as one superset. */
   supersetId?: string;
 };

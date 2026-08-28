@@ -45,8 +45,10 @@ export default function ExerciseDetail() {
   // Exercise History and records are grouped by this exact id in the anatomy
   // ID space — never by display name, never merged with the plan ID space.
   const performances = useMemo(
-    () => (ex ? exercisePerformances(w.history, ex.id, "anatomy") : []),
-    [w.history, ex],
+    // In the stored display unit, so a history that legitimately mixes kg and
+    // lb workouts ranks records on one scale instead of comparing raw numbers.
+    () => (ex ? exercisePerformances(w.history, ex.id, "anatomy", w.unit) : []),
+    [w.history, ex, w.unit],
   );
   const record = useMemo(() => personalRecord(performances), [performances]);
 

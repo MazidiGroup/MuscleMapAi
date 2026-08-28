@@ -107,7 +107,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
     const items = resolveDayExercises(todayDay.exercises, swaps, answers);
     const dateKey = todayISO();
     try {
-      for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets, todayDay.typeName, it.repsOrTime);
+      for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets, todayDay.typeName, it.repsOrTime, it.restSeconds);
     } catch {
       onOpenDay(todayIdx);
       return;
@@ -591,7 +591,7 @@ export function WorkoutDay({ dayIndex, onBack }: { dayIndex: number; onBack: () 
     setStartFailed(false);
     try {
       // The planned set count travels with the exercise into the session.
-      for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets, day.typeName, it.repsOrTime);
+      for (const it of items) w.addExerciseFromPlan(it.id, dateKey, it.sets, day.typeName, it.repsOrTime, it.restSeconds);
     } catch {
       // Nothing is half-started, and we never retry behind the user's back: the
       // retry below only runs when they ask for it.
@@ -1010,7 +1010,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingBottom: 8,
   },
-  wpTitle: { fontSize: 26, fontWeight: "700" },
+  wpTitle: { fontSize: 24, fontWeight: "700" },
   dayHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingTop: 56, paddingHorizontal: 20, paddingBottom: 8,
@@ -1074,7 +1074,7 @@ const styles = StyleSheet.create({
   // ---- redesigned day view ----
   dayHeadRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 4 },
   dayBackBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  dayBigTitle: { fontSize: 28, fontWeight: "800", flexShrink: 1 },
+  dayBigTitle: { fontSize: 24, fontWeight: "800", flexShrink: 1 },
   dayHeadMeta: { fontSize: 13, fontWeight: "600", marginLeft: "auto" },
   dowStrip: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 10 },
   dowPill: { width: 42, height: 34, borderRadius: R.pill, alignItems: "center", justifyContent: "center" },

@@ -36,6 +36,9 @@ export type SessionExercise = {
   sets: LoggedSet[];
   notes: string;
   planLink?: { planDate: string; planName?: string };
+  /** The plan's rest prescription in seconds. The rest timer prefers it over
+   *  the global preference — a strength compound rests longer than a curl. */
+  restSeconds?: number;
   /** v1.2.0. Exercises sharing an id are alternated as a superset. */
   supersetId?: string;
 };
@@ -123,6 +126,7 @@ export function buildActiveSession(
       sets: e.sets,
       notes: e.notes,
       planLink: e.planLink,
+      restSeconds: e.restSeconds,
       supersetId: e.supersetId,
     })),
   };

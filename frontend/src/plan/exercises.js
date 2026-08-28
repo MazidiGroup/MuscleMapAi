@@ -84,7 +84,7 @@ cable-standing-low-to-high-wood-chopper|core|cable|core|1|
 cable-standing-single-arm-chest-press|chest|cable|hpush|2|c
 cable-supinating-row|back|cable|hpull|2|c
 cable-wood-chopper|core|cable|core|1|
-chin-ups|back|bar|vpull|2|c
+chin-ups|back|pullup|vpull|2|c
 decline-push-up|chest|bw|hpush|2|c
 diamond-push-ups|triceps|bw|ext|2|c
 dumbbell-alternating-forward-lunge|quads|db|lunge|1|c
@@ -149,7 +149,7 @@ ez-bar-reverse-preacher-curl|forearms|bb|curl|2|
 forward-lunge|quads|bw|lunge|1|c
 good-mornings|hams|bb|hinge|2|c
 hand-plank|core|bw|core|1|t
-hanging-knee-raises|core|bar|core|2|
+hanging-knee-raises|core|pullup|core|2|
 incline-push-up|chest|bw|hpush|1|c
 inverted-row|back|bw|hpull|1|c
 jump-squats|quads|bw|cond|1|c
@@ -196,9 +196,9 @@ machine-seated-cable-row|back|machine|hpull|1|c
 machine-underhand-row|back|machine|hpull|1|c
 mountain-climber|core|bw|cond|1|t
 narrow-pulldown|back|machine|vpull|1|c
-parralel-bar-dips|chest|bar|hpush|2|c
+parralel-bar-dips|chest|dip|hpush|2|c
 plate-forward-lunge|quads|bb|lunge|1|c
-pull-ups|back|bar|vpull|2|c
+pull-ups|back|pullup|vpull|2|c
 push-up|chest|bw|hpush|1|c
 single-legged-romanian-deadlifts|hams|bw|hinge|2|c
 smith-machine-close-grip-bench-press|triceps|machine|hpush|1|c
@@ -363,11 +363,21 @@ function pick(slot, used, ans, rnd) {
     if (!cands.length) continue;
     let best = null, bs = -1e9;
     for (const e of cands) {
-      let s = (pats.length - pats.indexOf(e.pat)) * 10 + (slot.m && e.m === slot.m ? 9 : 0) + (e.c ? 5 : 0) + rnd() * 8;
+      // Jitter is a TIE-BREAKER among near-equals, never a programmer: at 8 it
+      // could outvote the muscle fit (9) and hand a slot to the wrong movement.
+      let s = (pats.length - pats.indexOf(e.pat)) * 10 + (slot.m && e.m === slot.m ? 9 : 0) + (e.c ? 5 : 0) + rnd() * 2;
       if (ans.exp === 'beginner' && e.level > 1) s -= 7;
       if (ans.goal === 'strength' && e.c) s += 4;
       if (ans.focus && ans.focus.includes(REGION[e.m])) s += 3;
-      if (used.has(e.id)) s -= 40;
+      if (used.has(e.id)) {
+        // Repetition across the week is a feature for the people who benefit
+        // from practising a lift — beginners, and anyone training for strength
+        // — so their compounds repeat cheaply. Everyone else still gets
+        // variety, just without the old blanket -40 that punished a beginner's
+        // third squat session as hard as a duplicate curl.
+        const practises = ans.exp === 'beginner' || ans.goal === 'strength';
+        s -= practises ? (e.c ? 3 : 18) : 30;
+      }
       if (s > bs) { bs = s; best = e; }
     }
     if (best) { used.add(best.id); return best; }
@@ -377,14 +387,22 @@ function pick(slot, used, ans, rnd) {
 
 function setsRepsRest(e, ans) {
   const beg = ans.exp === 'beginner';
-  let sets, reps, rest;
-  if (ans.goal === 'strength') { sets = e.c ? 4 : 3; reps = e.c ? '4\u20136' : '6\u20138'; rest = e.c ? '2\u20133 min' : '90 sec'; }
-  else if (ans.goal === 'muscle') { sets = e.c ? 4 : 3; reps = '8\u201312'; rest = '60\u201390 sec'; }
-  else if (ans.goal === 'fatloss') { sets = 3; reps = '12\u201315'; rest = '45 sec'; }
-  else { sets = 3; reps = '10\u201312'; rest = '60 sec'; }
+  // `restSec` is the same prescription as `rest`, as a NUMBER the session's
+  // rest timer can actually run. The display range's lower bound: a timer that
+  // undershoots invites an extension, one that overshoots gets skipped.
+  let sets, reps, rest, restSec;
+  if (ans.goal === 'strength') { sets = e.c ? 4 : 3; reps = e.c ? '4\u20136' : '6\u20138'; rest = e.c ? '2\u20133 min' : '90 sec'; restSec = e.c ? 120 : 90; }
+  else if (ans.goal === 'muscle') { sets = e.c ? 4 : 3; reps = '8\u201312'; rest = '60\u201390 sec'; restSec = e.c ? 90 : 60; }
+  else if (ans.goal === 'fatloss') {
+    // Resistance work during fat loss preserves muscle; it is not itself the
+    // conditioning. The old blanket 12-15 @ 45 sec turned every lift into
+    // circuit work — the finisher is where conditioning lives.
+    sets = e.c ? 4 : 3; reps = '8\u201312'; rest = '60\u201390 sec'; restSec = e.c ? 90 : 60;
+  }
+  else { sets = 3; reps = '10\u201312'; rest = '60 sec'; restSec = 60; }
   if (beg) sets = Math.min(3, sets);
   if (e.t) reps = '30\u201345 sec';
-  return { sets, reps, rest };
+  return { sets, reps, rest, restSec };
 }
 
 export function entryFor(id, ans, opts) {
@@ -393,7 +411,7 @@ export function entryFor(id, ans, opts) {
   return {
     id: e.id, name: e.name, img: posterUrl(e.id),
     muscle: MUSCLE_LABEL[e.m], region: REGION[e.m],
-    sets: srr.sets, reps: srr.reps, rest: srr.rest,
+    sets: srr.sets, reps: srr.reps, rest: srr.rest, restSeconds: srr.restSec,
     setsLabel: srr.sets + ' sets \u00b7 ' + srr.reps + (e.t ? '' : ' reps'),
     focus: !!(opts && opts.focus) || !!(ans.focus && ans.focus.includes(REGION[e.m])),
     finisher: !!(opts && opts.finisher),
@@ -407,6 +425,12 @@ export const PROGRESS_TIP = {
   fatloss: 'Keep rests short and try to move a little faster each week.',
   general: 'Each week, aim to do just a little more than last week.',
 };
+
+/** Bumped whenever selection, prescriptions or the library change what the
+ *  same answers + seed produce. Stored plans carry it; regeneration under a
+ *  newer version is expected to differ, and that difference is announced by
+ *  this number rather than discovered by diffing workouts. */
+export const GENERATOR_VERSION = 2;
 
 const STRETCHES = ['abdominals-stretch-variation-one', 'abdominals-stretch-variation-two', 'abdominals-stretch-variation-three', 'abdominals-stretch-variation-four'];
 const DOW = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -423,7 +447,10 @@ export function buildPlan(ans, seed) {
   const typeCount = {};
   const days = types.map((type, i) => {
     typeCount[type] = (typeCount[type] || 0) + 1;
-    let slots = TEMPLATES[type].slice(0, !advanced && ans.goal === 'fatloss' ? count - 1 : count);
+    // The slot given up for the conditioning finisher is only given up on the
+    // days that actually get one.
+    const finisherDay = ans.goal === 'fatloss' && i % 2 === 0;
+    let slots = TEMPLATES[type].slice(0, !advanced && finisherDay ? count - 1 : count);
     let extras = 0;
     for (const r of (ans.focus || [])) {
       if (extras >= 2) break;
@@ -434,7 +461,10 @@ export function buildPlan(ans, seed) {
       const e = pick(slot, used, ans, rnd);
       if (e && !exercises.some(x => x.id === e.id)) exercises.push(entryFor(e.id, ans, { focus: slot.focus }));
     }
-    if (ans.goal === 'fatloss') {
+    if (finisherDay) {
+      // Alternate days, not all of them: conditioning frequency has to respect
+      // consecutive training days, and a finisher after every session is how a
+      // fat-loss plan stops being a resistance plan.
       const f = pick({ p: ['cond', 'carry'] }, used, ans, rnd);
       if (f) { const en = entryFor(f.id, ans, { finisher: true }); en.setsLabel = '3 rounds \u00b7 40 sec on / 20 off'; en.rest = '\u2014'; exercises.push(en); }
     }
@@ -461,7 +491,7 @@ export function buildPlan(ans, seed) {
     };
   });
   const split = advanced ? 'Muscle Specialisation \u00d7' + dayIdxs.length : SPLIT_LABEL[dayIdxs.length];
-  return { days, split, goalLabel: GOAL_LABEL[ans.goal], tip: PROGRESS_TIP[ans.goal] };
+  return { days, split, goalLabel: GOAL_LABEL[ans.goal], tip: PROGRESS_TIP[ans.goal], generator: GENERATOR_VERSION };
 }
 
 export function alternativesFor(id, ans, excludeIds) {

@@ -39,6 +39,7 @@ export default function WorkoutScreen() {
   const styles = useMemo(() => makeStyles(T), [T]);
 
   const [restVisible, setRestVisible] = useState(false);
+  const [restInitial, setRestInitial] = useState<number | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
   // The exercise in hand. Removing an exercise can leave the index past the
@@ -80,7 +81,14 @@ export default function WorkoutScreen() {
 
   const onToggleDone = (exId: string, setId: string, willBeDone: boolean) => {
     w.toggleDone(exId, setId);
-    if (willBeDone) setRestVisible(true);
+    if (willBeDone) {
+      // The plan's prescription for THIS exercise, when it made one: a strength
+      // compound rests 120s while a curl rests 90 — one global figure cannot
+      // say both. The preference stays the fallback and the user's override.
+      const planned = w.session?.find((e) => e.exerciseId === exId)?.restSeconds;
+      setRestInitial(planned && planned > 0 ? planned : null);
+      setRestVisible(true);
+    }
   };
 
   // Finishing is a verified local transaction: History and PRs must both be
@@ -242,7 +250,7 @@ export default function WorkoutScreen() {
         </View>
       )}
 
-      <RestTimer visible={restVisible} initial={w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />
+      <RestTimer visible={restVisible} initial={restInitial ?? w.restPref} onClose={() => setRestVisible(false)} onPrefChange={w.setRestPref} />
     </View>
   );
 }
@@ -527,7 +535,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   // absolutely positioned overlay competing with a floating segmented control.
   full: { flex: 1, backgroundColor: T.bg },
   header: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingBottom: 10 },
-  headerTitle: { flex: 1, color: T.text, fontSize: 22, fontWeight: "800" },
+  headerTitle: { flex: 1, color: T.text, fontSize: 24, fontWeight: "800" },
   unitBtn: {
     minWidth: 44, height: 44, paddingHorizontal: 10, borderRadius: 22, 
     backgroundColor: T.surface, alignItems: "center", justifyContent: "center", overflow: "hidden",
