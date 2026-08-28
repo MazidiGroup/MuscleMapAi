@@ -409,7 +409,7 @@ test("14 — the committed eas-build-pre-install chain succeeds in a pipeline-sh
 
 const MANAGED_SLUG = "ai-coach-trainer-2";
 const COMMITTED_SLUG = "apex-ai";
-const EXPECTED_VERSION = "1.2.0";
+const EXPECTED_VERSION = "1.3.0";
 
 /** Cloud environment as the managed wrapper supplies it for a production build. */
 function managedCloudEnv(extra: Record<string, string> = {}, shimDir?: string) {
@@ -433,22 +433,22 @@ function makeCloudRenamedArchive(mutate: (expo: Record<string, any>) => void = (
 
 test("RC6.1 — local mode accepts the committed version with the committed slug", () => {
   const app = JSON.parse(fs.readFileSync(path.join(ROOT, "app.json"), "utf8")).expo;
-  assert.equal(app.version, EXPECTED_VERSION, "the committed marketing version is 1.2.0");
+  assert.equal(app.version, EXPECTED_VERSION, "the committed marketing version is 1.3.0");
   assert.equal(app.slug, COMMITTED_SLUG, "the committed slug is unchanged");
   // Identity, build numbers and OTA configuration are untouched by the version bump.
   assert.equal(app.ios.bundleIdentifier, "com.mazidigroup.apexai");
   assert.equal(app.android.package, "com.mazidigroup.apexai");
   assert.equal(app.scheme, "apexai");
   assert.equal(app.name, "Muscle Map");
-  assert.equal(app.ios.buildNumber, "3");
-  assert.equal(app.android.versionCode, 3);
+  assert.equal(app.ios.buildNumber, "4");
+  assert.equal(app.android.versionCode, 4);
   assert.equal(app.updates, undefined, "no Expo Updates configuration");
 
   const dir = makeArchive();
   writeEnv(dir, managedEnvFile());
   const res = runGate(dir, cloudEnv());
   assert.equal(res.status, 0, res.all);
-  assert.match(res.stdout, /app\.json: version 1\.2\.0, slug apex-ai/);
+  assert.match(res.stdout, /app\.json: version 1\.3\.0, slug apex-ai/);
   clean(dir);
 });
 
@@ -468,7 +468,7 @@ test("RC6.3 — cloud mode accepts the managed slug for the approved production 
   const shim = makeGitShim();
   const res = runGate(dir, managedCloudEnv({}, shim.dir));
   assert.equal(res.status, 0, res.all);
-  assert.match(res.stdout, /app\.json: version 1\.2\.0, slug ai-coach-trainer-2/);
+  assert.match(res.stdout, /app\.json: version 1\.3\.0, slug ai-coach-trainer-2/);
   assert.match(res.stdout, /managed wrapper slug "ai-coach-trainer-2" accepted for the approved production project/);
   assert.match(res.stdout, /source fingerprint matches \(21 files\)/);
   assert.deepEqual(shim.invocations(), [], "no Git process was invoked");
@@ -564,7 +564,7 @@ test("RC6.5 — the marketing version can never fail a build, and the fingerprin
     assert.equal(a.status, 0, `cloud must accept version "${version}": ${a.all}`);
     assert.match(a.stdout, /source fingerprint matches \(21 files\)/);
     if (version !== EXPECTED_VERSION) {
-      assert.match(a.stdout, /the approved committed version is "1\.2\.0" \(wrapper-rewritten, not a failure\)/);
+      assert.match(a.stdout, /the approved committed version is "1\.3\.0" \(wrapper-rewritten, not a failure\)/);
     }
     assert.ok(!a.all.includes("DO NOT BUILD"), `version "${version}" must not block the build`);
 
@@ -598,7 +598,7 @@ test("RC6.7 — the committed pre-install chain passes on the cloud-renamed arch
   const res = spawnSync("sh", ["-c", command], { cwd: dir, env: managedCloudEnv({}, shim.dir), encoding: "utf8" });
   assert.equal(res.status, 0, `${res.stdout}${res.stderr}`);
   assert.match(res.stdout, /✓ release source verified/);
-  assert.match(res.stdout, /version 1\.2\.0, slug ai-coach-trainer-2/);
+  assert.match(res.stdout, /version 1\.3\.0, slug ai-coach-trainer-2/);
   assert.deepEqual(shim.invocations(), [], "neither the gate nor cmd-guard invoked Git");
   clean(dir, shim.dir);
 });
