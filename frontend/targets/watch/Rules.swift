@@ -259,6 +259,9 @@ struct WatchExerciseView: Codable, Hashable, Identifiable {
   var idSpace: ExerciseIdSpace
   var name: String
   var targetReps: Int
+  var targetSets: Int?
+  var targetRest: Int?
+  var targetWeight: WeightValue?
   var sets: [WatchSetView]
   var id: String { "\(idSpace.rawValue):\(exerciseId)" }
   var liveSets: [WatchSetView] { sets.filter { !$0.voided } }
@@ -336,6 +339,8 @@ struct WatchSnapshot: Codable, Equatable {
   var currentIndex: Int = 0
   var workingWeight: WeightValue = WeightValue(value: 0, unit: .kg)
   var restSeconds: Int = WatchLimits.defaultRestSeconds
+  /// Carried from the phone so the preview page can fetch its frames.
+  var mediaBase: String?
   var rest: RestClock?
   var paused: Bool = false
   var seq: Int = 0
@@ -496,7 +501,11 @@ enum WatchRules {
     // number asserts where a blank one asks.
     if index != s.currentIndex {
       let target = s.exercises[index]
-      next.workingWeight = target.liveSets.last?.weight ?? WeightValue(value: 0, unit: s.unit)
+      // Logged work first; failing that, the phone's own suggestion — the
+      // user's last performance on THIS exercise, which is what the phone is
+      // already showing them. Zero only when neither exists.
+      next.workingWeight =
+        target.liveSets.last?.weight ?? target.targetWeight ?? WeightValue(value: 0, unit: s.unit)
     }
     return .applied(snapshot: next, events: [], feedback: .make(.success, "\(s.exercises[index].name).", .click))
   }
@@ -547,7 +556,11 @@ enum WatchRules {
     next.exercises[index].sets.append(set)
     next.workingWeight = weight
     next.seq = s.seq + 1
-    next.rest = RestClock.start(total: s.restSeconds, now: deps.now)
+    // The plan's prescription for THIS exercise outranks the one global rest:
+    // a strength compound rests minutes while an isolation rests seconds, and
+    // one number cannot say both. Absent (older phone) falls back exactly as
+    // before the field existed.
+    next.rest = RestClock.start(total: exercise.targetRest ?? s.restSeconds, now: deps.now)
     next.paused = false
 
     let shown = displayWeight(weight, in: s.unit)

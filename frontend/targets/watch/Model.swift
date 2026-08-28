@@ -163,6 +163,15 @@ struct SnapshotExercise: Codable, Hashable {
   var idSpace: ExerciseIdSpace
   var name: String
   var targetReps: Int
+  /// Sets the plan asked for. Optional: a phone on an older build does not send
+  /// it, and absent must mean "never prompt" rather than "zero sets planned".
+  var targetSets: Int?
+  /// The plan's rest prescription for this exercise, seconds. Absent = use the
+  /// session's global restSeconds, exactly as before it existed.
+  var targetRest: Int?
+  /// The load the phone pre-filled for the next set — the user's last recorded
+  /// performance. Fresh exercises would otherwise open the crown at zero.
+  var targetWeight: WeightValue?
   var sets: [SnapshotSet]
 }
 
@@ -181,11 +190,19 @@ struct EntitlementPayload: Codable, Hashable {
 
 struct WatchContextPayload: Codable {
   var schema: Int
-  var revision: Int
+  /// Int64, not Int: watchOS builds arm64_32, where Int is 32 bits, and the
+  /// phone mints this as `now * REVISION_TICKS_PER_MS`, which has exceeded
+  /// Int32 since 1970 + 25 days. Decoding it into Int throws, and the throw
+  /// discards the WHOLE payload — entitlement included — leaving the watch on
+  /// "Checking your Premium access…" forever.
+  var revision: Int64
   var sentAt: Double
   var entitlement: EntitlementPayload
   var unit: WeightUnit
   var restSeconds: Int
+  /// Where to fetch exercise frame packs. Optional: an older phone sends none,
+  /// and its absence simply means no previews.
+  var mediaBase: String?
   var session: SnapshotSession?
 }
 
@@ -203,7 +220,11 @@ enum IdMint {
     counter = (counter + 1) % 0xffff
     let count = String(counter, radix: 36)
     lock.unlock()
-    let time = String(Int(now.timeIntervalSince1970 * 1000), radix: 36)
+    // Int64 for the same reason as WatchContextPayload.revision: Int is 32 bits
+    // on arm64_32, and a millisecond epoch has not fit in it since 1970. `Int(_:)`
+    // on an out-of-range Double TRAPS, so this crashed the moment a watch minted
+    // its first id — the first set logged from the wrist.
+    let time = String(Int64(now.timeIntervalSince1970 * 1000), radix: 36)
     let random = String(Int.random(in: 0..<0x7fffffff), radix: 36)
     return "\(prefix)_\(time)\(count)\(random)"
   }

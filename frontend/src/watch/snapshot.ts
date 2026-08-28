@@ -38,6 +38,22 @@ export type SnapshotExercise = {
   idSpace: ExerciseIdSpace;
   name: string;
   targetReps: number;
+  /**
+   * How many sets the plan asked for, which is NOT `sets.length` — that is only
+   * the ones already done. Optional because a watch on an older build has no
+   * field for it, and an absent value simply means "never prompt".
+   */
+  targetSets?: number;
+  /** The plan's rest prescription for this exercise, seconds. Absent = use the
+   *  session's global restSeconds, exactly as before it existed. */
+  targetRest?: number;
+  /**
+   * The load the phone pre-filled for the next set — the user's own last
+   * performance. Only completed sets cross the wire, so without this a fresh
+   * exercise seeds the watch at 0 while the phone is already suggesting the
+   * previous weight.
+   */
+  targetWeight?: WeightValue;
   sets: SnapshotSet[];
 };
 
@@ -61,6 +77,13 @@ export type WatchContextPayload = {
   entitlement: { access: boolean; state: EntitlementState; verifiedAt: number };
   unit: WeightUnit;
   restSeconds: number;
+  /**
+   * Where the watch fetches exercise frame packs. The watch has no build-time
+   * knowledge of the backend, and bundling ~80 MB of frames in a watch app is
+   * not viable, so the phone hands over its own base URL and the watch caches
+   * what it actually shows. Absent = no previews, which is a clean degrade.
+   */
+  mediaBase?: string;
   /** Null when no workout is in progress. */
   session: SnapshotSession | null;
 };
@@ -80,6 +103,8 @@ export type BuildInput = {
   nameOf?: (exerciseId: string, idSpace: ExerciseIdSpace) => string | undefined;
   /** The plan's rep target for an exercise, when it set one. */
   targetRepsFor?: (exerciseId: string, idSpace: ExerciseIdSpace) => number;
+  /** Base URL for watch frame packs, or undefined when none is configured. */
+  mediaBase?: string;
 };
 
 /**
@@ -96,6 +121,7 @@ export function buildContextPayload(input: BuildInput): WatchContextPayload {
     entitlement: input.entitlement,
     unit,
     restSeconds: input.restSeconds,
+    ...(input.mediaBase ? { mediaBase: input.mediaBase } : {}),
     session: session
       ? {
           sessionId: session.sessionId,
@@ -104,7 +130,25 @@ export function buildContextPayload(input: BuildInput): WatchContextPayload {
             exerciseId: e.exerciseId,
             idSpace: e.idSpace,
             name: input.nameOf?.(e.exerciseId, e.idSpace) || e.exerciseId,
-            targetReps: input.targetRepsFor?.(e.exerciseId, e.idSpace) ?? 0,
+            // The plan's target when it set one; otherwise the reps the phone
+            // pre-filled from the user's last performance — the same number it
+            // is showing them on the row. The watch's "8" default is a guess of
+            // last resort, not a rival to either.
+            targetReps:
+              input.targetRepsFor?.(e.exerciseId, e.idSpace) ||
+              e.sets.find((s) => !s.done && s.reps > 0)?.reps ||
+              0,
+            // ONLY for a plan-linked exercise, where the rows were laid down up
+            // front and the count is a real target. An exercise added by hand
+            // grows a row per set, so `sets.length` there is just "how many so
+            // far" — sending it made the watch offer "next exercise?" after the
+            // very first set. Absent means never prompt, which is right.
+            ...(e.planLink ? { targetSets: e.sets.length } : {}),
+            ...(e.restSeconds && e.restSeconds > 0 ? { targetRest: e.restSeconds } : {}),
+            ...(() => {
+              const next = e.sets.find((s) => !s.done && s.weight > 0);
+              return next ? { targetWeight: { value: next.weight, unit } } : {};
+            })(),
             // Only completed sets: an empty row the user has not filled in is a
             // phone editing affordance, not a result, and showing it as set 1 of
             // 3 already done would misstate the session.

@@ -28,9 +28,40 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
   @Published var lastFeedback: Feedback?
   /// Set when a command needs a yes/no answer before it may proceed.
   @Published var pendingConfirmation: WorkoutCommand?
+  /// Set the moment the plan's set count for the current exercise is met, so
+  /// the user is asked whether to keep going or move on rather than having to
+  /// remember the target themselves.
+  @Published var setGoalReached = false
+
+  #if targetEnvironment(simulator)
+    /// LAYOUT HARNESS — simulator screenshots only, never compiled for device.
+    func seedForAnimationShot() {
+      entitlement = WatchEntitlement(access: true, state: "ready", verifiedAt: nowMs())
+      var s = WatchSnapshot()
+      s.sessionId = "sim"
+      s.startedAt = nowMs()
+      s.exercises = [
+        WatchExerciseView(
+          exerciseId: "barbell-overhead-press", idSpace: .plan,
+          name: "Barbell Overhead Press", targetReps: 8, sets: [])
+      ]
+      snapshot = s
+    }
+  #endif
 
   private var outbox: Outbox
-  private var appliedRevision: Int?
+  private var appliedRevision: Int64?
+  /// Sets this watch has logged and has NOT yet seen come back in a snapshot.
+  ///
+  /// The outbox is not enough on its own. An ack says the phone APPLIED the
+  /// event, but a context the phone composed just before that apply is still in
+  /// flight and describes a workout without the set. If the ack wins the race,
+  /// `unackedSetIds` is already empty when that context lands, the set is
+  /// dropped as "the phone deleted it", and the set counter jumps BACK a set —
+  /// then forward again when the next snapshot arrives. Holding the id until
+  /// the phone actually echoes it closes that window without trusting two
+  /// devices' clocks to agree.
+  private var awaitingEcho: Set<String> = []
   private var flushTimer: Timer?
   /// Set when the snapshot changed in a way that is not worth a write on its own.
   private var snapshotDirty = false
@@ -90,6 +121,9 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
     case let .applied(next, events, feedback):
       snapshot = next
       if !events.isEmpty {
+        for event in events where event.kind == .setLog {
+          if let setId = event.payload.setId { awaitingEcho.insert(setId) }
+        }
         outbox.enqueue(events, now: deps.now)
         // Disk first, and only then is the set "saved" as far as the user is
         // concerned. Reversing these two lines is the bug this ordering exists
@@ -104,6 +138,17 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
         snapshotDirty = true
       }
       pendingCount = outbox.pendingCount
+      // Asked again after EVERY set once the target is met, not just the first
+      // time. "1 more set" means one more — the question has to come back when
+      // that set lands, or the choice silently becomes "all the rest of them".
+      // Choosing "Next exercise" is what ends the asking, by moving on.
+      if events.contains(where: { $0.kind == .setLog }),
+        let exercise = next.currentExercise,
+        let target = exercise.targetSets, target > 0,
+        exercise.liveSets.count >= target
+      {
+        setGoalReached = true
+      }
       announce(feedback)
       flush()
 
@@ -151,6 +196,17 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
     persistSnapshot()
   }
 
+  /// Resizes the rest that is RUNNING, leaving the stored default alone. The
+  /// running clock may have started from an exercise's own prescription, and
+  /// adjusting it must move from THAT number — resizing from the stored
+  /// default is how a 2:00 compound rest snapped to 0:45 on one tap.
+  func adjustRunningRest(_ delta: Int) {
+    guard let clock = snapshot.rest else { return }
+    let bounded = min(max(clock.total + delta, 15), 600)
+    snapshot.rest = clock.withTotal(bounded, now: nowMs())
+    persistSnapshot()
+  }
+
   func setRestTotal(_ seconds: Int) {
     let bounded = min(max(seconds, 15), 600)
     snapshot.restSeconds = bounded
@@ -158,6 +214,23 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
       snapshot.rest = clock.withTotal(bounded, now: nowMs())
     }
     persistSnapshot()
+  }
+
+  /// The rest clock reached zero. Buzz so a wrist that stopped watching the
+  /// screen knows, then move on — to the NEXT EXERCISE when this one's planned
+  /// sets are all logged, otherwise back to logging the next set. Advancing on
+  /// every completed rest would skip sets 2-4 of anything.
+  func restCompleted() {
+    guard let clock = snapshot.rest, clock.remaining(now: nowMs()) <= 0 else { return }
+    snapshot.rest = nil
+    persistSnapshot()
+    Haptics.play(.stop)
+    if let exercise = snapshot.currentExercise,
+      let target = exercise.targetSets, target > 0,
+      exercise.liveSets.count >= target
+    {
+      run(.nextExercise)
+    }
   }
 
   /// Ends the rest period now. The same thing the phone's Skip does — the timer
@@ -255,6 +328,7 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
 
     let unsynced = outbox.unackedSetIds
     snapshot.unit = payload.unit
+    snapshot.mediaBase = payload.mediaBase ?? snapshot.mediaBase
     snapshot.restSeconds = payload.restSeconds > 0 ? payload.restSeconds : WatchLimits.defaultRestSeconds
 
     guard let incoming = payload.session else {
@@ -287,12 +361,22 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
   }
 
   private func adopt(_ incoming: SnapshotSession, payload: WatchContextPayload) {
+    // A different workout carries none of the last one's outstanding echoes, and
+    // this is what keeps the set from growing across a long day of sessions.
+    awaitingEcho.removeAll()
     snapshot.sessionId = incoming.sessionId
     snapshot.startedAt = incoming.startedAt
     snapshot.exercises = incoming.exercises.map(Self.view(from:))
-    snapshot.currentIndex = max(0, snapshot.exercises.count - 1)
+    // The FIRST exercise, not the last. Joining a workout put the watch at the
+    // bottom of the list, so the session read backwards and a set logged
+    // straight after adopting landed on the last exercise — which, when that
+    // was the one the phone had just logged to, looked on the phone like a
+    // duplicate of the set before it.
+    snapshot.currentIndex = 0
+    // Seeded from the exercise actually shown, for the same reason.
+    let first = snapshot.exercises.first
     snapshot.workingWeight =
-      snapshot.exercises.last?.sets.last?.weight ?? WeightValue(value: 0, unit: payload.unit)
+      first?.sets.last?.weight ?? first?.targetWeight ?? WeightValue(value: 0, unit: payload.unit)
     // Joining a session records whether this watch was entitled at that moment.
     snapshot.grantedAt = payload.entitlement.access ? nowMs() : nil
     snapshot.lastAction = nil
@@ -313,8 +397,12 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
       let mine = byKey.removeValue(forKey: key)
       let fromPhone = Self.view(from: incomingExercise).sets.filter { !voided.contains($0.setId) }
       let known = Set(fromPhone.map(\.setId))
+      // Echoed at last: the phone's own picture now contains it, so the local
+      // copy no longer needs protecting from a snapshot that predates it.
+      awaitingEcho.subtract(known)
       let stillMine = (mine?.sets ?? []).filter {
-        !known.contains($0.setId) && !$0.voided && unsynced.contains($0.setId)
+        !known.contains($0.setId) && !$0.voided
+          && (unsynced.contains($0.setId) || awaitingEcho.contains($0.setId))
       }
       let tombstones = (mine?.sets ?? []).filter(\.voided)
       return WatchExerciseView(
@@ -322,6 +410,9 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
         idSpace: incomingExercise.idSpace,
         name: incomingExercise.name.isEmpty ? (mine?.name ?? incomingExercise.exerciseId) : incomingExercise.name,
         targetReps: incomingExercise.targetReps != 0 ? incomingExercise.targetReps : (mine?.targetReps ?? 0),
+        targetSets: incomingExercise.targetSets ?? mine?.targetSets,
+        targetRest: incomingExercise.targetRest ?? mine?.targetRest,
+        targetWeight: incomingExercise.targetWeight ?? mine?.targetWeight,
         sets: fromPhone + stillMine + tombstones)
     }
 
@@ -332,7 +423,9 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
     merged.append(
       contentsOf: byKey.filter { key, exercise in
         unackedExercises.contains(key)
-          || exercise.sets.contains { !$0.voided && unsynced.contains($0.setId) }
+          || exercise.sets.contains {
+            !$0.voided && (unsynced.contains($0.setId) || awaitingEcho.contains($0.setId))
+          }
       }.values)
 
     snapshot.sessionId = incoming.sessionId
@@ -351,6 +444,9 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
       idSpace: exercise.idSpace,
       name: exercise.name,
       targetReps: exercise.targetReps,
+      targetSets: exercise.targetSets,
+      targetRest: exercise.targetRest,
+      targetWeight: exercise.targetWeight,
       sets: exercise.sets.map {
         WatchSetView(
           setId: $0.setId, reps: $0.reps, weight: $0.weight, warmup: $0.warmup ?? false, voided: false,

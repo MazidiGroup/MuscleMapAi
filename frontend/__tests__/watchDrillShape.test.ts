@@ -54,13 +54,17 @@ test("the September drill shape: solo offline set, dual redelivery, then [set,en
   const offline = log(1, "set_offline");
 
   // Pre-shutdown: online set on its own envelope. Binds the fresh ledger.
+  // The watch set FILLS the first planned row rather than appending beside it:
+  // a Plan day pre-creates its rows loaded from last session, and appending
+  // left that stale row showing yesterday's numbers while the count grew.
+  // `p1` is consumed — its identity becomes the watch's set id.
   const r0 = routeEnvelope(envelope([online], "envA"), { session: adopted, ledger: emptyLedger(), ctx: ctx() });
-  assert.deepEqual(ids(r0.session), ["p1", "p2", "set_online"]);
+  assert.deepEqual(ids(r0.session), ["p2", "set_online"]);
 
   // Reconnect, envelope 1: the offline set ALONE. This is the shape that lost it.
   const r1 = routeEnvelope(envelope([offline], "envB"), { session: r0.session, ledger: r0.ledger, ctx: ctx() });
   assert.deepEqual(r1.ack.accepted, [offline.eventId]);
-  assert.deepEqual(ids(r1.session), ["p1", "p2", "set_offline", "set_online"],
+  assert.deepEqual(ids(r1.session), ["set_offline", "set_online"],
     "the solo offline set MUST materialise in the same envelope that accepts it");
   assert.ok(r1.ledger.processed.includes(offline.eventId));
 
@@ -72,7 +76,7 @@ test("the September drill shape: solo offline set, dual redelivery, then [set,en
   // Envelope 3: [set, end]. Commits with BOTH watch sets.
   const r3 = routeEnvelope(envelope([offline, end(2)], "envD"), { session: r2.session, ledger: r2.ledger, ctx: ctx() });
   assert.equal(r3.finished, true);
-  assert.deepEqual(ids(r3.session), ["p1", "p2", "set_offline", "set_online"]);
+  assert.deepEqual(ids(r3.session), ["set_offline", "set_online"]);
 });
 
 test("the same chain but envelope 1 handed a STALE session missing the online set", () => {
@@ -95,8 +99,9 @@ test("the same chain but envelope 1 handed a STALE session missing the online se
   // PRE-online-set one (stale closure), ledger fresh from disk.
   const r1 = routeEnvelope(envelope([offline, end(2)], "envB2"), { session: adopted, ledger: r0.ledger, ctx: ctx() });
   // The applier cannot know the session is stale: the online set is silently
-  // gone from what gets committed, while its event stays "processed".
-  assert.deepEqual(ids(r1.session), ["p1", "set_offline2"],
+  // gone from what gets committed, while its event stays "processed". The
+  // offline set consumes the stale copy's untouched planned row.
+  assert.deepEqual(ids(r1.session), ["set_offline2"],
     "stale session in = online set lost, exactly the artifact class observed");
   assert.ok(r1.ledger.processed.includes(online.eventId));
 });

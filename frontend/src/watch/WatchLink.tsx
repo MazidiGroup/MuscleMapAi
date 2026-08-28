@@ -113,6 +113,10 @@ export function WatchLink() {
       entitlement: { access: resolution.access, state: resolution.state, verifiedAt: confirmedAt },
       revision: revision.current,
       now: Date.now(),
+      // The watch cannot know the backend; the phone already does.
+      mediaBase: process.env.EXPO_PUBLIC_BACKEND_URL
+        ? `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/watch-frames`
+        : undefined,
       nameOf: exerciseName,
       targetRepsFor: (exerciseId) => planTargetReps(exerciseId),
     });

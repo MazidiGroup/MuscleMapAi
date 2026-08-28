@@ -406,9 +406,22 @@ function applyOne(
         done: true,
         ...(payload.warmup ? { warmup: true } : {}),
       };
-      const withSet = withExerciseAt(base, index, (e) =>
-        e.sets.some((s) => s.id === set.id) ? e : { ...e, sets: [...e.sets, set] },
-      );
+      // Fill the first row the plan laid down but the user has not completed,
+      // rather than appending beside it. A Plan day opens the exercise with N
+      // rows PRE-LOADED from the last time it was logged, so appending left
+      // that stale row sitting there untouched: the watch said "set 1" while
+      // the phone showed a set matching the previous session's record, and the
+      // planned row count grew with every set logged from the wrist.
+      const withSet = withExerciseAt(base, index, (e) => {
+        if (e.sets.some((s) => s.id === set.id)) return e;
+        const slot = e.sets.findIndex((s) => !s.done);
+        if (slot < 0) return { ...e, sets: [...e.sets, set] };
+        const sets = e.sets.slice();
+        // The watch's id wins: it is the identity the watch binds its own
+        // events and acknowledgements to.
+        sets[slot] = { ...sets[slot], ...set };
+        return { ...e, sets };
+      });
       return { session: withSet, ledger, verdict: ACCEPT };
     }
 

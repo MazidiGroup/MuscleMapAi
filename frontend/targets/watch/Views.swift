@@ -52,6 +52,9 @@ struct RootView: View {
     // Applied here rather than per screen: Locked, Idle and both workout pages
     // all sat low, and one root offset keeps them level with each other.
     .padding(.top, -Palette.topLift)
+    #if targetEnvironment(simulator)
+      .onAppear { store.seedForAnimationShot() }
+    #endif
     .confirmationDialog(
       store.lastFeedback?.message ?? "",
       isPresented: Binding(
@@ -140,12 +143,272 @@ struct ActiveWorkoutView: View {
   @ObservedObject private var store = WatchStore.shared
   @State private var page = 0
 
+  /// Every exercise gets a preview page now: the packs are fetched on demand
+  /// and the page degrades to black if one is unavailable, so gating on a
+  /// hardcoded id would only hide working previews.
+  private var showsAnimation: Bool {
+    store.snapshot.mediaBase != nil && store.snapshot.currentExercise != nil
+  }
+
   var body: some View {
-    TabView(selection: $page) {
-      LoggingPage().tag(0)
-      SessionPage(onDone: { page = 0 }).tag(1)
+    GeometryReader { geo in
+      TabView(selection: $page) {
+        if showsAnimation, let ex = store.snapshot.currentExercise {
+          FormPreviewPage(exerciseId: ex.exerciseId, mediaBase: store.snapshot.mediaBase).tag(-1)
+        }
+        LoggingPage().tag(0)
+        SessionPage(onDone: { page = 0 }).tag(1)
+      }
+      // Leaving the animated exercise while ON its page would strand the
+      // selection on a tag that no longer exists.
+      .onChange(of: showsAnimation) { _, shows in
+        if !shows && page == -1 { page = 0 }
+      }
+      #if targetEnvironment(simulator)
+        .onAppear { page = -1 }
+      #endif
+      // The dots cost a strip of height the 40mm cannot spare: with them the
+      // logging page is budgeted 131pt for a stack that needs more, and the
+      // overflow lands on "Log set". Bigger cases keep the affordance.
+      .tabViewStyle(.page(indexDisplayMode: geo.size.height < 170 ? .never : .automatic))
     }
-    .tabViewStyle(.page)
+  }
+}
+
+// MARK: page 0 — form preview (prototype, one exercise)
+
+/// Development instrumentation for the flipbook. Off in a shipping build.
+enum FlipbookMetrics {
+  static let enabled = true
+
+  static func footprintMB() -> Double {
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+    let kr = withUnsafeMutablePointer(to: &info) {
+      $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+        task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+      }
+    }
+    guard kr == KERN_SUCCESS else { return -1 }
+    return Double(info.phys_footprint) / 1_048_576
+  }
+
+  static func log(_ line: String) {
+    if enabled { NSLog("[FLIPBOOK] %@", line) }
+  }
+}
+
+/// On-disk frame-pack cache.
+///
+/// Bundling every exercise would put ~80 MB of JPEG inside the watch app, so
+/// packs are fetched once from the phone's backend and kept in Caches — the
+/// directory the system may reclaim under pressure, which is exactly the right
+/// contract for regenerable media. Only the exercise on screen is ever decoded.
+enum FramePackCache {
+  struct Meta: Codable {
+    let frames: Int
+    let loopSeconds: Double
+  }
+
+  private static var root: URL {
+    let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+    return base.appendingPathComponent("watch-frames", isDirectory: true)
+  }
+
+  private static func dir(_ id: String) -> URL { root.appendingPathComponent(id, isDirectory: true) }
+
+  /// Downloads what is missing and returns the pack. Frames already on disk are
+  /// never re-fetched, so a second visit to an exercise is offline-fast.
+  static func load(id: String, base: String) async -> (Meta, [UIImage])? {
+    let folder = dir(id)
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let metaURL = folder.appendingPathComponent("pack.json")
+
+    var meta: Meta?
+    if let d = try? Data(contentsOf: metaURL) { meta = try? JSONDecoder().decode(Meta.self, from: d) }
+    if meta == nil {
+      guard let url = URL(string: "\(base)/\(id)/pack.json"),
+        let (d, resp) = try? await URLSession.shared.data(from: url),
+        (resp as? HTTPURLResponse)?.statusCode == 200,
+        let m = try? JSONDecoder().decode(Meta.self, from: d)
+      else { return nil }
+      try? d.write(to: metaURL)
+      meta = m
+    }
+    guard let m = meta, m.frames > 0, m.loopSeconds > 0 else { return nil }
+
+    var images: [UIImage] = []
+    images.reserveCapacity(m.frames)
+    for i in 0..<m.frames {
+      let name = String(format: "%02d.jpg", i)
+      let fileURL = folder.appendingPathComponent(name)
+      var bytes = try? Data(contentsOf: fileURL)
+      if bytes == nil {
+        guard let url = URL(string: "\(base)/\(id)/\(name)"),
+          let (d, resp) = try? await URLSession.shared.data(from: url),
+          (resp as? HTTPURLResponse)?.statusCode == 200
+        else { return nil }
+        try? d.write(to: fileURL)
+        bytes = d
+      }
+      guard let data = bytes, let img = decode(data) else { return nil }
+      images.append(img)
+    }
+    return (m, images)
+  }
+
+  /// Forces the bitmap now. JPEG data decodes lazily on first draw otherwise,
+  /// which would land the cost inside a frame's display slot.
+  private static func decode(_ data: Data) -> UIImage? {
+    guard let raw = UIImage(data: data), let cg = raw.cgImage else { return nil }
+    guard
+      let ctx = CGContext(
+        data: nil, width: cg.width, height: cg.height, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpace(name: CGColorSpace.sRGB)!,
+        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+    else { return raw }
+    ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+    guard let flat = ctx.makeImage() else { return raw }
+    return UIImage(cgImage: flat)
+  }
+}
+
+/// Holds the decoded loop for ONE exercise. Released on page exit.
+@MainActor
+final class FlipbookStore: ObservableObject {
+  @Published private(set) var frames: [UIImage] = []
+  @Published private(set) var loopSeconds: Double = 0
+  @Published private(set) var failed = false
+  private var loadedId: String?
+  private var task: Task<Void, Never>?
+
+  func load(id: String, base: String?) {
+    guard let base, !base.isEmpty else { failed = true; return }
+    guard loadedId != id else { return }
+    task?.cancel()
+    loadedId = id
+    frames = []
+    failed = false
+    let t0 = Date()
+    FlipbookMetrics.log(String(format: "%@: memory before decode %.1f MB", id, FlipbookMetrics.footprintMB()))
+    task = Task { [weak self] in
+      let pack = await FramePackCache.load(id: id, base: base)
+      guard !Task.isCancelled else { return }
+      await MainActor.run {
+        guard let self, self.loadedId == id else { return }
+        if let (meta, images) = pack {
+          self.frames = images
+          self.loopSeconds = meta.loopSeconds
+          FlipbookMetrics.log(String(
+            format: "%@: %d frames, %.2fs loop, ready in %.0f ms, memory %.1f MB",
+            id, images.count, meta.loopSeconds, Date().timeIntervalSince(t0) * 1000,
+            FlipbookMetrics.footprintMB()))
+        } else {
+          self.failed = true
+          FlipbookMetrics.log("\(id): no pack available")
+        }
+      }
+    }
+  }
+
+  func release() {
+    task?.cancel()
+    task = nil
+    frames = []
+    loadedId = nil
+    FlipbookMetrics.log(String(format: "released; memory %.1f MB", FlipbookMetrics.footprintMB()))
+  }
+}
+
+/// The dedicated animation page: footage and nothing else.
+struct FormPreviewPage: View {
+  let exerciseId: String
+  let mediaBase: String?
+
+  @StateObject private var store = FlipbookStore()
+  @Environment(\.scenePhase) private var scenePhase
+  @State private var start: Date?
+  @State private var lastChange: Date?
+  @State private var lastIndex = -1
+  @State private var worstGapMs: Double = 0
+  @State private var skipped = 0
+  @State private var presented = 0
+
+  var body: some View {
+    GeometryReader { geo in
+      TimelineView(.animation(paused: scenePhase != .active || store.frames.isEmpty)) { context in
+        Canvas { ctx, size in
+          ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
+          let frames = store.frames
+          guard !frames.isEmpty, store.loopSeconds > 0 else { return }
+          let i = frameIndex(at: context.date, count: frames.count)
+          let img = frames[i]
+          let iw = img.size.width, ih = img.size.height
+          let scale = max(size.width / iw, size.height / ih)
+          let w = iw * scale, h = ih * scale
+          ctx.draw(
+            Image(uiImage: img),
+            in: CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h))
+          recordPacing(index: i, at: context.date, count: frames.count)
+        }
+        .frame(width: geo.size.width, height: geo.size.height)
+      }
+    }
+    .ignoresSafeArea()
+    .background(Color.black)
+    .onAppear {
+      resetPacing()
+      store.load(id: exerciseId, base: mediaBase)
+    }
+    .onChange(of: exerciseId) { _, id in
+      resetPacing()
+      store.load(id: id, base: mediaBase)
+    }
+    .onDisappear { store.release() }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(Text("Exercise form preview animation"))
+  }
+
+  private func resetPacing() {
+    start = nil
+    lastChange = nil
+    lastIndex = -1
+    worstGapMs = 0
+    skipped = 0
+    presented = 0
+  }
+
+  /// Elapsed-time driven: a delayed callback lands on the CORRECT frame, so
+  /// delay never accumulates into drift. The remainder is taken in Double
+  /// before any Int conversion — Int is 32 bits on arm64_32.
+  private func frameIndex(at date: Date, count: Int) -> Int {
+    let t0 = start ?? { start = date; return date }()
+    let loop = store.loopSeconds
+    let progress = date.timeIntervalSince(t0).truncatingRemainder(dividingBy: loop) / loop
+    return min(count - 1, max(0, Int(progress * Double(count)) % count))
+  }
+
+  private func recordPacing(index: Int, at date: Date, count: Int) {
+    guard FlipbookMetrics.enabled, index != lastIndex else { return }
+    if let last = lastChange {
+      let gap = date.timeIntervalSince(last) * 1000
+      worstGapMs = max(worstGapMs, gap)
+      let jump = (index - lastIndex + count) % count
+      if jump > 1 { skipped += jump - 1 }
+    }
+    presented += 1
+    lastChange = date
+    let wasLast = lastIndex
+    lastIndex = index
+    if index < wasLast {
+      FlipbookMetrics.log(String(
+        format: "loop: presented %d, skipped %d, worst gap %.0f ms (intended %.0f ms), memory %.1f MB",
+        presented, skipped, worstGapMs, store.loopSeconds / Double(count) * 1000,
+        FlipbookMetrics.footprintMB()))
+      presented = 0
+      skipped = 0
+      worstGapMs = 0
+    }
   }
 }
 
@@ -174,22 +437,34 @@ struct LoggingPage: View {
       // move in with it.
       let inset = max(8, w * 0.075)
       let usable = w - inset * 2
-      let dial = max(74, min(min(h * 0.475, 120), usable - 8))
-      let control = max(30, min(h * 0.155, 38))
-      let gap = max(3, min(h * 0.022, 7))
+      let gap = max(2, min(h * 0.02, 6))
+      let head = max(32, min(h * 0.26, 48))
+      let button = max(30, min(h * 0.21, 38))
+      // Reps is deliberately the most generous row on the screen. It is the one
+      // control that is aimed at mid-set, and at the old size a miss landed on
+      // the weight shoulders or on "Log set" — logging the wrong set rather
+      // than doing nothing.
+      let repsRow = max(34, min(h * 0.29, 44))
+      // The weight readout takes the remainder, never a floor of its own: a
+      // floor here is exactly what pushed "Log set" off a 40mm screen.
+      let readout = max(20, h - head - repsRow - button - gap * 3 - 2)
 
       VStack(spacing: gap) {
-        header
+        header(width: usable, height: head)
         if let clock = resting {
-          restDial(clock, size: dial)
-          restStepper(clock, height: control)
-          PrimaryButton(title: "Skip rest", systemImage: nil, height: control + 4) {
+          // ONE timer, not a countdown dial arguing with a length stepper: a
+          // single row counting down against its own total, with the ±15
+          // controls on its shoulders.
+          restRow(clock, height: repsRow)
+          PrimaryButton(title: "Skip rest", systemImage: nil, height: button) {
             store.skipRest()
           }
         } else {
-          weightDial(size: dial)
-          repsStepper(height: control)
-          PrimaryButton(title: "Log set", systemImage: "checkmark", height: control + 4) {
+          // Reps ABOVE the weight, so the row the thumb aims at is not adjacent
+          // to "Log set". The weight sits between them as a buffer.
+          repsStepper(height: repsRow)
+          weightReadout(height: readout)
+          PrimaryButton(title: "Log set", systemImage: "checkmark", height: button) {
             store.run(.logSet(reps: reps, weight: nil, warmup: false))
           }
         }
@@ -197,7 +472,29 @@ struct LoggingPage: View {
       .padding(.horizontal, inset)
       .frame(width: w, height: h, alignment: .top)
     }
-    .onReceive(tick) { _ in now = nowMs() }
+    .onReceive(tick) { _ in
+      now = nowMs()
+      // The tick doubles as the completion edge: the store clears the clock on
+      // the first zero it sees, so this cannot fire twice for one rest.
+      if let clock = resting, clock.remaining(now: now) <= 0 { store.restCompleted() }
+    }
+    // Asked, not assumed: the plan's set count is a target, not a limit, and
+    // plenty of sessions run long or stop short of it on purpose.
+    .confirmationDialog(
+      goalPrompt,
+      isPresented: Binding(
+        get: { store.setGoalReached },
+        set: { if !$0 { store.setGoalReached = false } })
+    ) {
+      // Both plain buttons on purpose. A `.cancel` role is not rendered as a
+      // choice on watchOS — it becomes the dismiss gesture — so the second
+      // option was invisible and the prompt read as "next exercise or nothing".
+      Button("Next exercise") {
+        store.setGoalReached = false
+        store.run(.nextExercise)
+      }
+      Button("1 more set") { store.setGoalReached = false }
+    }
     .onAppear { reps = max(exercise?.targetReps ?? 8, WatchLimits.minReps) }
     .onChange(of: snapshot.currentIndex) { _, _ in
       reps = max(exercise?.targetReps ?? 8, WatchLimits.minReps)
@@ -206,17 +503,24 @@ struct LoggingPage: View {
 
   /// Prev and Next are the chevrons flanking the name, because the name IS the
   /// thing they move between. That reclaims a whole 40 pt row for the dial.
-  private var header: some View {
-    HStack(spacing: 2) {
-      ChevronButton(systemImage: "chevron.left", label: "Previous exercise") {
+  private func header(width: CGFloat, height: CGFloat) -> some View {
+    // A 40mm loses roughly a third of the name row to two 26pt chevrons, which
+    // is what capped the readable name at about twelve characters. They shrink
+    // with the screen, and the name is allowed a second line: "Plate-Loaded
+    // Machine Military Press" cannot be read on one line at any legible size.
+    let chevron: CGFloat = width < 150 ? 20 : 26
+    return HStack(spacing: 1) {
+      ChevronButton(
+        systemImage: "chevron.left", label: "Previous exercise", width: chevron, height: height
+      ) {
         store.run(.previousExercise)
       }
-      VStack(spacing: 0) {
+      VStack(spacing: 1) {
         Text(exercise?.name ?? "No exercise")
-          .font(.system(size: 15, weight: .semibold))
+          .font(.system(size: height >= 44 ? 14 : 12, weight: .semibold))
           .multilineTextAlignment(.center)
-          .lineLimit(1)
-          .minimumScaleFactor(0.65)
+          .lineLimit(2)
+          .minimumScaleFactor(0.55)
           .foregroundStyle(Palette.text)
         HStack(spacing: 3) {
           if store.pendingCount > 0 {
@@ -227,21 +531,35 @@ struct LoggingPage: View {
           // A refusal takes over this line rather than opening a banner: an
           // overlay big enough to read is an overlay big enough to cover
           // "Log set", and the status line is already where the eye goes.
+          // One line, not two: the second line is what the name now uses, and a
+          // status that can grow is a status that can push "Log set" off-screen.
           Text(refusal ?? subtitle)
-            .font(.system(size: 11))
+            .font(.system(size: height >= 44 ? 10 : 9))
             .foregroundStyle(refusal == nil ? Palette.muted : Palette.accent)
-            .lineLimit(2)
+            .lineLimit(1)
             .multilineTextAlignment(.center)
-            .minimumScaleFactor(0.75)
+            .minimumScaleFactor(0.7)
             .accessibilityAddTraits(refusal == nil ? [] : .updatesFrequently)
         }
       }
       .frame(maxWidth: .infinity)
-      ChevronButton(systemImage: "chevron.right", label: "Next exercise") {
+      ChevronButton(
+        systemImage: "chevron.right", label: "Next exercise", width: chevron, height: height
+      ) {
         store.run(.nextExercise)
       }
     }
+    .frame(height: height)
     .accessibilityElement(children: .contain)
+  }
+
+  /// Names the target rather than just saying "done", so the choice is
+  /// informed by what the plan actually asked for.
+  private var goalPrompt: String {
+    let done = exercise?.liveSets.count ?? 0
+    let name = exercise?.name ?? ""
+    return String(
+      format: NSLocalizedString("%d sets done on %@", comment: ""), done, name)
   }
 
   private var refusal: String? {
@@ -265,15 +583,26 @@ struct LoggingPage: View {
   /// The Digital Crown drives the load because it is the one control that works
   /// with a sweaty finger and a glove. The ring is a full-travel gauge: it says
   /// "this is turnable" without pretending the load has a maximum.
-  private func weightDial(size: CGFloat) -> some View {
-    DialFace(
-      caption: "WEIGHT",
-      value: formatLoad(snapshot.displayedWorkingWeight),
-      unit: snapshot.unit.label,
-      progress: 1,
-      size: size,
-      leading: DialAction(label: "minus", systemImage: "minus") { store.nudgeWeight(steps: -1) },
-      trailing: DialAction(label: "plus", systemImage: "plus") { store.nudgeWeight(steps: 1) })
+  /// No plus/minus here on purpose. The crown is how a load gets set — it works
+  /// with a sweaty hand and a glove — and the two shoulders it used to carry
+  /// were close enough to the reps row to steal taps meant for it. Removing
+  /// them gives reps the space and takes away the mis-hit.
+  private func weightReadout(height: CGFloat) -> some View {
+    HStack(spacing: 4) {
+      Text(formatLoad(snapshot.displayedWorkingWeight))
+        .font(.system(size: max(15, height * 0.62), weight: .bold, design: .rounded))
+        .foregroundStyle(Palette.accent)
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+      Text(snapshot.unit.label)
+        .font(.system(size: max(10, height * 0.34), weight: .semibold))
+        .foregroundStyle(Palette.accent.opacity(0.85))
+        .lineLimit(1)
+    }
+    .frame(maxWidth: .infinity)
+    .frame(height: height)
+    .background(Palette.surface)
+    .clipShape(RoundedRectangle(cornerRadius: Palette.radius))
       .focusable(true)
       .digitalCrownRotation(
         $crown, from: -1000, through: 1000, by: 1, sensitivity: .low, isContinuous: false)
@@ -286,26 +615,6 @@ struct LoggingPage: View {
       .accessibilityValue(Text("\(formatLoad(snapshot.displayedWorkingWeight)) \(snapshot.unit.label)"))
       .accessibilityAdjustableAction { direction in
         store.nudgeWeight(steps: direction == .increment ? 1 : -1)
-      }
-  }
-
-  private func restDial(_ clock: RestClock, size: CGFloat) -> some View {
-    let remaining = clock.remaining(now: now)
-    let fraction = clock.total > 0 ? Double(remaining) / Double(clock.total) : 0
-    return DialFace(
-      caption: "REST",
-      value: clockText(remaining),
-      unit: "of \(clockText(clock.total))",
-      progress: fraction,
-      size: size,
-      tint: remaining == 0 ? Palette.done : Palette.accent,
-      leading: DialAction(label: "minus 30 seconds", text: "-30s") { store.extendRest(seconds: -30) },
-      trailing: DialAction(label: "plus 30 seconds", text: "+30s") { store.extendRest(seconds: 30) })
-      .accessibilityElement(children: .combine)
-      .accessibilityLabel(Text(snapshot.paused ? "Rest paused" : "Rest remaining"))
-      .accessibilityValue(Text("\(remaining) seconds"))
-      .accessibilityAdjustableAction { direction in
-        store.extendRest(seconds: direction == .increment ? 30 : -30)
       }
   }
 
@@ -325,19 +634,37 @@ struct LoggingPage: View {
       }
   }
 
-  private func restStepper(_ clock: RestClock, height: CGFloat) -> some View {
-    StepperRow(
-      text: "Rest \(clockText(snapshot.restSeconds))",
-      height: height,
-      decrement: { store.setRestTotal(snapshot.restSeconds - 15) },
-      increment: { store.setRestTotal(snapshot.restSeconds + 15) })
-      .accessibilityElement(children: .combine)
-      .accessibilityLabel(Text("Rest length"))
-      .accessibilityValue(Text("\(snapshot.restSeconds) seconds"))
-      .accessibilityAdjustableAction { direction in
-        store.setRestTotal(snapshot.restSeconds + (direction == .increment ? 15 : -15))
-      }
+  /// The one rest display: remaining / total, counting down, resizable in
+  /// place. Two separate rest readouts — a dial counting one number and a
+  /// stepper showing another — is how the screen disagreed with itself.
+  private func restRow(_ clock: RestClock, height: CGFloat) -> some View {
+    let remaining = clock.remaining(now: now)
+    return HStack(spacing: 3) {
+      DialShoulder(
+        action: DialAction(label: "minus 15 seconds", text: "-15") { store.adjustRunningRest(-15) },
+        tint: Palette.accent, size: height - 4)
+      Text("\(clockText(remaining)) / \(clockText(clock.total))")
+        .font(.system(size: max(15, height * 0.42), weight: .bold, design: .rounded))
+        .foregroundStyle(remaining == 0 ? Palette.done : Palette.accent)
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+        .frame(maxWidth: .infinity)
+      DialShoulder(
+        action: DialAction(label: "plus 15 seconds", text: "+15") { store.adjustRunningRest(15) },
+        tint: Palette.accent, size: height - 4)
+    }
+    .padding(.horizontal, 2)
+    .frame(height: height)
+    .background(Palette.surface)
+    .clipShape(RoundedRectangle(cornerRadius: Palette.radius))
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(Text(snapshot.paused ? "Rest paused" : "Rest remaining"))
+    .accessibilityValue(Text("\(remaining) of \(clock.total) seconds"))
+    .accessibilityAdjustableAction { direction in
+      store.adjustRunningRest(direction == .increment ? 15 : -15)
+    }
   }
+
 }
 
 // MARK: page 2 — the session
@@ -389,28 +716,6 @@ private func clockText(_ seconds: Int) -> String {
 
 // MARK: - Pieces
 
-struct RestTimerView: View {
-  let clock: RestClock?
-  let paused: Bool
-  @State private var now = nowMs()
-  private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-  var body: some View {
-    Group {
-      if let clock {
-        let remaining = clock.remaining(now: now)
-        Text("Rest \(remaining / 60):\(String(format: "%02d", remaining % 60))")
-          .font(.system(size: 16, weight: .medium, design: .rounded))
-          .foregroundStyle(remaining == 0 ? Palette.done : Palette.muted)
-          .accessibilityLabel(Text(paused ? "Rest paused" : "Rest remaining"))
-          .accessibilityValue(Text("\(remaining) seconds"))
-      }
-    }
-    // Wall-clock based, so time that passes off-screen is accounted for rather
-    // than frozen at the last tick.
-    .onReceive(tick) { _ in now = nowMs() }
-  }
-}
 
 struct SyncBadge: View {
   /// Logged sets only. `total` is every queued event, which is what decides
@@ -463,7 +768,35 @@ struct DialFace: View {
   let leading: DialAction
   let trailing: DialAction
 
+  /// Below this the ring is smaller than its own shoulders, which then sit on
+  /// top of the value instead of beside it. A 40mm has no height to spare for a
+  /// circle, so the same controls lay out as a row instead.
+  private var isCompact: Bool { size < 48 }
+
   var body: some View {
+    if isCompact { compactRow } else { ring }
+  }
+
+  /// Same value, same two actions, same accessibility — a row rather than a
+  /// circle. The crown still drives it: that modifier lives on the caller.
+  private var compactRow: some View {
+    HStack(spacing: 3) {
+      DialShoulder(action: leading, tint: tint, size: size - 4)
+      Text(unit.isEmpty ? value : "\(value) \(unit)")
+        .font(.system(size: max(14, size * 0.46), weight: .bold, design: .rounded))
+        .foregroundStyle(tint)
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+        .frame(maxWidth: .infinity)
+      DialShoulder(action: trailing, tint: tint, size: size - 4)
+    }
+    .padding(.horizontal, 2)
+    .frame(height: size)
+    .background(Palette.surface)
+    .clipShape(RoundedRectangle(cornerRadius: Palette.radius))
+  }
+
+  private var ring: some View {
     ZStack {
       TickRing()
         .frame(width: size, height: size)
@@ -473,16 +806,20 @@ struct DialFace: View {
         .rotationEffect(.degrees(147))
         .frame(width: size - 8, height: size - 8)
       VStack(spacing: -2) {
-        Text(caption)
-          .font(.system(size: size * 0.105, weight: .semibold))
-          .foregroundStyle(Palette.muted)
+        // Below ~58pt the caption renders under 6pt — unreadable, and it is the
+        // one line here that carries no information the value does not.
+        if size >= 58 {
+          Text(caption)
+            .font(.system(size: max(7, size * 0.105), weight: .semibold))
+            .foregroundStyle(Palette.muted)
+        }
         Text(value)
-          .font(.system(size: size * 0.38, weight: .bold, design: .rounded))
+          .font(.system(size: max(17, size * 0.38), weight: .bold, design: .rounded))
           .foregroundStyle(tint)
           .minimumScaleFactor(0.45)
           .lineLimit(1)
         Text(unit)
-          .font(.system(size: size * 0.13, weight: .semibold))
+          .font(.system(size: max(9, size * 0.13), weight: .semibold))
           .foregroundStyle(tint.opacity(0.85))
           .lineLimit(1)
           .minimumScaleFactor(0.6)
@@ -600,13 +937,17 @@ private struct StepperEnd: View {
 struct ChevronButton: View {
   let systemImage: String
   let label: String
+  var width: CGFloat = 26
+  var height: CGFloat = 40
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
       Image(systemName: systemImage)
         .font(.system(size: 13, weight: .bold))
-        .frame(width: 26, height: 40)
+        // The tap target keeps the full row height even when the glyph column
+        // narrows, so the reclaimed width costs nothing in reachability.
+        .frame(width: width, height: height)
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
