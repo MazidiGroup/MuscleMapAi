@@ -213,7 +213,7 @@ const makeStyles = (T: LegacyPalette) =>
     back: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
     backPlaceholder: { width: 40 },
     headerTitle: { color: T.text, fontSize: 17, fontWeight: "700" },
-    lede: { color: T.text, fontSize: 22, fontWeight: "800", marginBottom: 8 },
+    lede: { color: T.text, fontSize: 24, fontWeight: "800", marginBottom: 8 },
     blurb: { color: T.textDim, fontSize: 14, lineHeight: 21, marginBottom: 18 },
     h2: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 24, marginBottom: 12 },
     list: { gap: 10 },

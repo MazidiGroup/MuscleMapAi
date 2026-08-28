@@ -180,7 +180,7 @@ function ExploreContent() {
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   header: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 18, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
-  h1: { color: T.text, fontSize: 22, fontWeight: "800" },
+  h1: { color: T.text, fontSize: 24, fontWeight: "800" },
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
   controls: { flex: 1, paddingHorizontal: 16, paddingTop: 2 },
   segment: { flexDirection: "row", backgroundColor: T.bg2, borderRadius: 22, padding: 4, marginBottom: 12, gap: 4 },
@@ -204,7 +204,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   regionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   region: {
     width: "48%", flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 10,
-    minHeight: 54, paddingHorizontal: 14, borderRadius: 18, backgroundColor: T.bg2,
+    minHeight: 54, paddingHorizontal: 14, borderRadius: 22, backgroundColor: T.bg2,
     borderWidth: 1.5, borderColor: "transparent",
   },
   regionActive: { borderColor: T.accent },

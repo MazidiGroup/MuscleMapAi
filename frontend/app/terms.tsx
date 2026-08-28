@@ -144,7 +144,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   backPlaceholder: { width: 40, height: 40 },
   headerTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
   updated: { color: T.textFaint, fontSize: 12, marginBottom: 14 },
-  h2: { color: T.text, fontSize: 16, fontWeight: "800", marginTop: 18, marginBottom: 6 },
+  h2: { color: T.text, fontSize: 15, fontWeight: "800", marginTop: 18, marginBottom: 6 },
   p: { color: T.textDim, fontSize: 14, lineHeight: 22 },
   link: { color: T.accent, fontSize: 15, fontWeight: "700", marginTop: 6 },
   linkButton: { minHeight: 44, alignSelf: "flex-start", justifyContent: "center", paddingHorizontal: 14, borderRadius: 999, backgroundColor: T.surface },

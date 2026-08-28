@@ -62,7 +62,7 @@ function LearnContent() {
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
-  h1: { color: T.text, fontSize: 26, fontWeight: "800" },
+  h1: { color: T.text, fontSize: 24, fontWeight: "800" },
   sub: { color: T.textDim, fontSize: 13, marginTop: 2, marginBottom: 18 },
   card: {
     flexDirection: "row",
@@ -78,7 +78,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   iconWrap: { width: 50, height: 50, borderRadius: 22, backgroundColor: T.surfaceHi, alignItems: "center", justifyContent: "center" },
   lessonNum: { alignSelf: "flex-start", backgroundColor: "rgba(52,199,255,0.14)", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 4 },
   lessonNumText: { color: T.accent, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
-  cardTitle: { color: T.text, fontSize: 16, fontWeight: "800" },
+  cardTitle: { color: T.text, fontSize: 15, fontWeight: "800" },
   cardSub: { color: T.textDim, fontSize: 13, marginTop: 1 },
   metaCol: { alignItems: "center", gap: 2 },
   metaText: { color: T.textFaint, fontSize: 11, fontWeight: "600" },

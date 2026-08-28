@@ -48,8 +48,10 @@ export const WEEKDAYS: Weekday[] = [
   { index: 6, short: "Sun", long: "Sunday" },
 ];
 
-/** Defaults for everything we stopped asking. Documented, never silent guesses. */
+/** Defaults for everything not asked. Documented, never silent guesses. */
 export const ANSWER_DEFAULTS = {
+  /** Level IS asked (on the days step). The default exists for stored answers
+   *  written before it was, and it is the safe end of the scale. */
   exp: "beginner" as Experience,
   days: [0, 2, 4],
   equip: [] as Equipment[],
@@ -82,8 +84,8 @@ export function isStepComplete(step: number, answers: Partial<Answers>): boolean
     case "goal":
       return !!answers.goal;
     case "days":
-      // Advanced Lifter Mode cannot be programmed under five training days.
-      if (answers.advanced) return !!answers.days && answers.days.length >= ADVANCED_MIN_DAYS;
+      // Level is asked here too, but it has a safe default: an unanswered
+      // level must never block the flow the way zero selected days does.
       return !!answers.days && answers.days.length >= 1;
     case "equipment":
       return true; // bodyweight-only is a valid answer
@@ -105,13 +107,19 @@ export function normalizeAnswers(partial: Partial<Answers>): Answers {
   const days = Array.isArray(partial.days) && partial.days.length ? [...partial.days].sort((a, b) => a - b) : ANSWER_DEFAULTS.days;
   return {
     goal: (partial.goal || "general") as Goal,
-    exp: (partial.exp || ANSWER_DEFAULTS.exp) as Experience,
     days,
     equip: Array.isArray(partial.equip) ? partial.equip : ANSWER_DEFAULTS.equip,
     focus: Array.isArray(partial.focus) ? partial.focus : ANSWER_DEFAULTS.focus,
     posture: typeof partial.posture === "boolean" ? partial.posture : ANSWER_DEFAULTS.posture,
-    // Advanced Lifter Mode only survives normalisation while it is programmable.
-    advanced: !!partial.advanced && days.length >= ADVANCED_MIN_DAYS,
+    // Level is independent of day count: an advanced lifter on three days is
+    // still advanced. The DERIVED `advanced` flag below is narrower — it turns
+    // on the muscle-group specialisation split, which genuinely needs five
+    // training days to be programmable. Legacy stored answers that carried the
+    // old toggle but no exp are read as declaring an advanced lifter.
+    exp: (partial.exp || (partial.advanced ? "advanced" : ANSWER_DEFAULTS.exp)) as Experience,
+    advanced:
+      (partial.exp === "advanced" || (!partial.exp && !!partial.advanced)) &&
+      days.length >= ADVANCED_MIN_DAYS,
   };
 }
 

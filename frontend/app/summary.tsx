@@ -401,7 +401,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   },
   headerBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", overflow: "hidden" },
 
-  title: { color: T.text, fontSize: 28, fontWeight: "800", lineHeight: 34 },
+  title: { color: T.text, fontSize: 24, fontWeight: "800", lineHeight: 30 },
   subtitle: { color: T.textDim, fontSize: 14, marginTop: 4 },
 
   heroCard: { flexDirection: "row", alignItems: "center", gap: 16, backgroundColor: T.bg2, borderRadius: 22, padding: 16 },

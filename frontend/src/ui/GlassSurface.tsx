@@ -1,7 +1,6 @@
 import React from "react";
 import { Platform, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
 
 import { useTheme } from "@/src/theme/ThemeContext";
 import type { ThemeMode } from "@/src/theme/tokens";
@@ -39,43 +38,17 @@ export function liquidShadow(mode: ThemeMode, raised = false): ViewStyle {
  * own border to give three outlines of different weights. The parent alone
  * decides whether it has an outline.
  */
-export function LiquidSheen({ tone = "neutral" }: { tone?: GlassTone }) {
-  const { mode } = useTheme();
-  // Every stop is WHITE, fading to fully transparent. Two earlier bugs came
-  // from this gradient and both were colour, not geometry:
+export function LiquidSheen(_: { tone?: GlassTone }) {
+  // Deliberately renders nothing.
   //
-  //  - the final stop used to be blue (rgba(14,75,178) / rgba(78,159,255)),
-  //    left over from the pre-copper palette. It landed on the bottom-right
-  //    corner of every copper control, so the fill turned muddy exactly where
-  //    the curve is — reading as a dark line tracing the radius.
-  //  - the opening stop was far too strong (0.76 white in Day), which put a
-  //    bright patch behind whatever sat in the top-left corner.
+  // The diagonal white sheen read as a gradient wash across every card, button
+  // and menu surface, and on Dim and Night it was worse than on Day: a few
+  // percent of white over a near-black fill is exactly where banding shows. A
+  // surface is now its fill, its blur and its shadow — nothing else.
   //
-  // Fading to transparent white means the sheen can never tint a surface or
-  // fight its edge: at the boundary it IS the surface colour.
-  const peak = tone === "accent"
-    ? mode === "day" ? 0.26 : 0.20
-    : tone === "danger"
-      ? 0.16
-      : mode === "day" ? 0.30 : 0.085;
-  const colors: [string, string, ...string[]] = [
-    `rgba(255,255,255,${peak})`,
-    `rgba(255,255,255,${(peak * 0.22).toFixed(4)})`,
-    "rgba(255,255,255,0)",
-  ];
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <LinearGradient
-        colors={colors}
-        // Weighted early so the highlight is a soft falloff off the top-left
-        // rather than a band with a visible edge mid-surface.
-        locations={[0, 0.35, 0.85]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.85, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-    </View>
-  );
+  // Kept as a no-op rather than deleted from its nine call sites so the change
+  // is one line to reverse if the sheen is ever wanted back.
+  return null;
 }
 
 /**

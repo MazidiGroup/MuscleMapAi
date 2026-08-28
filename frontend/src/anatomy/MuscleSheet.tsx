@@ -716,7 +716,7 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
   },
   tabText: { fontSize: 14.5, fontWeight: "700" },
 
-  previewCard: { backgroundColor: T.bg2, borderRadius: 18, borderWidth: 1, borderColor: T.border, overflow: "hidden" },
+  previewCard: { backgroundColor: T.bg2, borderRadius: 22, borderWidth: 1, borderColor: T.border, overflow: "hidden" },
   previewCaps: { fontSize: 11.5, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.7 },
   previewRule: { height: 1, backgroundColor: T.border },
   fnHead: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 14 },
@@ -754,7 +754,7 @@ function makeStyles(T: LegacyPalette) { return StyleSheet.create({
   subCard: { backgroundColor: T.bg2, borderRadius: 22, padding: 16, marginBottom: 12 },
   cardHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   cardHeadLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
-  cardTitle: { color: T.text, fontSize: 17, fontWeight: "800" },
+  cardTitle: { color: T.text, fontSize: 15, fontWeight: "800" },
   sectionHeading: { color: T.text, fontSize: 17, fontWeight: "800" },
 
   field: { paddingVertical: 10 },

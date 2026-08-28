@@ -2,7 +2,6 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Platform, View, StyleSheet } from "react-native";
 import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
 
 import { usePremium } from "@/src/premium/PremiumContext";
 import { gate, isPremiumSurface, Surface } from "@/src/premium/entitlement";
@@ -33,18 +32,20 @@ function DeckButton({ children, style, ...props }: any) {
 }
 
 function DeckBackground({ mode }: { mode: string }) {
-  const colors = mode === "day"
-    ? ["rgba(237,243,251,0.28)", "rgba(255,255,255,0.82)", "rgba(241,247,255,0.92)"]
-    : mode === "dim"
-      ? ["rgba(21,25,32,0.32)", "rgba(42,48,61,0.84)", "rgba(27,32,42,0.94)"]
-      : ["rgba(7,10,16,0.28)", "rgba(22,28,39,0.84)", "rgba(9,13,21,0.94)"];
+  // One flat fill, not a three-stop gradient. Ramping from 0.28 to 0.94 alpha
+  // over the height of the bar banded visibly on the dark themes, where the
+  // stops are only a few values apart. This is the gradient's final stop, so
+  // the bar keeps the weight it had without the ramp that caused the banding.
+  const fill =
+    mode === "day"
+      ? "rgba(241,247,255,0.92)"
+      : mode === "dim"
+        ? "rgba(27,32,42,0.94)"
+        : "rgba(9,13,21,0.94)";
   return (
     <View style={styles.deckBackground} pointerEvents="none">
       <BlurView intensity={62} tint={mode === "day" ? "light" : "dark"} style={StyleSheet.absoluteFill} />
-      <LinearGradient
-        colors={colors as [string, string, ...string[]]}
-        style={StyleSheet.absoluteFill}
-      />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: fill }]} />
     </View>
   );
 }

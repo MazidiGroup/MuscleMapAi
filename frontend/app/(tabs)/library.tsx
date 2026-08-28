@@ -1217,7 +1217,7 @@ function Pills({ title, icon, data, onPress, styles, T }: { title: string; icon:
 
 const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
-  h1: { color: T.text, fontSize: 26, fontWeight: "800" },
+  h1: { color: T.text, fontSize: 24, fontWeight: "800" },
   sub: { color: T.textDim, fontSize: 13, marginTop: 2 },
   search: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surface, borderRadius: 22, paddingHorizontal: 12, height: 44, marginTop: 14, overflow: "hidden" },
   searchInput: { flex: 1, color: T.text, fontSize: 15 },
@@ -1248,10 +1248,10 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   dirHead: { flexDirection: "row", alignItems: "center", marginTop: 16, marginBottom: 8 },
   sortBtn: { minHeight: 32, paddingHorizontal: 8, justifyContent: "center" },
   sortText: { fontSize: 13, fontWeight: "800", letterSpacing: 0.3 },
-  dirCard: { backgroundColor: T.surface, borderRadius: 20, overflow: "hidden" },
+  dirCard: { backgroundColor: T.surface, borderRadius: 22, overflow: "hidden" },
   // An open region is outlined in the accent; the fill never changes, so the
   // row does not jump when it opens.
-  dirGroup: { borderWidth: 1.5, borderColor: "transparent", borderRadius: 20 },
+  dirGroup: { borderWidth: 1.5, borderColor: "transparent", borderRadius: 22 },
   dirRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, minHeight: 58 },
   dirDot: { width: 14, height: 14, borderRadius: 7 },
   dirName: { color: T.text, fontSize: 17, fontWeight: "700", flex: 1 },
@@ -1265,7 +1265,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   mgHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   mgCount: { color: T.textDim, fontSize: 12.5, marginBottom: 8, marginTop: 4 },
   seeAll: { color: T.accent, fontSize: 13, fontWeight: "700", marginBottom: 8, marginTop: 4 },
-  mgCard: { backgroundColor: T.surface, borderRadius: 20, overflow: "hidden", marginBottom: 14 },
+  mgCard: { backgroundColor: T.surface, borderRadius: 22, overflow: "hidden", marginBottom: 14 },
   // The virtualised list cannot sit inside one rounded card, so each row
   // carries the fill and the ends carry the curve.
   listRow: { backgroundColor: T.surface },
@@ -1279,23 +1279,23 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   duoRow: { flexDirection: "row", gap: 10, marginTop: 2 },
   duoLink: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    paddingHorizontal: 10, minHeight: 56, borderRadius: 18, backgroundColor: T.surface, overflow: "hidden",
+    paddingHorizontal: 10, minHeight: 56, borderRadius: 22, backgroundColor: T.surface, overflow: "hidden",
   },
   duoText: { color: T.text, fontSize: 14.5, fontWeight: "600", flexShrink: 1 },
   azRow: {
     flexDirection: "row", alignItems: "center", minHeight: 56, marginTop: 14,
-    paddingHorizontal: 16, borderRadius: 20, backgroundColor: T.surface, overflow: "hidden",
+    paddingHorizontal: 16, borderRadius: 22, backgroundColor: T.surface, overflow: "hidden",
   },
   azText: { color: T.text, fontSize: 15.5, fontWeight: "600" },
 
   // --- Exercises: quick access + browse ---
-  quickCard: { flexDirection: "row", alignItems: "stretch", backgroundColor: T.surface, borderRadius: 20, overflow: "hidden", marginBottom: 18 },
+  quickCard: { flexDirection: "row", alignItems: "stretch", backgroundColor: T.surface, borderRadius: 22, overflow: "hidden", marginBottom: 18 },
   quickCell: { flex: 1, alignItems: "center", gap: 4, paddingVertical: 16 },
   quickDivider: { width: StyleSheet.hairlineWidth, backgroundColor: T.border, marginVertical: 14 },
   quickLabel: { color: T.text, fontSize: 14, fontWeight: "700" },
   quickCount: { color: T.textDim, fontSize: 13 },
   browseGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 18 },
-  browseTile: { flexGrow: 1, flexBasis: "45%", flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: T.surface, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 14, overflow: "hidden" },
+  browseTile: { flexGrow: 1, flexBasis: "45%", flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: T.surface, borderRadius: 22, paddingHorizontal: 12, paddingVertical: 14, overflow: "hidden" },
   browseTitle: { color: T.text, fontSize: 14.5, fontWeight: "700" },
   browseSub: { color: T.textDim, fontSize: 12, marginTop: 1 },
   exRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 11 },

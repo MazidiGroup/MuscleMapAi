@@ -52,9 +52,7 @@ export function LoadingScreen() {
         style={[styles.logo, { transform: [{ scale }], opacity }]}
         resizeMode="contain"
       />
-      <Text style={[styles.title, { color: T.text }]}>
-        Muscle Map <Text style={{ color: T.accent }}>AI</Text>
-      </Text>
+      <Text style={[styles.title, { color: T.text }]}>Muscle Map</Text>
       <Text style={[styles.subtitle, { color: T.textMuted }]}>Your plan. Built around your muscles.</Text>
       <View style={styles.dotsWrap}>
         <View style={styles.dots}>

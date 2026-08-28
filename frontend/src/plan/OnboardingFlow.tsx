@@ -31,7 +31,7 @@ import {
   stepLabel,
   toggleWeekday,
 } from "./onboarding";
-import type { Equipment, Goal } from "./exercises";
+import type { Equipment, Experience, Goal } from "./exercises";
 import { ADVANCED_MIN_DAYS } from "./exercises";
 
 // ---- Question data -------------------------------------------------------
@@ -43,7 +43,7 @@ const GOAL_OPTS: { k: Goal; label: string; sub: string }[] = [
 ];
 
 const EQUIP_PRESETS: { k: string; label: string; sub: string; equip: Equipment[] }[] = [
-  { k: "gym", label: "Full gym", sub: "Everything unlocked", equip: ["db", "bb", "kb", "band", "cable", "machine", "pullup"] },
+  { k: "gym", label: "Full gym", sub: "Everything unlocked", equip: ["db", "bb", "kb", "band", "cable", "machine", "pullup", "dip"] },
   { k: "home", label: "Home setup", sub: "Dumbbells + bands + pull-up bar", equip: ["db", "band", "pullup"] },
   { k: "body", label: "Just my body", sub: "Bodyweight only", equip: [] },
 ];
@@ -56,6 +56,7 @@ const EQUIP_PILLS: { k: Equipment; label: string }[] = [
   { k: "cable", label: "Cables" },
   { k: "machine", label: "Machines" },
   { k: "pullup", label: "Pull-up bar" },
+  { k: "dip", label: "Dip station" },
 ];
 
 // ---- Welcome -------------------------------------------------------------
@@ -72,7 +73,7 @@ export function Welcome({ onStart, onSignIn }: { onStart: () => void; onSignIn: 
       <View style={styles.center}>
         <Image source={require("../../assets/images/adaptive-icon.png")} style={styles.brandMark} resizeMode="contain" />
         <Text style={[t.type.title, { color: t.color.text, marginTop: t.space.xl, textAlign: "center" }]}>
-          Muscle Map <Text style={{ color: t.color.accent }}>AI</Text>
+          Muscle Map
         </Text>
         <Text style={[t.type.body, { color: t.color.textSecondary, marginTop: t.space.sm, textAlign: "center" }]}>
           Learn your body. Train it smarter.
@@ -214,81 +215,61 @@ function OptionCard({
 }
 
 /**
- * Advanced Lifter Mode — lives with the training-days question because it is a
- * constraint ON those days: it needs five or more of them to be programmable. The
- * same control is reachable after onboarding through "Change my answers".
+ * Training level — lives with the training-days question because the two
+ * together describe the week: how often, and how hard the programming may be.
+ * Level is independent of day count on purpose: an advanced lifter on three
+ * days is still advanced, and a beginner picking six days is still a beginner.
+ * (The muscle-specialisation split still needs 5+ days; `normalizeAnswers`
+ * derives that separately.)
  */
-export function AdvancedLifterToggle({
-  on,
+const LEVELS: { k: Experience; label: string; sub: string }[] = [
+  { k: "beginner", label: "Beginner", sub: "Learning the main movements and building consistency." },
+  { k: "intermediate", label: "Intermediate", sub: "Training consistently, confident with the main lifts." },
+  { k: "advanced", label: "Advanced", sub: "Years of structured training; manages effort and fatigue." },
+];
+
+export function LevelSelector({
+  value,
   dayCount,
   onChange,
 }: {
-  on: boolean;
+  value: Experience;
   dayCount: number;
-  onChange: (next: boolean) => void;
+  onChange: (next: Experience) => void;
 }) {
   const t = useSemanticTokens();
-  const [tipOpen, setTipOpen] = useState(false);
-  const short = on && dayCount < ADVANCED_MIN_DAYS;
-  const aria = Platform.OS === "web" ? ({ "aria-checked": on } as any) : null;
   return (
     <View style={{ marginTop: t.space.lg, gap: t.space.sm }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: t.space.sm }}>
-        <Pressable
-          onPress={() => onChange(!on)}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: on }}
-          accessibilityLabel="Advanced Lifter Mode"
-          testID="advanced-lifter-toggle"
-          style={{ flexDirection: "row", alignItems: "center", gap: t.space.sm, minHeight: t.target.min, flexShrink: 1 }}
-          {...aria}
-        >
-          <View
+      <Text style={[t.type.subheading, { color: t.color.text }]}>Your training level</Text>
+      {LEVELS.map((lvl) => {
+        const on = value === lvl.k;
+        return (
+          <Pressable
+            key={lvl.k}
+            onPress={() => onChange(lvl.k)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={`${lvl.label}. ${lvl.sub}`}
+            testID={`level-${lvl.k}`}
             style={{
-              width: 24,
-              height: 24,
-              borderRadius: t.radius.sm,
+              borderRadius: t.radius.lg,
               borderWidth: 2,
               borderColor: on ? t.color.accent : "transparent",
-              backgroundColor: on ? t.color.accent : "transparent",
-              alignItems: "center",
-              justifyContent: "center",
+              backgroundColor: t.color.surfaceAlt,
+              paddingHorizontal: t.space.lg,
+              paddingVertical: t.space.md,
+              gap: 2,
+              overflow: "hidden",
             }}
           >
-            {on ? <Ionicons name="checkmark" size={16} color={t.color.bg} /> : null}
-          </View>
-          <Text style={[t.type.bodyStrong, { color: t.color.text }]}>Advanced Lifter Mode</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setTipOpen((v) => !v)}
-          accessibilityRole="button"
-          accessibilityLabel={tipOpen ? "Hide what Advanced Lifter Mode does" : "What is Advanced Lifter Mode?"}
-          accessibilityState={{ expanded: tipOpen }}
-          testID="advanced-lifter-info"
-          style={{
-            width: t.target.min,
-            height: t.target.min,
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: t.radius.md,
-            
-            
-            backgroundColor: t.color.surfaceAlt,
-            overflow: "hidden",
-          }}
-        >
-          <LiquidSheen tone="neutral" />
-          <Ionicons name="information-circle-outline" size={20} color={t.color.textSecondary} />
-        </Pressable>
-      </View>
-      {tipOpen ? (
-        <Text style={[t.type.caption, { color: t.color.textSecondary }]} testID="advanced-lifter-tip">
-          For experienced lifters. Requires 5+ training days. Uses muscle group specialization with higher weekly volume.
-        </Text>
-      ) : null}
-      {short ? (
-        <Text style={[t.type.bodyStrong, { color: t.status.warning.fg }]} testID="advanced-lifter-warning">
-          {`Advanced Lifter Mode needs 5 or more training days — ${dayCount} selected. Pick ${ADVANCED_MIN_DAYS - dayCount} more, or untick the box.`}
+            <Text style={[t.type.bodyStrong, { color: on ? t.color.accent : t.color.text }]}>{lvl.label}</Text>
+            <Text style={[t.type.caption, { color: t.color.textSecondary }]}>{lvl.sub}</Text>
+          </Pressable>
+        );
+      })}
+      {value === "advanced" && dayCount >= ADVANCED_MIN_DAYS ? (
+        <Text style={[t.type.caption, { color: t.color.textSecondary }]} testID="level-specialisation-note">
+          With {dayCount} training days your plan uses muscle-group specialisation for higher weekly volume.
         </Text>
       ) : null}
     </View>
@@ -402,10 +383,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         <Text style={[t.type.bodyStrong, { color: t.color.accentSoft, marginTop: t.space.lg }]} testID="days-summary">
           {days.length === 0 ? "Pick at least one day." : daysSummary(days)}
         </Text>
-        <AdvancedLifterToggle
-          on={!!answers.advanced}
+        <LevelSelector
+          value={(answers.exp || "beginner") as Experience}
           dayCount={days.length}
-          onChange={(next) => setAnswers({ advanced: next })}
+          onChange={(next) => setAnswers({ exp: next })}
         />
       </Shell>
     );

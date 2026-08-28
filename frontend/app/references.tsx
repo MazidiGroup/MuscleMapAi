@@ -159,7 +159,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   },
   noticeText: { flex: 1, color: T.textDim, fontSize: 13, lineHeight: 19 },
   category: { marginBottom: 24 },
-  h2: { color: T.text, fontSize: 16, fontWeight: "800", marginBottom: 6 },
+  h2: { color: T.text, fontSize: 15, fontWeight: "800", marginBottom: 6 },
   blurb: { color: T.textDim, fontSize: 13, lineHeight: 19, marginBottom: 10 },
   refRow: {
     flexDirection: "row",
