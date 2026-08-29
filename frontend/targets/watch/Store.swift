@@ -40,10 +40,30 @@ final class WatchStore: ObservableObject, WatchLinkDelegate {
       var s = WatchSnapshot()
       s.sessionId = "sim"
       s.startedAt = nowMs()
+      // Any base works: the OHP pack is bundled, so the loader never reaches
+      // the network. Set so the form-preview page renders in the simulator.
+      s.mediaBase = "https://sim.invalid/api/watch-frames"
+      let kg = { (v: Double) in WeightValue(value: v, unit: .kg) }
+      s.workingWeight = kg(40)
+      let set = { (i: Int, reps: Int, w: Double) in
+        WatchSetView(
+          setId: "sim-\(i)", reps: reps, weight: kg(w), warmup: false,
+          voided: false, revision: 1, source: .watchUI, at: nowMs())
+      }
       s.exercises = [
         WatchExerciseView(
           exerciseId: "barbell-overhead-press", idSpace: .plan,
-          name: "Barbell Overhead Press", targetReps: 8, sets: [])
+          name: "Barbell Overhead Press", targetReps: 8, targetSets: 4,
+          targetRest: 120, targetWeight: kg(40),
+          sets: [set(1, 8, 40), set(2, 8, 40)]),
+        WatchExerciseView(
+          exerciseId: "dumbbell-lateral-raise", idSpace: .plan,
+          name: "Dumbbell Lateral Raise", targetReps: 12, targetSets: 3,
+          targetRest: 90, targetWeight: kg(10), sets: []),
+        WatchExerciseView(
+          exerciseId: "chin-ups", idSpace: .plan,
+          name: "Chin Ups", targetReps: 10, targetSets: 3,
+          targetRest: 120, sets: []),
       ]
       snapshot = s
     }

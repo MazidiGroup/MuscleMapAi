@@ -165,7 +165,15 @@ struct ActiveWorkoutView: View {
         if !shows && page == -1 { page = 0 }
       }
       #if targetEnvironment(simulator)
-        .onAppear { page = -1 }
+        // Screenshot driver: SIMCTL_CHILD_SHOT_PAGE=<tag> picks the page, so
+        // App Store captures need no touch injection. Defaults to the loop.
+        .onAppear {
+          if let p = ProcessInfo.processInfo.environment["SHOT_PAGE"], let n = Int(p) {
+            page = n
+          } else {
+            page = -1
+          }
+        }
       #endif
       // The dots cost a strip of height the 40mm cannot spare: with them the
       // logging page is budgeted 131pt for a stack that needs more, and the
