@@ -174,7 +174,7 @@ struct UndoLastSetIntent: AppIntent {
 
 struct EndWorkoutIntent: AppIntent {
   static var title: LocalizedStringResource = "End my workout"
-  static var description = IntentDescription("Finishes the workout and saves it to your iPhone.")
+  static var description = IntentDescription("Finishes the workout and saves it to your history.")
   static var openAppWhenRun = false
 
   @MainActor
