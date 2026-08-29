@@ -440,8 +440,8 @@ test("RC6.1 — local mode accepts the committed version with the committed slug
   assert.equal(app.android.package, "com.mazidigroup.apexai");
   assert.equal(app.scheme, "apexai");
   assert.equal(app.name, "Muscle Map");
-  assert.equal(app.ios.buildNumber, "5");
-  assert.equal(app.android.versionCode, 5);
+  assert.equal(app.ios.buildNumber, "142");
+  assert.equal(app.android.versionCode, 142);
   assert.equal(app.updates, undefined, "no Expo Updates configuration");
 
   const dir = makeArchive();

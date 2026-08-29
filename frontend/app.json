@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mazidigroup.apexai",
-      "buildNumber": "5",
+      "buildNumber": "142",
       "usesAppleSignIn": true,
       "config": {
         "usesNonExemptEncryption": false
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.mazidigroup.apexai",
-      "versionCode": 5,
+      "versionCode": 142,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
