@@ -32,6 +32,12 @@ const WATCHOS_DEPLOYMENT_TARGET = "10.0";
 const SWIFT_VERSION = "5.0";
 
 /** Files copied verbatim into the generated target directory. */
+/** Bundled flipbook frames for the form-preview page (folder reference). */
+const FRAMES_DIR = "OHPFrames";
+
+/** Asset catalog holding the watch AppIcon — ASC rejects an iconless watch app (90713). */
+const ASSETS_DIR = "Assets.xcassets";
+
 const SWIFT_SOURCES = [
   "Model.swift",
   "Rules.swift",
@@ -79,6 +85,36 @@ function withWatchSources(config) {
         throw new Error(`[withWatchTarget] ${SOURCE_DIR}/Info.plist is missing.`);
       }
       fs.copyFileSync(plist, path.join(to, `${TARGET_NAME}-Info.plist`));
+
+      // The bundled frame pack. Prebuild --clean rebuilds ios/ from nothing,
+      // and a build without these ships green with a dead preview page — the
+      // same silent-omission class as losing the watch target itself.
+      const framesFrom = path.join(from, FRAMES_DIR);
+      if (!fs.existsSync(framesFrom)) {
+        throw new Error(`[withWatchTarget] ${SOURCE_DIR}/${FRAMES_DIR} is missing.`);
+      }
+      const framesTo = path.join(to, FRAMES_DIR);
+      fs.rmSync(framesTo, { recursive: true, force: true });
+      fs.mkdirSync(framesTo, { recursive: true });
+      let frameCount = 0;
+      for (const f of fs.readdirSync(framesFrom)) {
+        if (!/\.jpg$/.test(f)) continue;
+        fs.copyFileSync(path.join(framesFrom, f), path.join(framesTo, f));
+        frameCount++;
+      }
+      if (frameCount === 0) {
+        throw new Error(`[withWatchTarget] ${SOURCE_DIR}/${FRAMES_DIR} holds no frames.`);
+      }
+
+      // The icon catalog. App Store Connect refuses a watch app without
+      // CFBundleIconName + a compiled AppIcon (ITMS-90713).
+      const assetsFrom = path.join(from, ASSETS_DIR);
+      if (!fs.existsSync(path.join(assetsFrom, "AppIcon.appiconset", "AppIcon.png"))) {
+        throw new Error(`[withWatchTarget] ${SOURCE_DIR}/${ASSETS_DIR} is missing its AppIcon.`);
+      }
+      const assetsTo = path.join(to, ASSETS_DIR);
+      fs.rmSync(assetsTo, { recursive: true, force: true });
+      fs.cpSync(assetsFrom, assetsTo, { recursive: true });
 
       return config;
     },
@@ -149,7 +185,11 @@ function applyBuildSettings(project, targetUuid, { bundleId, marketingVersion, b
     settings.SWIFT_EMIT_LOC_STRINGS = "YES";
     settings.CLANG_ENABLE_MODULES = "YES";
     settings.ALWAYS_SEARCH_USER_PATHS = "NO";
-    settings.SKIP_INSTALL = "NO";
+    // YES: the watch app reaches the IPA through the Embed Watch Content
+    // phase. NO installs a second copy at the archive's top level, which
+    // demotes it to a "Generic Xcode Archive" that exportArchive refuses.
+    settings.SKIP_INSTALL = "YES";
+    settings.ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon";
     settings.CURRENT_PROJECT_VERSION = `"${buildNumber}"`;
     settings.MARKETING_VERSION = `"${marketingVersion}"`;
     settings.LD_RUNPATH_SEARCH_PATHS = '"$(inherited) @executable_path/Frameworks"';
@@ -230,6 +270,53 @@ function withWatchXcodeTarget(config) {
     for (const file of SWIFT_SOURCES) {
       project.addSourceFile(file, { target: target.uuid }, group.uuid);
     }
+
+    // The frame pack rides as a BLUE FOLDER reference: one entry that copies
+    // the whole directory into the bundle, so frames can be regenerated
+    // without touching the project again. `xcode` has no folder-reference
+    // helper, so the objects are written directly — a file reference of type
+    // folder, hung on the watch group, named in the watch Resources phase.
+    const folderRefUuid = project.generateUuid();
+    project.hash.project.objects.PBXFileReference[folderRefUuid] = {
+      isa: "PBXFileReference",
+      lastKnownFileType: "folder",
+      path: FRAMES_DIR,
+      sourceTree: '"<group>"',
+    };
+    project.hash.project.objects.PBXFileReference[`${folderRefUuid}_comment`] = FRAMES_DIR;
+    project.addToPbxGroup({ fileRef: folderRefUuid, basename: FRAMES_DIR }, group.uuid);
+    const buildFileUuid = project.generateUuid();
+    project.hash.project.objects.PBXBuildFile[buildFileUuid] = {
+      isa: "PBXBuildFile",
+      fileRef: folderRefUuid,
+      fileRef_comment: FRAMES_DIR,
+    };
+    project.hash.project.objects.PBXBuildFile[`${buildFileUuid}_comment`] = `${FRAMES_DIR} in Resources`;
+    const resourcesPhase = project.buildPhaseObject("PBXResourcesBuildPhase", "Resources", target.uuid);
+    if (!resourcesPhase) {
+      throw new Error("[withWatchTarget] the watch Resources phase is missing; frames cannot be bundled.");
+    }
+    resourcesPhase.files.push({ value: buildFileUuid, comment: `${FRAMES_DIR} in Resources` });
+
+    // The icon catalog goes through actool, so it is a real asset-catalog
+    // reference rather than a plain folder like the frames.
+    const assetsRefUuid = project.generateUuid();
+    project.hash.project.objects.PBXFileReference[assetsRefUuid] = {
+      isa: "PBXFileReference",
+      lastKnownFileType: "folder.assetcatalog",
+      path: ASSETS_DIR,
+      sourceTree: '"<group>"',
+    };
+    project.hash.project.objects.PBXFileReference[`${assetsRefUuid}_comment`] = ASSETS_DIR;
+    project.addToPbxGroup({ fileRef: assetsRefUuid, basename: ASSETS_DIR }, group.uuid);
+    const assetsBuildUuid = project.generateUuid();
+    project.hash.project.objects.PBXBuildFile[assetsBuildUuid] = {
+      isa: "PBXBuildFile",
+      fileRef: assetsRefUuid,
+      fileRef_comment: ASSETS_DIR,
+    };
+    project.hash.project.objects.PBXBuildFile[`${assetsBuildUuid}_comment`] = `${ASSETS_DIR} in Resources`;
+    resourcesPhase.files.push({ value: assetsBuildUuid, comment: `${ASSETS_DIR} in Resources` });
 
     // The dependency is what orders the watch build before the embed phase, so
     // assert it rather than trusting a call that is documented to fail quietly.
