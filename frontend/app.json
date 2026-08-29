@@ -60,6 +60,22 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "MuscleMapWatch",
+                  "bundleIdentifier": "com.mazidigroup.apexai.watchkitapp"
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   }
 }

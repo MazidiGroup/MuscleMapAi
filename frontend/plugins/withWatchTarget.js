@@ -267,7 +267,38 @@ function withSiriUsage(config) {
   return config;
 }
 
+/**
+ * EAS resolves signing credentials from the app config BEFORE prebuild runs, and
+ * it only knows about targets declared here — an undeclared watch app gets no
+ * provisioning profile and the archive fails with "requires a development team".
+ *
+ * This is set from the plugin rather than left in app.json alone because the
+ * Emergent publish wrapper rewrites app.json and replaces `extra.eas` with a bare
+ * `{ projectId }`, which would silently drop a static declaration. Merging here
+ * runs after that rewrite. The app.json entry is kept too, so a plain
+ * `expo prebuild` outside the managed pipeline behaves identically.
+ */
+function withEasAppExtension(config) {
+  const appBundleId = config.ios?.bundleIdentifier;
+  if (!appBundleId) return config;
+
+  const extra = (config.extra = config.extra || {});
+  const eas = (extra.eas = extra.eas || {});
+  const build = (eas.build = eas.build || {});
+  const experimental = (build.experimental = build.experimental || {});
+  const ios = (experimental.ios = experimental.ios || {});
+  const extensions = (ios.appExtensions = ios.appExtensions || []);
+
+  if (!extensions.some((entry) => entry?.targetName === TARGET_NAME)) {
+    extensions.push({
+      targetName: TARGET_NAME,
+      bundleIdentifier: `${appBundleId}.watchkitapp`,
+    });
+  }
+  return config;
+}
 module.exports = function withWatchTarget(config) {
+  config = withEasAppExtension(config);
   config = withSiriUsage(config);
   config = withWatchSources(config);
   config = withWatchXcodeTarget(config);
