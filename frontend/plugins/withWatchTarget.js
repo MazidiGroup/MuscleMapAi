@@ -96,7 +96,16 @@ function findExistingTarget(project) {
   return null;
 }
 
-function applyBuildSettings(project, targetUuid, { bundleId, marketingVersion, buildNumber }) {
+/**
+ * The Apple Team ID to sign the watch target with.
+ *
+ * Prebuild runs BEFORE EAS assigns credentials, so the team cannot be read back
+ * off the project — it has to be supplied. Set APPLE_TEAM_ID in the build
+ * environment to override.
+ */
+const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || "JWAX6S948T";
+
+function applyBuildSettings(project, targetUuid, { bundleId, marketingVersion, buildNumber, appleTeamId }) {
   const configurations = project.pbxXCBuildConfigurationSection();
   const target = project.pbxNativeTargetSection()[targetUuid];
   const listUuid = target.buildConfigurationList;
@@ -119,6 +128,22 @@ function applyBuildSettings(project, targetUuid, { bundleId, marketingVersion, b
     // The plist is checked in and complete; letting Xcode synthesise one would
     // drop WKCompanionAppBundleIdentifier and unpair the app from the phone.
     settings.GENERATE_INFOPLIST_FILE = "NO";
+
+    // SIGNING. EAS assigns a provisioning profile to the MAIN target only — it
+    // has no idea a second bundle id exists — so without a team here the archive
+    // stops at "Signing for MuscleMapWatch requires a development team". EAS
+    // surfaces that as "resource bundles are signed by default, downgrade Xcode
+    // or upgrade to SDK 46", which is a generic pattern-match on the wording and
+    // is entirely misleading; the real line sits one level deeper in the Xcode
+    // log. Setting the team is NECESSARY BUT NOT SUFFICIENT — an App Store
+    // archive also needs its own provisioning profile for the watch bundle id.
+    //
+    // The team is read from the environment so it is never pinned to one
+    // account, with the shipping team as the fallback. An Apple Team ID is not a
+    // secret: it appears in every provisioning profile and inside every IPA.
+    if (appleTeamId) {
+      settings.DEVELOPMENT_TEAM = appleTeamId;
+    }
 
     settings.SWIFT_VERSION = SWIFT_VERSION;
     settings.SWIFT_EMIT_LOC_STRINGS = "YES";
@@ -221,6 +246,7 @@ function withWatchXcodeTarget(config) {
       bundleId,
       marketingVersion: config.version || "1.0.0",
       buildNumber: config.ios?.buildNumber || "1",
+      appleTeamId: APPLE_TEAM_ID,
     });
 
     return config;
@@ -254,3 +280,4 @@ module.exports.TARGET_NAME = TARGET_NAME;
 module.exports.SWIFT_SOURCES = SWIFT_SOURCES;
 module.exports.WATCHOS_DEPLOYMENT_TARGET = WATCHOS_DEPLOYMENT_TARGET;
 module.exports.SOURCE_DIR = SOURCE_DIR;
+module.exports.APPLE_TEAM_ID = APPLE_TEAM_ID;
