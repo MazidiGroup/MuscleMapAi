@@ -217,15 +217,39 @@ enum FramePackCache {
 
   private static func dir(_ id: String) -> URL { root.appendingPathComponent(id, isDirectory: true) }
 
-  /// Downloads what is missing and returns the pack. Frames already on disk are
-  /// never re-fetched, so a second visit to an exercise is offline-fast.
-  static func load(id: String, base: String) async -> (Meta, [UIImage])? {
+  /// Packs shipped inside the app (targets/watch/BundledFramePacks, copied by
+  /// the config plugin). Same NN.jpg + pack.json layout as the server, read in
+  /// place — never copied into Caches.
+  private static func bundled(_ id: String) -> URL? {
+    guard let res = Bundle.main.resourceURL else { return nil }
+    let d = res.appendingPathComponent("BundledFramePacks/\(id)", isDirectory: true)
+    return FileManager.default.fileExists(atPath: d.appendingPathComponent("pack.json").path) ? d : nil
+  }
+
+  /// How many frames fetch at once. The watch often proxies HTTP through the
+  /// phone over Bluetooth, where per-request latency, not bandwidth, dominates
+  /// — serial fetching of a 48-frame pack took tens of seconds.
+  private static let fetchWidth = 6
+
+  /// Resolves the pack, cheapest source first per file: Caches, then the app
+  /// bundle, then the network (missing frames download `fetchWidth` at a time
+  /// and are cached, so a second visit is offline-fast). `onPoster` fires as
+  /// soon as frame 0 is decoded so the page can show something immediately.
+  static func load(
+    id: String, base: String,
+    onPoster: @MainActor @escaping (Meta, UIImage) -> Void
+  ) async -> (Meta, [UIImage])? {
     let folder = dir(id)
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let metaURL = folder.appendingPathComponent("pack.json")
+    let bundleDir = bundled(id)
 
     var meta: Meta?
     if let d = try? Data(contentsOf: metaURL) { meta = try? JSONDecoder().decode(Meta.self, from: d) }
+    if meta == nil, let bundleDir,
+      let d = try? Data(contentsOf: bundleDir.appendingPathComponent("pack.json")) {
+      meta = try? JSONDecoder().decode(Meta.self, from: d)
+    }
     if meta == nil {
       guard let url = URL(string: "\(base)/\(id)/pack.json"),
         let (d, resp) = try? await URLSession.shared.data(from: url),
@@ -237,24 +261,50 @@ enum FramePackCache {
     }
     guard let m = meta, m.frames > 0, m.loopSeconds > 0 else { return nil }
 
-    var images: [UIImage] = []
-    images.reserveCapacity(m.frames)
-    for i in 0..<m.frames {
+    func frame(_ i: Int) async -> UIImage? {
       let name = String(format: "%02d.jpg", i)
-      let fileURL = folder.appendingPathComponent(name)
-      var bytes = try? Data(contentsOf: fileURL)
+      var bytes = try? Data(contentsOf: folder.appendingPathComponent(name))
+      if bytes == nil, let bundleDir {
+        bytes = try? Data(contentsOf: bundleDir.appendingPathComponent(name))
+      }
       if bytes == nil {
         guard let url = URL(string: "\(base)/\(id)/\(name)"),
           let (d, resp) = try? await URLSession.shared.data(from: url),
           (resp as? HTTPURLResponse)?.statusCode == 200
         else { return nil }
-        try? d.write(to: fileURL)
+        try? d.write(to: folder.appendingPathComponent(name))
         bytes = d
       }
-      guard let data = bytes, let img = decode(data) else { return nil }
-      images.append(img)
+      guard let data = bytes else { return nil }
+      return decode(data)
     }
-    return (m, images)
+
+    guard let first = await frame(0) else { return nil }
+    await onPoster(m, first)
+
+    var images = [UIImage?](repeating: nil, count: m.frames)
+    images[0] = first
+    let ok = await withTaskGroup(of: (Int, UIImage?).self, returning: Bool.self) { group in
+      var next = 1
+      func addNext() {
+        guard next < m.frames else { return }
+        let i = next
+        next += 1
+        group.addTask { (i, await frame(i)) }
+      }
+      for _ in 0..<fetchWidth { addNext() }
+      while let (i, img) = await group.next() {
+        guard let img else {
+          group.cancelAll()
+          return false
+        }
+        images[i] = img
+        addNext()
+      }
+      return true
+    }
+    guard ok else { return nil }
+    return (m, images.compactMap { $0 })
   }
 
   /// Forces the bitmap now. JPEG data decodes lazily on first draw otherwise,
@@ -292,7 +342,15 @@ final class FlipbookStore: ObservableObject {
     let t0 = Date()
     FlipbookMetrics.log(String(format: "%@: memory before decode %.1f MB", id, FlipbookMetrics.footprintMB()))
     task = Task { [weak self] in
-      let pack = await FramePackCache.load(id: id, base: base)
+      let pack = await FramePackCache.load(id: id, base: base) { meta, poster in
+        // Frame 0 as a static poster the moment it exists — the page stops
+        // being black while the rest of the pack streams in.
+        guard let self, self.loadedId == id, self.frames.isEmpty else { return }
+        self.frames = [poster]
+        self.loopSeconds = meta.loopSeconds
+        FlipbookMetrics.log(String(
+          format: "%@: poster in %.0f ms", id, Date().timeIntervalSince(t0) * 1000))
+      }
       guard !Task.isCancelled else { return }
       await MainActor.run {
         guard let self, self.loadedId == id else { return }

@@ -10,6 +10,7 @@ import {
   View,
   StyleSheet,
   PanResponder,
+  InteractionManager,
   ActivityIndicator,
   Text,
   LayoutChangeEvent,
@@ -19,6 +20,7 @@ import { GLView } from "expo-gl";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Asset } from "expo-asset";
+import { File } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { AnatomyEngine } from "./engine";
@@ -68,8 +70,21 @@ async function getModelBuffer(): Promise<ArrayBuffer> {
         const res = await fetch(uri);
         if (res.ok) buf = await res.arrayBuffer();
       } else {
-        const b64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
-        buf = base64ToArrayBuffer(b64);
+        // Native byte read (SDK 52+ File API). The legacy path base64-encodes
+        // 3.6 MB and decodes it with a JS character loop — measured in the
+        // hundreds of ms on the JS thread, right when a screen is opening.
+        try {
+          const bytes = await new File(uri).bytes();
+          if (bytes.byteLength > 0) {
+            buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+          }
+        } catch {
+          // fall through to the legacy base64 path
+        }
+        if (!buf) {
+          const b64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+          buf = base64ToArrayBuffer(b64);
+        }
       }
       if (buf && buf.byteLength > 0) {
         return buf;
@@ -156,6 +171,10 @@ export const AnatomyViewer = forwardRef<ViewerHandle, Props>(function AnatomyVie
     if (!engine) return;
     setError(null);
     try {
+      // Let any in-flight navigation transition finish first: the clone below
+      // and `setModel`'s per-mesh material pass are synchronous JS-thread work
+      // that would otherwise land mid-animation and stutter the push.
+      await new Promise<void>((resolve) => InteractionManager.runAfterInteractions(() => resolve()));
       // Parsed once per session; this viewer gets its own clone of the node graph.
       const root = await getAnatomyModel(getModelBuffer);
       engine.setModel(root);

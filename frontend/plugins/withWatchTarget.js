@@ -32,8 +32,12 @@ const WATCHOS_DEPLOYMENT_TARGET = "10.0";
 const SWIFT_VERSION = "5.0";
 
 /** Files copied verbatim into the generated target directory. */
-/** Bundled flipbook frames for the form-preview page (folder reference). */
-const FRAMES_DIR = "OHPFrames";
+/**
+ * Bundled flipbook packs for the form-preview page (folder reference). One
+ * subdirectory per exercise id, laid out exactly like the server/cache pack
+ * (NN.jpg + pack.json) so the loader can seed from it without translation.
+ */
+const FRAMES_DIR = "BundledFramePacks";
 
 /** Asset catalog holding the watch AppIcon — ASC rejects an iconless watch app (90713). */
 const ASSETS_DIR = "Assets.xcassets";
@@ -93,18 +97,18 @@ function withWatchSources(config) {
       if (!fs.existsSync(framesFrom)) {
         throw new Error(`[withWatchTarget] ${SOURCE_DIR}/${FRAMES_DIR} is missing.`);
       }
+      const packs = fs
+        .readdirSync(framesFrom)
+        .filter((d) =>
+          fs.existsSync(path.join(framesFrom, d, "pack.json")) &&
+          fs.existsSync(path.join(framesFrom, d, "00.jpg")),
+        );
+      if (packs.length === 0) {
+        throw new Error(`[withWatchTarget] ${SOURCE_DIR}/${FRAMES_DIR} holds no complete pack.`);
+      }
       const framesTo = path.join(to, FRAMES_DIR);
       fs.rmSync(framesTo, { recursive: true, force: true });
-      fs.mkdirSync(framesTo, { recursive: true });
-      let frameCount = 0;
-      for (const f of fs.readdirSync(framesFrom)) {
-        if (!/\.jpg$/.test(f)) continue;
-        fs.copyFileSync(path.join(framesFrom, f), path.join(framesTo, f));
-        frameCount++;
-      }
-      if (frameCount === 0) {
-        throw new Error(`[withWatchTarget] ${SOURCE_DIR}/${FRAMES_DIR} holds no frames.`);
-      }
+      fs.cpSync(framesFrom, framesTo, { recursive: true });
 
       // The icon catalog. App Store Connect refuses a watch app without
       // CFBundleIconName + a compiled AppIcon (ITMS-90713).
