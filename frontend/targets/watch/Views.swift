@@ -185,27 +185,6 @@ struct ActiveWorkoutView: View {
 
 // MARK: page 0 — form preview (prototype, one exercise)
 
-/// Development instrumentation for the flipbook. Off in a shipping build.
-enum FlipbookMetrics {
-  static let enabled = true
-
-  static func footprintMB() -> Double {
-    var info = task_vm_info_data_t()
-    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-    let kr = withUnsafeMutablePointer(to: &info) {
-      $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-        task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
-      }
-    }
-    guard kr == KERN_SUCCESS else { return -1 }
-    return Double(info.phys_footprint) / 1_048_576
-  }
-
-  static func log(_ line: String) {
-    if enabled { NSLog("[FLIPBOOK] %@", line) }
-  }
-}
-
 /// On-disk frame-pack cache.
 ///
 /// Bundling every exercise would put ~80 MB of JPEG inside the watch app, so
@@ -347,8 +326,6 @@ final class FlipbookStore: ObservableObject {
     loadedId = id
     frames = []
     failed = false
-    let t0 = Date()
-    FlipbookMetrics.log(String(format: "%@: memory before decode %.1f MB", id, FlipbookMetrics.footprintMB()))
     task = Task { [weak self] in
       let pack = await FramePackCache.load(id: id, base: base) { meta, poster in
         // Frame 0 as a static poster the moment it exists — the page stops
@@ -356,8 +333,6 @@ final class FlipbookStore: ObservableObject {
         guard let self, self.loadedId == id, self.frames.isEmpty else { return }
         self.frames = [poster]
         self.loopSeconds = meta.loopSeconds
-        FlipbookMetrics.log(String(
-          format: "%@: poster in %.0f ms", id, Date().timeIntervalSince(t0) * 1000))
       }
       guard !Task.isCancelled else { return }
       await MainActor.run {
@@ -365,13 +340,8 @@ final class FlipbookStore: ObservableObject {
         if let (meta, images) = pack {
           self.frames = images
           self.loopSeconds = meta.loopSeconds
-          FlipbookMetrics.log(String(
-            format: "%@: %d frames, %.2fs loop, ready in %.0f ms, memory %.1f MB",
-            id, images.count, meta.loopSeconds, Date().timeIntervalSince(t0) * 1000,
-            FlipbookMetrics.footprintMB()))
         } else {
           self.failed = true
-          FlipbookMetrics.log("\(id): no pack available")
         }
       }
     }
@@ -382,7 +352,6 @@ final class FlipbookStore: ObservableObject {
     task = nil
     frames = []
     loadedId = nil
-    FlipbookMetrics.log(String(format: "released; memory %.1f MB", FlipbookMetrics.footprintMB()))
   }
 }
 
@@ -394,11 +363,6 @@ struct FormPreviewPage: View {
   @StateObject private var store = FlipbookStore()
   @Environment(\.scenePhase) private var scenePhase
   @State private var start: Date?
-  @State private var lastChange: Date?
-  @State private var lastIndex = -1
-  @State private var worstGapMs: Double = 0
-  @State private var skipped = 0
-  @State private var presented = 0
 
   var body: some View {
     GeometryReader { geo in
@@ -415,7 +379,6 @@ struct FormPreviewPage: View {
           ctx.draw(
             Image(uiImage: img),
             in: CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h))
-          recordPacing(index: i, at: context.date, count: frames.count)
         }
         .frame(width: geo.size.width, height: geo.size.height)
       }
@@ -423,25 +386,16 @@ struct FormPreviewPage: View {
     .ignoresSafeArea()
     .background(Color.black)
     .onAppear {
-      resetPacing()
+      start = nil
       store.load(id: exerciseId, base: mediaBase)
     }
     .onChange(of: exerciseId) { _, id in
-      resetPacing()
+      start = nil
       store.load(id: id, base: mediaBase)
     }
     .onDisappear { store.release() }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text("Exercise form preview animation"))
-  }
-
-  private func resetPacing() {
-    start = nil
-    lastChange = nil
-    lastIndex = -1
-    worstGapMs = 0
-    skipped = 0
-    presented = 0
   }
 
   /// Elapsed-time driven: a delayed callback lands on the CORRECT frame, so
@@ -452,29 +406,6 @@ struct FormPreviewPage: View {
     let loop = store.loopSeconds
     let progress = date.timeIntervalSince(t0).truncatingRemainder(dividingBy: loop) / loop
     return min(count - 1, max(0, Int(progress * Double(count)) % count))
-  }
-
-  private func recordPacing(index: Int, at date: Date, count: Int) {
-    guard FlipbookMetrics.enabled, index != lastIndex else { return }
-    if let last = lastChange {
-      let gap = date.timeIntervalSince(last) * 1000
-      worstGapMs = max(worstGapMs, gap)
-      let jump = (index - lastIndex + count) % count
-      if jump > 1 { skipped += jump - 1 }
-    }
-    presented += 1
-    lastChange = date
-    let wasLast = lastIndex
-    lastIndex = index
-    if index < wasLast {
-      FlipbookMetrics.log(String(
-        format: "loop: presented %d, skipped %d, worst gap %.0f ms (intended %.0f ms), memory %.1f MB",
-        presented, skipped, worstGapMs, store.loopSeconds / Double(count) * 1000,
-        FlipbookMetrics.footprintMB()))
-      presented = 0
-      skipped = 0
-      worstGapMs = 0
-    }
   }
 }
 
