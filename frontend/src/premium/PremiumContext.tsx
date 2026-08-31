@@ -88,6 +88,27 @@ const PACKAGE_LABELS: Record<string, string> = {
   SIX_MONTH: "6 months",
 };
 
+/**
+ * Rejects if the store SDK does not answer in time. A hung StoreKit call
+ * otherwise leaves its caller pending forever, which the UI cannot tell apart
+ * from "still loading" — see the offerings watchdog below.
+ */
+function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    work.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
 function mapPackage(p: any): PremiumPackage {
   const type = p?.packageType ?? "CUSTOM";
   return {
@@ -120,6 +141,17 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [rcState]);
 
+  // The same contract for the OFFERINGS read, which had no watchdog of its own.
+  // App Review's 2.1(b) screenshot was exactly this failure: placeholder rows
+  // where the plans belong, forever, with no retry affordance — the promise had
+  // never settled, so the paywall was still in "loading" rather than "error".
+  // Failing over to "error" is what surfaces the retry panel.
+  useEffect(() => {
+    if (offeringState !== "loading") return;
+    const t = setTimeout(() => setOfferingState((s) => (s === "loading" ? "error" : s)), 12000);
+    return () => clearTimeout(t);
+  }, [offeringState]);
+
   const resolution = resolvePremium({
     user,
     designatedEntitlementActive: rcActive,
@@ -135,7 +167,7 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
     try {
-      const info = await Purchases.getCustomerInfo();
+      const info = await withTimeout(Purchases.getCustomerInfo(), 8000, "getCustomerInfo");
       const active = hasDesignatedEntitlement(info);
       setRcActive(active);
       setRcState("ready");
@@ -166,7 +198,15 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     }
     setOfferingState("loading");
     try {
-      const offerings = await Purchases.getOfferings();
+      // One silent retry: a first-call failure in a cold sandbox is common, and
+      // a reviewer who sees an error panel does not necessarily tap "Try again".
+      let offerings: any;
+      try {
+        offerings = await withTimeout(Purchases.getOfferings(), 10000, "getOfferings");
+      } catch {
+        await new Promise((r) => setTimeout(r, 1500));
+        offerings = await withTimeout(Purchases.getOfferings(), 10000, "getOfferings (retry)");
+      }
       const available = offerings?.current?.availablePackages ?? [];
       const mapped: PremiumPackage[] = available.map(mapPackage);
       setPackages(mapped);
@@ -207,9 +247,12 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
         setRcState("ready");
       }
     };
+    // Concurrent, not sequential: the offerings read used to wait on the
+    // entitlement read, so a hung getCustomerInfo left the paywall on skeletons
+    // having never even asked for the products. Neither read depends on the
+    // other's result.
     (async () => {
-      await readEntitlement();
-      if (mounted) refreshOfferings();
+      await Promise.allSettled([readEntitlement(), mounted ? refreshOfferings() : undefined]);
     })();
     Purchases.addCustomerInfoUpdateListener(apply);
     return () => {
