@@ -219,7 +219,16 @@ test("the locked value path announces once and does not block free navigation", 
 
 test("no EAS project linkage, update channel or OTA configuration was introduced", () => {
   const app = JSON.parse(read("app.json"));
-  assert.equal(app.expo?.extra?.eas?.projectId, undefined, "no EAS project id");
+  // The project id IS committed now. It used to be absent because the Emergent
+  // wrapper injected its own at upload time; builds run under our own EAS
+  // project since Apple began refusing binaries built on this machine's beta
+  // macOS (ITMS-90111). Pinning it here keeps the point of the original
+  // assertion — the build cannot be silently redirected at another project.
+  assert.equal(
+    app.expo?.extra?.eas?.projectId,
+    "7f9b67dd-01d1-41ed-a962-1cdfad0f5f32",
+    "the approved EAS project id",
+  );
   assert.equal(app.expo?.updates, undefined, "no updates block");
   const eas = JSON.parse(read("eas.json"));
   for (const profile of Object.values(eas.build ?? {}) as any[]) {

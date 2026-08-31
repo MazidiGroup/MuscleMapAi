@@ -16,6 +16,9 @@
       "usesAppleSignIn": true,
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSSiriUsageDescription": "Muscle Map uses Siri so you can log a set by saying how many reps you did, without touching your phone."
       }
     },
     "android": {
@@ -72,12 +75,19 @@
                 {
                   "targetName": "MuscleMapWatch",
                   "bundleIdentifier": "com.mazidigroup.apexai.watchkitapp"
+                },
+                {
+                  "targetName": "MuscleMapWatch",
+                  "bundleIdentifier": "com.mazidigroup.apexai.watchkitapp"
                 }
               ]
             }
           }
-        }
-      }
-    }
+        },
+        "projectId": "7f9b67dd-01d1-41ed-a962-1cdfad0f5f32"
+      },
+      "router": {}
+    },
+    "owner": "mazidi-group"
   }
 }

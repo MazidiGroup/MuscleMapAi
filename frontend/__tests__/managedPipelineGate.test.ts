@@ -25,7 +25,7 @@ const COPY_DIRS = ["app", "src", "scripts"];
 const MANAGED_BACKEND_URL = "https://ai-coach-trainer-2.emergent.host";
 // Validator-only stand-in: shape is checked, ownership is a manual production check.
 const MANAGED_SDK_KEY = "appl_ManagedPipelineShapeOnlyKey00";
-const EXPECTED_PROJECT_ID = "7f544570-f0e2-45ce-bc88-97a50226e5cb";
+const EXPECTED_PROJECT_ID = "7f9b67dd-01d1-41ed-a962-1cdfad0f5f32";
 
 function makeArchive(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rc5-managed-"));
@@ -124,7 +124,7 @@ test("1/6/7/10 — a pipeline-shaped Gitless archive passes on .env-supplied val
   assert.equal(res.status, 0, res.all);
   assert.match(res.stdout, /EAS cloud pre-install mode/);
   assert.match(res.stdout, /source fingerprint matches \(21 files\)/);
-  assert.match(res.stdout, /app\.json: EAS project id matches \(7f544570-f0e2-45ce-bc88-97a50226e5cb\)/);
+  assert.match(res.stdout, /app\.json: EAS project id matches \(7f9b67dd-01d1-41ed-a962-1cdfad0f5f32\)/);
   assert.match(res.stdout, /eas\.json: valid JSON, no update channel, no conflicting identity/);
   assert.match(res.stdout, /EXPO_PUBLIC_BACKEND_URL present \(\.env\), absolute HTTPS, host ai-\*\*\*\.emergent\.host/);
   assert.match(res.stdout, /EXPO_PUBLIC_REVENUECAT_IOS_KEY present \(\.env\), shape accepted/);

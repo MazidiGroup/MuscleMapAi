@@ -118,7 +118,7 @@ const EXPECTED_SLUG = "apex-ai";
  */
 const MANAGED_CLOUD_SLUG = "ai-coach-trainer-2";
 const EXPECTED_VERSION = "1.3.0";
-const EXPECTED_PROJECT_ID = "7f544570-f0e2-45ce-bc88-97a50226e5cb";
+const EXPECTED_PROJECT_ID = "7f9b67dd-01d1-41ed-a962-1cdfad0f5f32";
 const LEGACY_IDENTITY_MARKERS = ["frontend", "muscle-map-ai", "musclemapai", "expo-template", "my-app"];
 
 const REQUIRED_MARKERS = [
