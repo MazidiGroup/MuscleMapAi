@@ -57,7 +57,8 @@
         }
       ],
       "expo-video",
-      "./plugins/withWatchTarget"
+      "./plugins/withWatchTarget",
+      "./plugins/withPodDeploymentFloor"
     ],
     "experiments": {
       "typedRoutes": true
