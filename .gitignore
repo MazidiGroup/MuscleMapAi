@@ -91,3 +91,4 @@ test_reports/
 credentials.json
 *.key
 .credentials
+AuthKey_*.p8
