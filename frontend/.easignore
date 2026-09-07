@@ -21,3 +21,15 @@ web-build
 .expo
 .next
 test_reports
+
+# EAS uses this file INSTEAD of .gitignore when it exists, so the generated
+# native projects have to be excluded here too: prebuild regenerates them on
+# the builder, and shipping ios/ (Pods + build) made every upload ~1.1 GB.
+ios/
+android/
+**/build/
+.expo/
+*.ipa
+*.xcarchive
+appstore-shots/
+__tests__/fixtures/
