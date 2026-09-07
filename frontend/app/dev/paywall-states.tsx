@@ -27,8 +27,8 @@ import { useSemanticTokens } from "@/src/theme/semantic";
 /**
  * Route entry point. `__DEV__` is a build-time constant, so in a production build
  * this returns before any fixture state or fixture JSX exists. "/" is the app's
- * index route, which redirects to the free Plan tab — no account, no Premium and
- * no onboarding is required, and it can never redirect back here.
+ * index route, which redirects to the Plan tab (onboarding, then the Premium
+ * wall) — it can never redirect back here.
  */
 export default function PaywallStatesRoute() {
   if (!__DEV__) {

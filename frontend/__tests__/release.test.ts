@@ -83,8 +83,8 @@ test("there is exactly one Premium provider, one gate and one resolver", () => {
   // provider, no gate and no resolver — it reads the single context like any
   // other consumer.
   assert.deepEqual(files, ["Paywall.tsx", "PremiumContext.tsx", "PremiumDiscovery.tsx", "PremiumGate.tsx", "entitlement.ts", "freeLimits.ts"]);
-  // freeLimits holds the free-tier caps as plain numbers and pure functions. It
-  // must never gate: a cap keeps a surface free and reachable, and only a
+  // freeLimits holds the (now disabled) caps as plain numbers and pure functions. It
+  // must never gate: a cap keeps a surface reachable, and only a
   // Premium surface may be locked.
   // Comments are stripped first: this asserts what the module DOES, not what it
   // explains about itself.
@@ -108,14 +108,29 @@ test("Premium screens gate through PremiumGate and never re-derive entitlement",
   }
 });
 
-test("no Free surface is gated anywhere in the app tree", () => {
+test("the whole app sits behind one wall at the root, and no screen builds a second one", () => {
+  const layout = read("app/_layout.tsx");
+  assert.ok(layout.includes("AppPremiumWall"), "the root layout mounts the wall");
+  // The wall wraps the navigator itself, so every route — deep links included —
+  // is behind it by construction rather than by each screen remembering to gate.
+  assert.match(layout, /<AppPremiumWall>\s*<Stack/, "the wall wraps the Stack");
+  assert.ok(layout.indexOf("<OwnerGate>") < layout.indexOf("<AppPremiumWall>"), "the wall reads owner-scoped plan state");
+  const gate = read("src/premium/PremiumGate.tsx");
+  assert.ok(gate.includes("export function AppPremiumWall"), "the wall lives with the single gate");
+  assert.ok(gate.includes('PremiumGate surface="app"'), "the wall is the shared gate on the root surface");
+  assert.ok(/routeStep\(step, !!plan\) <= ONBOARDING_STEP_COUNT/.test(gate), "onboarding runs in front of the wall");
+  for (const open of ["login", "terms", "privacy"]) {
+    assert.ok(gate.includes(`"${open}"`), `${open} stays reachable without Premium`);
+  }
+  // Screens never build a wall of their own: one wall, or a deep link could
+  // meet two paywalls stacked on each other.
   const plan = read("app/(tabs)/plan.tsx");
   const workout = read("app/(tabs)/workout.tsx");
   const summary = read("app/summary.tsx");
   const detail = read("app/exercise/[id].tsx");
   for (const [name, src] of Object.entries({ plan, workout, summary, detail })) {
-    assert.ok(!src.includes("PremiumGate"), `${name} must stay free`);
-    assert.ok(!/Paywall/.test(src), `${name} must never present the paywall`);
+    assert.ok(!src.includes("PremiumGate"), `${name} relies on the root wall`);
+    assert.ok(!/Paywall/.test(src), `${name} never presents a paywall of its own`);
   }
 });
 
@@ -201,13 +216,13 @@ test("selection and lock states are never communicated by colour alone", () => {
     tabs.includes('tabBarAccessibilityLabel: tabName("Plan", "plan")') &&
       tabs.includes('tabBarAccessibilityLabel: tabName("Workout", "workout.session")') &&
       tabs.includes('tabBarAccessibilityLabel: tabName("Library", "library.exercises")'),
-    "the free tabs are named too",
+    "the other tabs are named too",
   );
   const library = read("app/(tabs)/library.tsx");
   assert.ok(library.includes("`${SEG_LABELS[s]}, Premium`"), "locked Library segments are named");
 });
 
-test("the locked value path announces once and does not block free navigation", () => {
+test("the locked value path announces once and does not block navigation", () => {
   const gateSrc = read("src/premium/PremiumGate.tsx");
   assert.ok(gateSrc.includes("StatusAnnouncement"), "loading is announced, not silent");
   assert.ok(gateSrc.includes('visible={false}'), "the announcement is not visually duplicated");
@@ -240,7 +255,7 @@ test("no EAS project linkage, update channel or OTA configuration was introduced
 
 test("app identifiers, version and build configuration are unchanged", () => {
   const app = JSON.parse(read("app.json"));
-  assert.equal(app.expo.version, "1.3.0");
+  assert.equal(app.expo.version, "1.4.0");
   assert.equal(app.expo.ios.bundleIdentifier, "com.mazidigroup.apexai");
   assert.equal(app.expo.android.package, "com.mazidigroup.apexai");
   const eas = JSON.parse(read("eas.json"));

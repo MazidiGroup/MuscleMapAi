@@ -9,6 +9,7 @@ import { enableScreens } from "react-native-screens";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { WorkoutProvider } from "@/src/anatomy/workoutStore";
 import { PremiumProvider } from "@/src/premium/PremiumContext";
+import { AppPremiumWall } from "@/src/premium/PremiumGate";
 import { WatchLink } from "@/src/watch/WatchLink";
 import { RootErrorBoundary } from "@/src/ui/RootErrorBoundary";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
@@ -47,10 +48,11 @@ if (Platform.OS === "ios") {
 }
 
 /**
- * Direction B is local-first: the free journey (Welcome → plan → workout) runs for
- * whoever is on this device, with no account and no server round-trip. So this gate
- * no longer forces anyone to /login — it only sends a signed-in account away from
- * the sign-in screen. Deep links resolve normally either way.
+ * Local-first: onboarding (Welcome → three questions → plan) runs for whoever is
+ * on this device, with no account and no server round-trip. So this gate never
+ * forces anyone to /login — it only sends a signed-in account away from the
+ * sign-in screen. Premium is a separate question, answered once by
+ * AppPremiumWall below. Deep links resolve normally either way.
  */
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -98,13 +100,17 @@ function ThemedStack() {
       <StatusBar barStyle={mode === "day" ? "dark-content" : "light-content"} backgroundColor={T.bg} />
       <AuthGate>
         <OwnerGate>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: T.bg },
-            animation: "fade",
-          }}
-        />
+          {/* The whole app is Premium. One wall, above every route, lifted only
+              for onboarding and the open routes it names. */}
+          <AppPremiumWall>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: T.bg },
+                animation: "fade",
+              }}
+            />
+          </AppPremiumWall>
         </OwnerGate>
       </AuthGate>
     </View>

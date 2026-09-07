@@ -97,8 +97,12 @@ export function resolvePremium(input: ResolveInput): PremiumResolution {
 // One gating contract for the whole app.
 // ---------------------------------------------------------------------------
 
-/** Every gateable surface in Direction B, named once. */
+/**
+ * Every gateable surface, named once. `app` is the root: the wall that stands
+ * between onboarding and everything else.
+ */
 export type Surface =
+  | "app"
   | "plan"
   | "workout.session"
   | "workout.history"
@@ -113,24 +117,15 @@ export type Surface =
   | "watch.session";
 
 /**
- * The Premium set: the four frozen Direction B surfaces, plus the Apple Watch
- * companion.
- *
- * The watch is listed here rather than gated separately so that Siri, Shortcuts,
- * a deep link and the watch's own controls all resolve through `gate()` like
- * every other surface. Note what did NOT change: `workout.session` is still
- * free. Logging a workout on the iPhone is free and stays free; the premium
- * thing is doing it from the wrist.
+ * The Premium set is the whole app. Muscle Map sells one thing: everything
+ * after onboarding, opened with a subscription that starts with a free trial
+ * (the trial itself is an App Store introductory offer; nothing here invents
+ * one). Every surface stays named so Siri, Shortcuts, deep links and the watch
+ * keep resolving through `gate()` exactly as before — the answer is simply
+ * "Premium" for all of them, and `app` is the one wall a person actually meets.
  */
 export const PREMIUM_SURFACES: Surface[] = [
-  "explore",
-  "coach",
-  "library.muscles",
-  "library.learn",
-  "watch.session",
-];
-
-export const FREE_SURFACES: Surface[] = [
+  "app",
   "plan",
   "workout.session",
   "workout.history",
@@ -138,7 +133,20 @@ export const FREE_SURFACES: Surface[] = [
   "library.exercises",
   "library.exerciseDetail",
   "library.account",
+  "explore",
+  "coach",
+  "library.muscles",
+  "library.learn",
+  "watch.session",
 ];
+
+/**
+ * Empty on purpose. Onboarding (Welcome, the three questions, the build) is
+ * not a surface — it runs before the wall and sells nothing — and account,
+ * legal and development routes are exempted by the wall itself, not by being
+ * "free". Kept as a list so a free tier can return by naming surfaces here.
+ */
+export const FREE_SURFACES: Surface[] = [];
 
 export function isPremiumSurface(surface: Surface): boolean {
   return PREMIUM_SURFACES.includes(surface);
@@ -156,30 +164,26 @@ export function gate(surface: Surface, resolution: PremiumResolution): GateDecis
 }
 
 // ---------------------------------------------------------------------------
-// Paywall value list — only the frozen Premium areas may appear.
+// Paywall value list — the whole app, because the whole app is what is sold.
 // ---------------------------------------------------------------------------
 
 export const PREMIUM_VALUE_ITEMS: { icon: string; label: string; desc: string }[] = [
-  { icon: "sparkles", label: "A coach that knows your training", desc: "Ask why, what to change, and how to progress" },
+  { icon: "today", label: "A plan built around you", desc: "Your goal, your days and your equipment — rebuilt whenever they change" },
+  { icon: "barbell", label: "Log every workout", desc: "Sets, weight and rest, with your History and weekly Insights" },
   { icon: "cube", label: "See what every movement trains", desc: "Rotate, isolate and inspect the body in interactive 3D anatomy" },
   { icon: "body", label: "Understand every muscle", desc: "Explore how muscles function and move, highlighted in 3D" },
+  { icon: "sparkles", label: "A coach that knows your training", desc: "Ask why, what to change, and how to progress" },
   { icon: "school", label: "Learn workout anatomy", desc: "Build lasting knowledge with lessons and quizzes" },
   { icon: "watch", label: "Log sets from Apple Watch", desc: "Say the reps or turn the crown, phone left in your bag" },
 ];
 
-/** Copy that must never appear in the Premium value list (these areas are Free). */
-export const FREE_AREA_CLAIM_BLOCKLIST = [
-  "muscle groups",
-  "insights",
-  "history",
-  "exercise library",
-  "exercises",
-  "exercise instructions",
-  "plan",
-  "workout logging",
-  "recovery heatmap",
-  "weekly analytics",
-];
+/**
+ * Copy that must never appear in the Premium value list because the area is
+ * free. Nothing is free any more, so nothing is blocked — the list stays so a
+ * returning free tier has somewhere to declare itself, and the test that reads
+ * it keeps running.
+ */
+export const FREE_AREA_CLAIM_BLOCKLIST: string[] = [];
 
 // ---------------------------------------------------------------------------
 // Product presentation. Display data comes from the store, never from code.
@@ -301,12 +305,13 @@ export const PAYWALL_COPY = {
     { icon: "watch", label: "Watch logging", desc: "Log sets straight from your wrist" },
     { icon: "sparkles", label: "Coach insight", desc: "Guidance shaped by your training" },
   ],
-  /** Opens the full value list, the free promise and the billing terms. */
-  upgradeToggle: "What changes when you upgrade",
-  // Must describe the free tier EXACTLY as the app behaves. Free History and
-  // Insights are capped (see freeLimits.ts), so this no longer promises all of
-  // either — an inaccurate free promise is an App Store risk, not just bad copy.
-  freeReassurance: "Premium is optional. Your Plan, workouts, recent History, this week's Insights and the exercise library stay free.",
+  /** Opens the full value list, the data promise and the billing terms. */
+  upgradeToggle: "What’s included",
+  // There is no free tier to describe. What a person can rely on instead is
+  // their own data: the answers and plan they just built are on this device and
+  // open the moment Premium is active. Nothing here promises a free path.
+  freeReassurance:
+    "Your answers and plan are saved on this device and open the moment Premium is active. Manage or cancel the subscription anytime in your Apple ID settings.",
   selectPrompt: "Choose an option to continue",
   ctaUnselected: "Select an option",
   cta: (_label: string) => "Unlock Premium",
@@ -314,20 +319,20 @@ export const PAYWALL_COPY = {
   loadingProducts: "Checking the current options with the App Store",
   noOffering: {
     title: "Options aren’t available right now",
-    body: "We couldn’t load the current subscription options from the App Store. Everything free in the app still works.",
+    body: "We couldn’t load the current subscription options from the App Store. Nothing has changed on this device — try again in a moment.",
   },
   purchaseCancelled: "",
   purchaseFailed: {
     title: "Purchase didn’t go through",
-    body: "You haven’t been charged for an incomplete purchase. The free parts of the app are unaffected.",
+    body: "You haven’t been charged for an incomplete purchase. Nothing has changed on this device.",
   },
   purchaseUnknown: {
     title: "We couldn’t confirm that purchase",
-    body: "If it completed, Restore purchases will apply it. Nothing free in the app has changed.",
+    body: "If it completed, Restore purchases will apply it. Nothing has changed on this device.",
   },
   refreshFailed: {
     title: "We couldn’t confirm Premium yet",
-    body: "Your purchase may still be processing. Try Restore purchases in a moment. Everything free keeps working.",
+    body: "Your purchase may still be processing. Try Restore purchases in a moment. Nothing has changed on this device.",
   },
   purchaseVerified: "Premium is active on this device.",
   restoreBusy: "Checking for previous purchases",
@@ -335,10 +340,24 @@ export const PAYWALL_COPY = {
   restoreNothing: "No previous purchase was found for this Apple ID.",
   restoreFailed: {
     title: "Restore didn’t finish",
-    body: "Nothing has changed. You can try again, and the free parts of the app are unaffected.",
+    body: "Nothing has changed. You can try again in a moment.",
   },
   lockedTitle: (area: string) => `${area} is part of Premium`,
-  lockedBody: "Everything else — your Plan, workouts, History, Insights and the exercise library — stays free.",
+  lockedBody: "Everything in Muscle Map is part of Premium. Start a subscription, or restore a previous purchase, to continue.",
+  /**
+   * The wall is the only screen a returning or lapsed person can reach, so
+   * account access lives on it: sign in for a returning subscriber, and sign
+   * out / delete for a signed-in one (App Store 5.1.1(v): deletion must stay
+   * reachable, subscription or not).
+   */
+  account: {
+    signIn: "Already have an account? Sign in",
+    signedInAs: (email: string) => `Signed in as ${email}`,
+    signOut: "Sign out",
+    deleteAccount: "Delete account",
+  },
+  /** The web build has no store; a retry there can never succeed. */
+  webOnly: "Subscriptions are available in the Muscle Map app for iPhone. Your answers and plan are saved on this device.",
   legal: {
     restore: "Restore purchases",
     terms: "Terms of Use",
@@ -348,9 +367,10 @@ export const PAYWALL_COPY = {
 
 /** Human names for the Premium areas, used by the locked value path. */
 export const PREMIUM_AREA_NAMES: Record<
-  "explore" | "coach" | "library.muscles" | "library.learn" | "watch.session",
+  "app" | "explore" | "coach" | "library.muscles" | "library.learn" | "watch.session",
   string
 > = {
+  app: "Muscle Map",
   explore: "The 3D anatomy explorer",
   coach: "AI Coach",
   "library.muscles": "The Muscle library",
@@ -360,6 +380,12 @@ export const PREMIUM_AREA_NAMES: Record<
 
 /** Outcome-led entry copy for each locked surface. */
 export const PREMIUM_ENTRY_COPY: Record<keyof typeof PREMIUM_AREA_NAMES, { title: string; body: string }> = {
+  // The wall a person meets once their plan exists. Trial-agnostic on purpose:
+  // whether a free week applies is the store's answer, shown on the options.
+  app: {
+    title: "Your plan is ready",
+    body: "Everything in Muscle Map is part of Premium. Open your plan with a subscription — cancel anytime.",
+  },
   coach: {
     title: "Train with a coach that knows your plan",
     body: "Ask why an exercise is included, what to change when equipment is busy, and how to progress next week.",

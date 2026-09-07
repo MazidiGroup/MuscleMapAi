@@ -209,25 +209,36 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
       }
       const available = offerings?.current?.availablePackages ?? [];
       const mapped: PremiumPackage[] = available.map(mapPackage);
-      setPackages(mapped);
-      setOfferingState(mapped.length ? "ready" : "empty");
 
-      // Trial language is only allowed when eligibility is verified.
+      // Trial language is only allowed when eligibility is verified — and it is
+      // read BEFORE the options are published. Publishing first painted the
+      // plans as pay-now ("Unlock Premium", "Renews every 1 year") and then
+      // flipped them to the trial a moment later, which reads as a bait. The
+      // read is bounded like every other store call; a timeout is "unknown",
+      // which shows the standard non-trial terms rather than nothing.
+      let eligibility: Record<string, TrialEligibility> = {};
       if (mapped.length && Purchases.checkTrialOrIntroductoryPriceEligibility) {
         try {
           const ids = mapped.map((m: PremiumPackage) => m.product?.identifier).filter(Boolean);
-          const res = await Purchases.checkTrialOrIntroductoryPriceEligibility(ids);
-          const next: Record<string, TrialEligibility> = {};
+          // The SDK is untyped here (it is `require`d, see the top of the file),
+          // so the generic cannot infer the result shape from it.
+          const res: any = await withTimeout<any>(
+            Purchases.checkTrialOrIntroductoryPriceEligibility(ids),
+            6000,
+            "checkTrialOrIntroductoryPriceEligibility",
+          );
           for (const m of mapped) {
             const status = res?.[m.product?.identifier]?.status;
-            next[m.identifier] =
+            eligibility[m.identifier] =
               status === 2 ? "eligible" : status === 1 ? "ineligible" : status === 3 ? "none" : "unknown";
           }
-          setTrialEligibility(next);
         } catch {
-          setTrialEligibility({});
+          eligibility = {};
         }
       }
+      setTrialEligibility(eligibility);
+      setPackages(mapped);
+      setOfferingState(mapped.length ? "ready" : "empty");
     } catch {
       setPackages([]);
       setOfferingState("error");

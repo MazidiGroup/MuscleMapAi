@@ -47,11 +47,14 @@ export default function TermsScreen() {
         </Section>
 
         <Section title="Subscriptions and Auto-Renewal">
-          Muscle Map offers auto-renewing subscriptions (Premium) that unlock the AI Coach,
-          Learn lessons, recovery insights and other premium features. Subscription titles, lengths
-          and prices are displayed on the in-app paywall before purchase and match the products
-          published on the App Store.{"\n\n"}
-          Payment is charged to your Apple ID at confirmation of purchase. Subscriptions automatically
+          Muscle Map is a subscription app. An auto-renewing subscription (Premium) is required to
+          use the app after onboarding, including your plan, workout logging, History and Insights, the
+          AI Coach, 3D anatomy, lessons and Apple Watch logging. Subscription titles, lengths and prices
+          are displayed on the in-app paywall before purchase and match the products published on the
+          App Store. Where an introductory free trial is offered, its length is shown before you
+          subscribe.{"\n\n"}
+          Payment is charged to your Apple ID at confirmation of purchase, or at the end of a free trial
+          where one applies. Subscriptions automatically
           renew for the same period unless auto-renew is turned off at least 24 hours before the end
           of the current period. Your account is charged for renewal within 24 hours prior to the end
           of the current period at the same price, unless the plan has changed. You can manage your

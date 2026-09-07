@@ -1,4 +1,4 @@
-// Static safety scans over the redesign source: launch safety, free surfaces,
+// Static safety scans over the redesign source: launch safety, surface classification,
 // no telemetry, no cloud sync of Plan/Workout, no RevenueCat mutation.
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -59,7 +59,7 @@ const LEGACY_ALLOWED = new Set([
   "src/api.ts", // apex.session_token is the auth session, not app data
 ]);
 
-test("cold launch never lands on a Premium tab", () => {
+test("cold launch lands on Plan, where onboarding runs in front of the wall", () => {
   const index = read("app/index.tsx").replace(/\/\/.*$/gm, "");
   assert.match(index, /href="\/\(tabs\)\/plan"/);
   assert.doesNotMatch(index, /explore|coach/i);
@@ -73,7 +73,7 @@ test("the five-tab shell is unchanged and has no sixth History tab", () => {
   assert.equal(names.includes("history"), false);
 });
 
-test("Workout muscle groups, History and Insights are free surfaces", () => {
+test("the Workout tab never builds a paywall of its own", () => {
   const workout = read("app/(tabs)/workout.tsx");
   assert.doesNotMatch(workout, /isPremium/);
   assert.doesNotMatch(workout, /Paywall/);

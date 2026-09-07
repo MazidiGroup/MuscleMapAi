@@ -96,7 +96,7 @@ export default function WatchScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.upgradeTitle}>Part of Premium</Text>
               <Text style={styles.upgradeBody}>
-                Your Plan, workouts, History and Insights on iPhone stay free.
+                Log sets from your wrist with an active subscription.
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={T.textFaint} />

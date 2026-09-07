@@ -1,7 +1,7 @@
 // Welcome + fast onboarding + building screens for the Plan tab.
 //
 // Direction B, Phase 2:
-//   · Welcome offers exactly TWO actions — "Build my free plan" (primary) and
+//   · Welcome offers exactly TWO actions — "Create my plan" (primary) and
 //     "Already have an account?" (secondary). There is no separate guest CTA:
 //     building a plan simply works, locally, for whoever is on this device.
 //   · Onboarding asks exactly THREE questions — goal, training weekdays,
@@ -81,7 +81,7 @@ export function Welcome({ onStart, onSignIn }: { onStart: () => void; onSignIn: 
       </View>
 
       <View style={[styles.welcomeActions, { paddingBottom: insets.bottom + t.space.xl }]}>
-        <ActionButton label="Build my free plan" onPress={onStart} testID="cta-build-plan" />
+        <ActionButton label="Create my plan" onPress={onStart} testID="cta-build-plan" />
         <Pressable
           onPress={onSignIn}
           accessibilityRole="button"

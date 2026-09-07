@@ -206,7 +206,7 @@ test("a Plan with no active session routes to today's planned workout", () => {
   assert.deepEqual(ctx, { kind: "planned", dayIndex: 2, restDay: false });
 });
 
-test("no Plan and no session routes to Build my free plan", () => {
+test("no Plan and no session routes to Create my plan", () => {
   assert.deepEqual(resolveAddContext({ hasActiveSession: false, plan: null }), { kind: "no-plan" });
   assert.equal(ADD_COPY.noPlan, "You don’t have a Plan yet, so there’s no session to add this to.");
 });

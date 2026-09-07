@@ -128,34 +128,39 @@ test("an owner switch that clears entitlement state removes access immediately",
 
 // --- gating contract --------------------------------------------------------
 
-test("the Premium set is the four frozen areas plus the watch, and the free set is untouched", () => {
+test("the whole app is Premium: every surface is in the set, the root wall included, and nothing is free", () => {
   assert.deepEqual(
     [...PREMIUM_SURFACES].sort(),
-    ["coach", "explore", "library.learn", "library.muscles", "watch.session"],
+    [
+      "app",
+      "coach",
+      "explore",
+      "library.account",
+      "library.exerciseDetail",
+      "library.exercises",
+      "library.learn",
+      "library.muscles",
+      "plan",
+      "watch.session",
+      "workout.history",
+      "workout.insights",
+      "workout.session",
+    ],
   );
-  for (const free of [
-    "plan",
-    "workout.session",
-    "workout.history",
-    "workout.insights",
-    "library.exercises",
-    "library.exerciseDetail",
-    "library.account",
-  ] as Surface[]) {
-    assert.ok(FREE_SURFACES.includes(free), free);
-    assert.equal(isPremiumSurface(free), false, `${free} must stay free`);
-  }
+  assert.deepEqual(FREE_SURFACES, [], "a free tier returns only by naming surfaces here");
+  for (const s of PREMIUM_SURFACES) assert.equal(isPremiumSurface(s), true, `${s} is Premium`);
 });
 
-test("free surfaces are never gated, whatever the entitlement state says", () => {
+test("the root wall locks, waits or allows exactly like any other surface", () => {
   const states = [
-    { user: null, designatedEntitlementActive: false, revenueCatState: "loading" as const },
-    { user: null, designatedEntitlementActive: false, revenueCatState: "error" as const },
-    { user: { is_premium: false }, designatedEntitlementActive: false, revenueCatState: "ready" as const },
+    { user: null, designatedEntitlementActive: false, revenueCatState: "loading" as const, expect: "loading" },
+    { user: null, designatedEntitlementActive: false, revenueCatState: "error" as const, expect: "locked" },
+    { user: { is_premium: false }, designatedEntitlementActive: false, revenueCatState: "ready" as const, expect: "locked" },
+    { user: { is_premium: true }, designatedEntitlementActive: false, revenueCatState: "error" as const, expect: "allow" },
+    { user: null, designatedEntitlementActive: true, revenueCatState: "ready" as const, expect: "allow" },
   ];
-  for (const s of states) {
-    const r = resolvePremium(s);
-    for (const free of FREE_SURFACES) assert.equal(gate(free, r), "allow", `${free} during ${s.revenueCatState}`);
+  for (const { expect, ...s } of states) {
+    assert.equal(gate("app", resolvePremium(s)), expect, `app during ${s.revenueCatState}`);
   }
 });
 
@@ -174,37 +179,38 @@ test("Premium surfaces lock, show loading, or allow — never anything else", ()
 
 // --- paywall copy -----------------------------------------------------------
 
-test("the paywall value list contains only Premium areas", () => {
-  assert.equal(PREMIUM_VALUE_ITEMS.length, 5);
+test("the paywall value list describes the whole app, because the whole app is sold", () => {
+  assert.equal(PREMIUM_VALUE_ITEMS.length, 7);
   const text = PREMIUM_VALUE_ITEMS.map((v) => `${v.label} ${v.desc}`).join(" ").toLowerCase();
-  assert.ok(text.includes("3d anatomy"));
-  assert.ok(text.includes("coach"));
-  assert.ok(text.includes("muscles"));
-  assert.ok(text.includes("learn"));
-  assert.ok(text.includes("apple watch"));
-});
-
-test("iPhone workout logging stays free — only the watch is Premium", () => {
-  assert.equal(isPremiumSurface("workout.session"), false);
-  assert.ok(FREE_SURFACES.includes("workout.session"));
-  assert.equal(isPremiumSurface("watch.session"), true);
-});
-
-test("no free area is advertised as Premium", () => {
-  const listed = PREMIUM_VALUE_ITEMS.map((v) => `${v.label} ${v.desc}`.toLowerCase());
-  for (const claim of FREE_AREA_CLAIM_BLOCKLIST) {
-    for (const item of listed) {
-      // "Library Muscles"/"Library Learn" are Premium; the blocked words are the
-      // free areas, and none of them may appear in a value item.
-      assert.ok(!item.includes(claim), `${claim} must not be advertised as Premium (${item})`);
-    }
+  for (const area of ["plan", "workout", "history", "insights", "3d anatomy", "coach", "muscles", "learn", "apple watch"]) {
+    assert.ok(text.includes(area), `the value list names ${area}`);
   }
 });
 
-test("the paywall names what stays free and never claims a guaranteed result", () => {
+test("iPhone workout logging is Premium, and so is the watch", () => {
+  assert.equal(isPremiumSurface("workout.session"), true);
+  assert.equal(isPremiumSurface("watch.session"), true);
+  assert.ok(!FREE_SURFACES.includes("workout.session"));
+});
+
+test("no area is free, so no free area can be mis-advertised", () => {
+  assert.deepEqual(FREE_AREA_CLAIM_BLOCKLIST, []);
+  const listed = PREMIUM_VALUE_ITEMS.map((v) => `${v.label} ${v.desc}`.toLowerCase());
+  for (const claim of FREE_AREA_CLAIM_BLOCKLIST) {
+    for (const item of listed) assert.ok(!item.includes(claim), `${claim} must not be advertised as Premium (${item})`);
+  }
+});
+
+test("the paywall never promises a free tier and never claims a guaranteed result", () => {
   const all = JSON.stringify(PAYWALL_COPY).toLowerCase();
-  assert.ok(PAYWALL_COPY.freeReassurance.toLowerCase().includes("history"));
-  assert.ok(PAYWALL_COPY.freeReassurance.toLowerCase().includes("insights"));
+  // There is no free tier. Copy that says otherwise is an App Store risk, not
+  // just bad copy: a reviewer who reads "stays free" and finds a wall rejects.
+  for (const promise of ["stays free", "stay free", "is optional", "free parts", "everything free", "free in the app"]) {
+    assert.ok(!all.includes(promise), `copy must not promise a free tier: ${promise}`);
+  }
+  // What a person is promised instead is their own data.
+  assert.ok(PAYWALL_COPY.freeReassurance.toLowerCase().includes("saved on this device"));
+  assert.ok(PAYWALL_COPY.freeReassurance.toLowerCase().includes("cancel"));
   for (const banned of ["guarantee", "cure", "medical", "hurry", "limited time", "expires in", "only today"]) {
     assert.ok(!all.includes(banned), banned);
   }
@@ -296,7 +302,7 @@ test("user cancellation is a no-op, not an error", () => {
 test("a thrown purchase fails safely and says nothing was charged", () => {
   assert.equal(classifyPurchase({ threw: true }), "failed");
   assert.ok(PAYWALL_COPY.purchaseFailed.body.toLowerCase().includes("haven’t been charged"));
-  assert.ok(PAYWALL_COPY.purchaseFailed.body.toLowerCase().includes("free"));
+  assert.ok(PAYWALL_COPY.purchaseFailed.body.toLowerCase().includes("nothing has changed"));
 });
 
 test("restore outcomes are verified, empty or failed — and each is honest", () => {
@@ -308,7 +314,7 @@ test("restore outcomes are verified, empty or failed — and each is honest", ()
   assert.ok(PAYWALL_COPY.restoreFailed.body.toLowerCase().includes("nothing has changed"));
 });
 
-test("every failure state names what still works", () => {
+test("every failure state says plainly that nothing was taken or changed", () => {
   for (const state of [
     PAYWALL_COPY.noOffering.body,
     PAYWALL_COPY.purchaseFailed.body,
@@ -316,6 +322,7 @@ test("every failure state names what still works", () => {
     PAYWALL_COPY.refreshFailed.body,
     PAYWALL_COPY.restoreFailed.body,
   ]) {
-    assert.ok(/free|unaffected|keeps working|has changed/i.test(state), state);
+    assert.ok(/nothing has changed|has changed on this device/i.test(state), state);
+    assert.ok(!/stays free|free parts|everything free/i.test(state), `no free promise: ${state}`);
   }
 });

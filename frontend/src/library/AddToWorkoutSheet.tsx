@@ -130,7 +130,7 @@ export function AddToWorkoutSheet({
           <>
             <InfoBanner message={ADD_COPY.noPlan} testID="add-no-plan" />
             <ActionButton
-              label="Build my free plan"
+              label="Create my plan"
               onPress={() => {
                 onDismiss();
                 router.push("/(tabs)/plan");

@@ -19,6 +19,7 @@ import { ThinkingDots } from "@/src/components/ThinkingDots";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { PremiumGate } from "@/src/premium/PremiumGate";
+import { useAuth } from "@/src/auth/AuthContext";
 import { usePlanStore } from "@/src/plan/planStore";
 import { FLAGS } from "@/src/config/featureFlags";
 import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
@@ -122,6 +123,13 @@ function CoachContent() {
   const styles = useMemo(() => makeStyles(T), [T]);
   const params = useLocalSearchParams<{ q?: string }>();
   const { history: workoutHistory, prs, unit } = useWorkout();
+  // The Coach runs on the server and the server answers only a signed-in
+  // account (every coach endpoint requires a session). The rest of the app is
+  // local-first, so a trial subscriber commonly arrives here with no account:
+  // say so and offer sign-in, rather than letting the request fail as if the
+  // service were down.
+  const { user } = useAuth();
+  const needsAccount = !user || !!user.is_guest;
   const [messages, setMessages] = useState<CoachTurn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -156,7 +164,7 @@ function CoachContent() {
 
   const send = (text: string) => {
     const msg = text.trim();
-    if (!msg || busy) return;
+    if (!msg || busy || needsAccount) return;
     const history = messages.slice();
     setMessages((m) => [...m, { role: "user", content: msg }, { role: "assistant", content: "" }]);
     setInput("");
@@ -251,7 +259,30 @@ function CoachContent() {
       </View>
 
       <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 20 }}>
-        {messages.length === 0 ? (
+        {needsAccount ? (
+          <View style={styles.empty}>
+            <View style={styles.todayCard} testID="coach-needs-account">
+              <LiquidSheen tone="neutral" />
+              <Text style={styles.todayCaps}>SIGN IN TO USE COACH</Text>
+              <Text style={styles.todayName}>Coach remembers your training</Text>
+              <Text style={styles.todayMeta}>
+                Your conversations are kept with your account, so Coach needs one. Everything else in the app works without it.
+              </Text>
+              <View style={styles.todayRule} />
+              <TouchableOpacity
+                style={styles.todayAsk}
+                onPress={() => router.push("/login")}
+                accessibilityRole="button"
+                accessibilityLabel="Sign in to use Coach"
+                testID="coach-sign-in"
+              >
+                <Ionicons name="person-circle-outline" size={22} color={T.accent} />
+                <Text style={styles.todayAskText}>Sign in or create an account</Text>
+                <Ionicons name="chevron-forward" size={18} color={T.accent} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : messages.length === 0 ? (
           <View style={styles.empty}>
             {todayName ? (
               <View style={styles.todayCard}>
@@ -315,7 +346,7 @@ function CoachContent() {
           value={input}
           onChangeText={setInput}
           onSubmitEditing={() => send(input)}
-          editable={!busy}
+          editable={!busy && !needsAccount}
           testID="coach-input"
         />
         {busy ? (
@@ -326,7 +357,7 @@ function CoachContent() {
           <TouchableOpacity
             style={[styles.sendBtn, !input.trim() && { opacity: 0.4 }]}
             onPress={() => send(input)}
-            disabled={!input.trim()}
+            disabled={!input.trim() || needsAccount}
             testID="coach-send"
           >
             <Ionicons name="send" size={18} color={T.bg} />

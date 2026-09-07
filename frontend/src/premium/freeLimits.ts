@@ -1,20 +1,18 @@
-// Free-tier limits — every cap the free plan applies, in one place.
+// Free-tier limits — every cap a free plan applies, in one place.
 //
-// These are deliberately centralised. If App Store review objects to a limit,
-// or the business wants to loosen one, it is a single number here rather than a
-// hunt through screens. A limit of `Infinity` disables that cap entirely and is
-// the intended rollback, because it needs no other code change.
+// Both caps are `Infinity`: the whole app sits behind one Premium wall now, so
+// nobody without access reaches History or Insights and a cap has nothing to
+// cap. `Infinity` is the documented off switch — it needs no other code change
+// — and the functions stay so a free tier can return by putting numbers back.
 //
-// A cap is NOT a gate. Capped surfaces stay free and reachable: the user always
-// sees their recent data and is told plainly what Premium adds. Nothing is ever
-// hidden without saying so, and no free surface is ever locked behind
-// `PremiumGate` — see the release-gate assertions.
+// A cap is NOT a gate. If a free tier returns, capped surfaces stay reachable:
+// the user always sees their recent data and is told plainly what Premium adds.
 
 export const FREE_LIMITS = {
   /** Completed workouts a free account can review in History. */
-  historyWorkouts: 14,
-  /** Days of Insights a free account can chart. One week. */
-  insightsDays: 7,
+  historyWorkouts: Infinity,
+  /** Days of Insights a free account can chart. */
+  insightsDays: Infinity,
 } as const;
 
 /**

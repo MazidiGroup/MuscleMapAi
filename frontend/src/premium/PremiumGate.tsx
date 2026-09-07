@@ -1,22 +1,27 @@
 // Phase 4 — the single route/feature gating contract.
 //
 // A Premium surface renders <PremiumGate surface="coach">…</PremiumGate>. No screen
-// re-implements entitlement logic, and no Free surface is ever wrapped.
+// re-implements entitlement logic. The whole app is Premium, so the gate a person
+// actually meets is `AppPremiumWall` at the root; the per-surface gates remain as
+// defence in depth for deep links and for a future free tier.
 //
 // Loading never unlocks Premium and never traps the user: while the entitlement is
 // being read we show the shared skeleton, and any other non-access state routes to
-// the dismissible value path (the paywall) with the free areas named.
+// the value path (the paywall), where Restore, Terms and Privacy stay reachable.
 
 import React from "react";
-import { Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSegments } from "expo-router";
 
 import { useSemanticTokens } from "@/src/theme/semantic";
 import { LayoutSkeleton, StatusAnnouncement } from "@/src/ui/state";
+import { usePlanStore } from "@/src/plan/planStore";
+import { ONBOARDING_STEP_COUNT, routeStep } from "@/src/plan/onboarding";
 
 import { Paywall } from "./Paywall";
 import { usePremium } from "./PremiumContext";
-import { PREMIUM_AREA_NAMES, Surface, gate, isPremiumSurface } from "./entitlement";
+import { PREMIUM_AREA_NAMES, PREMIUM_ENTRY_COPY, Surface, gate, isPremiumSurface } from "./entitlement";
 
 /** Every surface that has locked-state copy, so the two can never drift apart. */
 export type GateableSurface = Extract<Surface, keyof typeof PREMIUM_AREA_NAMES>;
@@ -25,10 +30,18 @@ export function PremiumGate({
   surface,
   children,
   headerOffset = 0,
+  title,
+  body,
+  showAccount = false,
 }: {
   surface: GateableSurface;
   children: React.ReactNode;
   headerOffset?: number;
+  /** Paywall header override; the shared title is used when absent. */
+  title?: string;
+  body?: string;
+  /** Sign in / sign out / delete account on the paywall — the root wall only. */
+  showAccount?: boolean;
 }) {
   const t = useSemanticTokens();
   const insets = useSafeAreaInsets();
@@ -57,7 +70,66 @@ export function PremiumGate({
   // shared title in PAYWALL_COPY dead copy that never rendered.
   return (
     <View style={{ flex: 1, backgroundColor: t.color.bg }} testID={`locked-${surface}`}>
-      <Paywall headerOffset={headerOffset} />
+      <Paywall headerOffset={headerOffset} title={title} body={body} showAccount={showAccount} />
+    </View>
+  );
+}
+
+/**
+ * Routes that stay open without Premium: signing in, the legal pages the paywall
+ * itself links to, and the development harnesses. Everything else is the app,
+ * and the app is Premium.
+ */
+export const OPEN_ROUTES = new Set(["login", "auth", "terms", "privacy", "references", "dev"]);
+
+/**
+ * The one wall. Mounted once at the root, above every route.
+ *
+ * Onboarding runs in front of it: Welcome, the three questions and the build
+ * all happen before a plan exists, because a wall with nothing behind it sells
+ * nothing. The moment a plan exists the wall stands — and it stands again for a
+ * lapsed subscription, with the person's plan and history intact behind it.
+ *
+ * It is an OVERLAY, not a replacement: the navigator underneath stays mounted.
+ * The wall's own Terms, Privacy and Sign in links navigate that navigator, and
+ * unmounting it made every one of them throw ("navigate before mounting the
+ * Root Layout"). Those routes are open, so the overlay lifts while one is
+ * showing and returns on the way back. Deep links are covered by construction:
+ * whatever route a link resolves to renders beneath the wall.
+ */
+export function AppPremiumWall({ children }: { children: React.ReactNode }) {
+  const segments = useSegments();
+  const hydrated = usePlanStore((s) => s.hydrated);
+  const step = usePlanStore((s) => s.step);
+  const plan = usePlanStore((s) => s.plan);
+  const { resolution } = usePremium();
+
+  const top = segments[0] as string | undefined;
+  const open = !!top && OPEN_ROUTES.has(top);
+  // Same definition of "still onboarding" the tab bar uses to hide itself, so
+  // the wall and the tabs can never disagree about where onboarding ends.
+  const preOnboarding = !hydrated || !plan || routeStep(step, !!plan) <= ONBOARDING_STEP_COUNT;
+  const walled = !open && !preOnboarding && gate("app", resolution) !== "allow";
+
+  const entry = PREMIUM_ENTRY_COPY.app;
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Hidden from assistive tech while covered, so VoiceOver cannot read the
+          plan through the wall or land focus behind it. */}
+      <View
+        style={{ flex: 1 }}
+        accessibilityElementsHidden={walled}
+        importantForAccessibility={walled ? "no-hide-descendants" : "auto"}
+      >
+        {children}
+      </View>
+      {walled ? (
+        <View style={StyleSheet.absoluteFill} testID="app-wall">
+          <PremiumGate surface="app" title={entry.title} body={entry.body} showAccount>
+            {null}
+          </PremiumGate>
+        </View>
+      ) : null}
     </View>
   );
 }

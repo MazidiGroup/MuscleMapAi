@@ -87,7 +87,7 @@ export default function StateSystemReview() {
             icon="calendar-outline"
             title="No plan yet"
             body="Answer three quick questions and your first week is ready in under a minute."
-            primary={{ label: "Build my free plan", onPress: () => {} }}
+            primary={{ label: "Create my plan", onPress: () => {} }}
           />
         </View>
       </Section>

@@ -458,7 +458,7 @@ test("an expiry mid-workout lets that workout finish and gates the next one", ()
 
 test("an iPhone session alone is not a grant — watch logging stays gated", () => {
   const free: WatchEntitlement = { access: false, state: "ready", verifiedAt: NOW };
-  // A session exists (iPhone logging is free) but this watch was never granted.
+  // A session exists (started by the phone's own gate) but this watch was never granted.
   const phoneStarted: WatchSnapshot = { ...running(), grantedAt: null };
   const out = apply(phoneStarted, { kind: "logSet", reps: 8 }, { entitlement: free });
   assert.equal(out.status, "refused");

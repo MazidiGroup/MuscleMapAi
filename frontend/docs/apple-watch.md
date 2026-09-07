@@ -73,7 +73,7 @@ Connectivity, Siri phrase resolution and haptics all behave differently there.
    refuse. This is the check that matters most — the watch UI being locked proves
    nothing about Siri, and gating in the views alone would leave Shortcuts open.
 4. Start a workout on iPhone as a **non-Premium** user, then open the watch. A
-   session existing must not unlock it (iPhone logging is free).
+   session existing must not unlock it (the phone's gate starts sessions, not the watch's).
 
 ### Voice
 

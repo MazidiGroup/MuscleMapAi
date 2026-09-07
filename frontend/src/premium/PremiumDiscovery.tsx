@@ -268,7 +268,7 @@ export function PremiumValueMoment({
 
           <ActionButton label="Preview Premium" onPress={preview} testID="premium-value-preview" />
           <ActionButton
-            label="Continue with my free plan"
+            label="Not now"
             variant="secondary"
             onPress={() => finish("continued-free")}
             testID="premium-value-dismiss"

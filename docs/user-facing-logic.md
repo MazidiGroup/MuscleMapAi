@@ -45,10 +45,24 @@ One contract; screens never re-derive it or read RevenueCat directly.
 
 - Entitlement resolves from four sources, in precedence order:
   `reviewer_bypass`, `manual_grant` (server), `revenuecat`, `none`.
-- Twelve named surfaces are each classified Premium or Free.
+- Thirteen named surfaces, and every one of them is Premium. The whole app is
+  sold as one subscription with a free trial (an App Store introductory offer
+  on the Monthly and Yearly plans — the app never invents trial terms; it
+  shows the store's). `FREE_SURFACES` is empty and `freeLimits` caps are
+  `Infinity`, both kept so a free tier can return by naming surfaces and
+  putting numbers back.
 - `gate()` returns **`allow` / `loading` / `locked`** — three states, not two.
   `loading` exists so a paying user is never shown a paywall while the read is
   still in flight.
+- The wall a person meets is `AppPremiumWall` (`src/premium/PremiumGate.tsx`),
+  mounted once at the root above every route. It lifts for onboarding —
+  Welcome, the three questions and the build all run before a plan exists —
+  and for the open routes it names (sign-in, Terms, Privacy, references, dev
+  harnesses). The moment a plan exists it stands, and it stands again for a
+  lapsed subscription with the person's plan and history intact behind it.
+  Deep links are covered by construction: the wall wraps the navigator.
+- The per-surface gates (`<PremiumGate surface="coach">`) remain as defence in
+  depth; behind the wall they always answer `allow`.
 
 The tab bar names a Premium surface "…, Premium" for accessibility **unless
 entitlement has resolved with access**, so the label is identical on every

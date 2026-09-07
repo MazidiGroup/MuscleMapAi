@@ -19,8 +19,8 @@
 //     ninety seconds later.
 //
 // The grace in the third rule is anchored to this session's own grant, not to
-// "a session exists". Logging a workout on the iPhone is FREE, so a session on
-// its own is not evidence of anything; the watch records whether IT was allowed
+// "a session exists". A session is started by the PHONE's gate, so a session on
+// its own is not evidence of what this watch was allowed; the watch records whether IT was allowed
 // when it joined, and only that grant extends.
 //
 // Pure logic — no React, no storage, no store SDK.
@@ -66,7 +66,7 @@ export type AccessInput = {
   now: number;
   /**
    * True when THIS watch was granted access as it joined the running session.
-   * Never "a session exists" — iPhone logging is free and proves nothing.
+   * Never "a session exists" — a phone session proves nothing about this watch.
    */
   sessionGranted: boolean;
 };

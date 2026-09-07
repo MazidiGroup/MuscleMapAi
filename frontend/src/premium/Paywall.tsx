@@ -1,12 +1,13 @@
 // Phase 4 — the corrected paywall.
 //
-// It advertises ONLY the four frozen Premium areas, takes every price, period and
-// trial word from store data, makes its recommendation explicit, and never claims success before
-// the designated entitlement has been verified. All non-happy paths use the shared
-// State System.
+// It advertises the app — all of it is Premium — takes every price, period and
+// trial word from store data, makes its recommendation explicit, and never claims
+// success before the designated entitlement has been verified. All non-happy paths
+// use the shared State System, and Restore, Terms and Privacy are always reachable:
+// this is the only screen a person without access can stand on.
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -22,6 +23,7 @@ import {
   StatusAnnouncement,
 } from "@/src/ui/state";
 import { GlassSurface } from "@/src/ui/GlassSurface";
+import { MANUAL_APPLE_REVOCATION_COPY, useAuth } from "@/src/auth/AuthContext";
 import { ScalePressable } from "@/src/ui/ScalePressable";
 
 import { PremiumPackage, usePremium } from "./PremiumContext";
@@ -40,16 +42,30 @@ export function Paywall({
   title = PAYWALL_COPY.title,
   body = PAYWALL_COPY.subtitle,
   headerOffset = 0,
+  showAccount = false,
 }: {
   title?: string;
   body?: string;
   headerOffset?: number;
+  /**
+   * Sign in for a returning person, and sign out / delete account for a
+   * signed-in one whose subscription lapsed. Only the root wall sets this: it
+   * is the one screen such a person can reach, and App Store 5.1.1(v) requires
+   * account deletion to stay reachable.
+   */
+  showAccount?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const t = useSemanticTokens();
   const styles = useMemo(() => makeStyles(t), [t]);
   const { packages, offeringState, trialEligibility, busy, purchase, restorePurchases, refreshOfferings } = usePremium();
+  const { user, logout, deleteAccount } = useAuth();
+  const signedIn = !!user && !user.is_guest;
+  // The web build has no store SDK, so "no options" there is permanent rather
+  // than a retry: say where the subscription lives instead of offering a retry
+  // that can never succeed.
+  const webNoStore = Platform.OS === "web" && offeringState === "empty";
 
   const [selected, setSelected] = useState<string | null>(null);
   const [purchaseOutcome, setPurchaseOutcome] = useState<PurchaseOutcome | null>(null);
@@ -103,6 +119,47 @@ export function Paywall({
     setRestoreOutcome(null);
     setRestoreOutcome(await restorePurchases());
   };
+
+  // Same confirmations as the Account screen, which this person cannot reach.
+  const confirm = (title: string, message: string, action: string, onYes: () => void) => {
+    if (Platform.OS === "web") {
+      // eslint-disable-next-line no-alert
+      if (window.confirm(`${title} ${message}`)) onYes();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel" },
+      { text: action, style: "destructive", onPress: onYes },
+    ]);
+  };
+  const onSignOut = () => confirm("Sign out", "Sign out of Muscle Map on this device?", "Sign Out", () => logout());
+  const runDelete = async () => {
+    const res = await deleteAccount();
+    const message = res.ok
+      ? res.manualAppleRevocation
+        ? MANUAL_APPLE_REVOCATION_COPY
+        : "Your account has been deleted."
+      : res.error || "Couldn't delete your account. Please try again.";
+    if (Platform.OS === "web") {
+      // eslint-disable-next-line no-alert
+      window.alert(message);
+    } else if (!res.ok || res.manualAppleRevocation) {
+      Alert.alert(res.ok ? "Account deleted" : "Delete failed", message);
+    }
+  };
+  const onDeleteAccount = () =>
+    confirm(
+      "Delete account?",
+      "Deleting your account removes all your data from our servers. You can create a new account anytime.",
+      "Continue",
+      () =>
+        confirm(
+          "Delete account permanently?",
+          "This will permanently delete your account, your workout history, coach chats and subscription record. This cannot be undone.",
+          "Delete Forever",
+          runDelete,
+        ),
+    );
 
   return (
     <View style={styles.root}>
@@ -297,9 +354,9 @@ export function Paywall({
               <Text style={[t.type.label, { color: t.color.textMuted }]}>Subscription details</Text>
               <Text style={[t.type.caption, { color: t.color.textFaint, marginTop: 6 }]}>
                 Premium is an auto-renewing subscription. Payment is charged to your Apple ID at confirmation of
-                purchase, and it renews for the same period at the price shown above unless auto-renew is turned off
-                at least 24 hours before the end of the current period. You can manage or cancel it in your Apple ID
-                Account Settings.
+                purchase — or, when a free trial applies, when the trial ends — and it renews for the same period at
+                the price shown above unless auto-renew is turned off at least 24 hours before the end of the current
+                period. You can manage or cancel it in your Apple ID Account Settings.
               </Text>
             </View>
           </View>
@@ -313,11 +370,13 @@ export function Paywall({
           </>
         )}
 
-        {(offeringState === "error" || offeringState === "empty") && (
+        {webNoStore && <InfoBanner message={PAYWALL_COPY.webOnly} testID="paywall-web-only" />}
+
+        {(offeringState === "error" || offeringState === "empty") && !webNoStore && (
           <RetryPanel
             title={PAYWALL_COPY.noOffering.title}
             body={PAYWALL_COPY.noOffering.body}
-            preserved={["Your Plan", "Your workouts and History", "The full exercise library"]}
+            preserved={["Your answers and plan, saved on this device", "Everything you have logged"]}
             retry={{ label: "Try again", onPress: refreshOfferings, testID: "paywall-offering-retry" }}
             testID="paywall-no-offering"
           />
@@ -386,6 +445,31 @@ export function Paywall({
             <Text style={[t.type.caption, styles.legalLink]}>{PAYWALL_COPY.legal.privacy}</Text>
           </Pressable>
         </View>
+
+        {showAccount ? (
+          <View style={styles.accountRow} testID="paywall-account">
+            {signedIn ? (
+              <>
+                <Text style={[t.type.caption, { color: t.color.textFaint, textAlign: "center" }]}>
+                  {PAYWALL_COPY.account.signedInAs(user.email)}
+                </Text>
+                <View style={styles.legalRow}>
+                  <Pressable onPress={onSignOut} style={styles.legalBtn} accessibilityRole="button" testID="paywall-sign-out">
+                    <Text style={[t.type.caption, styles.legalLink]}>{PAYWALL_COPY.account.signOut}</Text>
+                  </Pressable>
+                  <Text style={[t.type.caption, { color: t.color.textFaint }]}>·</Text>
+                  <Pressable onPress={onDeleteAccount} style={styles.legalBtn} accessibilityRole="button" testID="paywall-delete-account">
+                    <Text style={[t.type.caption, styles.legalLink]}>{PAYWALL_COPY.account.deleteAccount}</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <Pressable onPress={() => router.push("/login")} style={styles.legalBtn} accessibilityRole="button" testID="paywall-sign-in">
+                <Text style={[t.type.caption, styles.legalLink]}>{PAYWALL_COPY.account.signIn}</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -508,6 +592,7 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
       padding: t.space.md,
     },
     legalRow: { flexDirection: "row", alignItems: "center", gap: t.space.sm },
+    accountRow: { width: "100%", alignItems: "center", gap: 2, marginTop: 2 },
     legalBtn: { minHeight: t.target.min, justifyContent: "center", paddingHorizontal: 4 },
     legalLink: { color: t.color.textSecondary, fontWeight: "700" },
     bottomDock: {
