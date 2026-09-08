@@ -95,7 +95,7 @@ export function Welcome({ onStart, onSignIn }: { onStart: () => void; onSignIn: 
           </Text>
         </Pressable>
         <Text style={[t.type.caption, { color: t.color.textMuted, textAlign: "center" }]}>
-          Three questions. About a minute.
+          Three questions. About a minute. Then open your plan with Muscle Map Premium.
         </Text>
       </View>
     </View>

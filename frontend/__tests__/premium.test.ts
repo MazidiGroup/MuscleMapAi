@@ -16,6 +16,7 @@ import {
   gate,
   hasDesignatedEntitlement,
   isPremiumSurface,
+  onboardingInFront,
   periodWords,
   productTerms,
   resolvePremium,
@@ -324,5 +325,28 @@ test("every failure state says plainly that nothing was taken or changed", () =>
   ]) {
     assert.ok(/nothing has changed|has changed on this device/i.test(state), state);
     assert.ok(!/stays free|free parts|everything free/i.test(state), `no free promise: ${state}`);
+  }
+});
+
+
+// --- the root wall's onboarding exemption ------------------------------------
+
+test("onboarding runs in front of the wall only on the plan tab, and only until a plan exists", () => {
+  // No plan yet: Welcome, the questions and the build are on the plan tab.
+  assert.equal(onboardingInFront([], false), true, "the index redirect lands on the plan tab");
+  assert.equal(onboardingInFront(["(tabs)"], false), true, "the tab group's initial tab is the plan tab");
+  assert.equal(onboardingInFront(["(tabs)", "plan"], false), true);
+  // No plan, but somewhere else: a deep link into the app is walled, not onboarded.
+  for (const route of [["history"], ["insights"], ["summary"], ["exercise", "[id]"], ["(tabs)", "workout"], ["(tabs)", "library"], ["(tabs)", "coach"]]) {
+    assert.equal(onboardingInFront(route, false), false, route.join("/"));
+  }
+});
+
+test("a plan owner sent back into the questions never lifts the wall", () => {
+  // The bypass this closes: ?edit=days (or "Edit answers") set the onboarding
+  // step to 1..3 while a plan existed, and a step-based exemption then lifted
+  // the wall for EVERY route. The step is not an input here at all.
+  for (const route of [[], ["(tabs)"], ["(tabs)", "plan"], ["history"], ["(tabs)", "workout"]]) {
+    assert.equal(onboardingInFront(route, true), false, `plan exists on ${route.join("/") || "index"}`);
   }
 });

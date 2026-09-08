@@ -55,12 +55,12 @@ One contract; screens never re-derive it or read RevenueCat directly.
   `loading` exists so a paying user is never shown a paywall while the read is
   still in flight.
 - The wall a person meets is `AppPremiumWall` (`src/premium/PremiumGate.tsx`),
-  mounted once at the root above every route. It lifts for onboarding —
-  Welcome, the three questions and the build all run before a plan exists —
-  and for the open routes it names (sign-in, Terms, Privacy, references, dev
-  harnesses). The moment a plan exists it stands, and it stands again for a
-  lapsed subscription with the person's plan and history intact behind it.
-  Deep links are covered by construction: the wall wraps the navigator.
+  mounted once at the root as an overlay above the navigator. It lifts for the
+  open routes (sign-in, Terms, Privacy, references) and for onboarding — which
+  is defined by `onboardingInFront()`: **the plan tab, with no plan yet**. The
+  onboarding step is never consulted: a plan owner re-entering the questions
+  ("Edit answers", `?edit=days`) stays behind the wall everywhere else.
+  Deep links are covered by construction: every route renders beneath the wall.
 - The per-surface gates (`<PremiumGate surface="coach">`) remain as defence in
   depth; behind the wall they always answer `allow`.
 

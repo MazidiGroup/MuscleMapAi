@@ -155,6 +155,26 @@ export function isPremiumSurface(surface: Surface): boolean {
 /** What a surface should render right now. Free surfaces are never gated. */
 export type GateDecision = "allow" | "loading" | "locked";
 
+/**
+ * Where the root wall lifts for onboarding: the plan tab, with no plan yet.
+ *
+ * The onboarding STEP is deliberately not consulted. A plan owner can be sent
+ * back into the questions ("Edit answers", the `?edit=days` link from Account),
+ * and a step-based exemption lifted the wall APP-WIDE for as long as that
+ * lasted — a paywall bypass reachable from a deep link. A plan either exists or
+ * it does not; the wall stands from the moment it does.
+ *
+ * `segments` is expo-router's segment list: `[]` is the index redirect,
+ * `["(tabs)"]` the tab group's initial (plan) tab, `["(tabs)", "plan"]` the plan
+ * tab by name.
+ */
+export function onboardingInFront(segments: readonly string[], hasPlan: boolean): boolean {
+  if (hasPlan) return false;
+  const top = segments[0];
+  if (!top) return true;
+  return top === "(tabs)" && (segments[1] ?? "plan") === "plan";
+}
+
 export function gate(surface: Surface, resolution: PremiumResolution): GateDecision {
   if (!isPremiumSurface(surface)) return "allow";
   if (resolution.access) return "allow";

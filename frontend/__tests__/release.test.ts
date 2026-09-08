@@ -118,7 +118,11 @@ test("the whole app sits behind one wall at the root, and no screen builds a sec
   const gate = read("src/premium/PremiumGate.tsx");
   assert.ok(gate.includes("export function AppPremiumWall"), "the wall lives with the single gate");
   assert.ok(gate.includes('PremiumGate surface="app"'), "the wall is the shared gate on the root surface");
-  assert.ok(/routeStep\(step, !!plan\) <= ONBOARDING_STEP_COUNT/.test(gate), "onboarding runs in front of the wall");
+  // The exemption is the plan's EXISTENCE on the plan tab — never the
+  // onboarding step, which a plan owner can re-enter (?edit=days) and which
+  // once lifted the wall app-wide while they were there.
+  assert.ok(gate.includes("onboardingInFront(segments, !!plan)"), "onboarding runs in front of the wall by plan existence");
+  assert.ok(!/routeStep|ONBOARDING_STEP_COUNT/.test(gate), "the wall never consults the onboarding step");
   for (const open of ["login", "terms", "privacy"]) {
     assert.ok(gate.includes(`"${open}"`), `${open} stays reachable without Premium`);
   }

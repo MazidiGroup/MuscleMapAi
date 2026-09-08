@@ -17,11 +17,10 @@ import { useSegments } from "expo-router";
 import { useSemanticTokens } from "@/src/theme/semantic";
 import { LayoutSkeleton, StatusAnnouncement } from "@/src/ui/state";
 import { usePlanStore } from "@/src/plan/planStore";
-import { ONBOARDING_STEP_COUNT, routeStep } from "@/src/plan/onboarding";
 
 import { Paywall } from "./Paywall";
 import { usePremium } from "./PremiumContext";
-import { PREMIUM_AREA_NAMES, PREMIUM_ENTRY_COPY, Surface, gate, isPremiumSurface } from "./entitlement";
+import { PREMIUM_AREA_NAMES, PREMIUM_ENTRY_COPY, Surface, gate, isPremiumSurface, onboardingInFront } from "./entitlement";
 
 /** Every surface that has locked-state copy, so the two can never drift apart. */
 export type GateableSurface = Extract<Surface, keyof typeof PREMIUM_AREA_NAMES>;
@@ -89,6 +88,9 @@ export const OPEN_ROUTES = new Set(["login", "auth", "terms", "privacy", "refere
  * all happen before a plan exists, because a wall with nothing behind it sells
  * nothing. The moment a plan exists the wall stands — and it stands again for a
  * lapsed subscription, with the person's plan and history intact behind it.
+ * "Exists" is the whole test (see `onboardingInFront`): the onboarding step is
+ * not consulted, because a plan owner sent back into the questions must not
+ * lift the wall for every other route while they are there.
  *
  * It is an OVERLAY, not a replacement: the navigator underneath stays mounted.
  * The wall's own Terms, Privacy and Sign in links navigate that navigator, and
@@ -98,17 +100,16 @@ export const OPEN_ROUTES = new Set(["login", "auth", "terms", "privacy", "refere
  * whatever route a link resolves to renders beneath the wall.
  */
 export function AppPremiumWall({ children }: { children: React.ReactNode }) {
-  const segments = useSegments();
+  const segments = useSegments() as readonly string[];
   const hydrated = usePlanStore((s) => s.hydrated);
-  const step = usePlanStore((s) => s.step);
   const plan = usePlanStore((s) => s.plan);
   const { resolution } = usePremium();
 
-  const top = segments[0] as string | undefined;
+  const top = segments[0];
   const open = !!top && OPEN_ROUTES.has(top);
-  // Same definition of "still onboarding" the tab bar uses to hide itself, so
-  // the wall and the tabs can never disagree about where onboarding ends.
-  const preOnboarding = !hydrated || !plan || routeStep(step, !!plan) <= ONBOARDING_STEP_COUNT;
+  // Not hydrated yet: nothing owner-scoped is known, and the plan tab shows its
+  // own loading screen. Otherwise the plan's existence decides, on the plan tab.
+  const preOnboarding = !hydrated || onboardingInFront(segments, !!plan);
   const walled = !open && !preOnboarding && gate("app", resolution) !== "allow";
 
   const entry = PREMIUM_ENTRY_COPY.app;
