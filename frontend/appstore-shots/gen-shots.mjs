@@ -158,6 +158,13 @@ function slideHTML({ W, H, index, count, kicker, headline, accentWord, sub, shot
 
 const IPHONE = { W: 1290, H: 2796, frame: { kind: "iphone", shotScale: 0.78, top: 0.385 } };
 const IPAD = { W: 2064, H: 2752, frame: { kind: "ipad", shotScale: 0.72, top: 0.30 } };
+// App Store Connect keeps separate slots per display class and rejects a size
+// that belongs to another one ("Screenshots dimensions should be 1284 × 2778…").
+// The 6.5" iPhone and 12.9" iPad slots are still required for listings that
+// once used them, so the same slides render at those sizes too. Every layout
+// value is a fraction of W/H, so nothing else changes.
+const IPHONE_65 = { W: 1284, H: 2778, frame: IPHONE.frame };
+const IPAD_129 = { W: 2048, H: 2732, frame: IPAD.frame };
 const WATCHF = { W: 410, H: 502, frame: { kind: "watch", shotScale: 0.62, top: 0.335 } };
 
 const iphoneSlides = [
@@ -203,6 +210,8 @@ const browser = await chromium.launch().catch(() => chromium.launch({ channel: "
 const jobs = [
   { dir: "iphone", cfg: IPHONE, slides: iphoneSlides, base: RAW, seed: 0 },
   { dir: "ipad", cfg: IPAD, slides: ipadSlides, base: RAW, seed: 7 },
+  { dir: "iphone-6.5", cfg: IPHONE_65, slides: iphoneSlides, base: RAW, seed: 0 },
+  { dir: "ipad-12.9", cfg: IPAD_129, slides: ipadSlides, base: RAW, seed: 7 },
   { dir: "watch", cfg: WATCHF, slides: watchSlides, base: "", seed: 13 },
 ];
 
