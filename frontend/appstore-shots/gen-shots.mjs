@@ -72,7 +72,7 @@ function backdropCSS(totalW, H, count) {
   return glows.join(",");
 }
 
-function slideHTML({ W, H, index, count, kicker, headline, accentWord, sub, shotB64, frame, seed, brand }) {
+function slideHTML({ W, H, index, count, kicker, headline, accentWord, sub, shotB64, frame, seed, brand, watches = [] }) {
   const totalW = W * count;
   const svg = Buffer.from(backdropSVG(totalW, H, seed)).toString("base64");
   const offset = -index * W;
@@ -98,6 +98,11 @@ function slideHTML({ W, H, index, count, kicker, headline, accentWord, sub, shot
   const frameTop = Math.round(H * frame.top);
 
   const brandHTML = brand ? `<div class="brand"><span class="brandDot"></span>Muscle Map</div>` : "";
+  // Apple Watch overlays: a drawn case (titanium gradient, crown, side button)
+  // around a real watch screenshot, centred on (x, y) as fractions of the slide
+  // and W*w wide, rotated a little so two of them read as objects, not tiles.
+  const watchHTML = watches.map((w) => `<div class="watch" style="left:${Math.round(W * w.x)}px; top:${Math.round(H * w.y)}px; width:${Math.round(W * w.w)}px; transform:translate(-50%,-50%) rotate(${w.rotate ?? 0}deg)">
+      <div class="wcase"><div class="wcrown"></div><div class="wbtn"></div><img src="${w.b64}"></div></div>`).join("");
   const subHTML = sub ? `<div class="sub">${sub}</div>` : "";
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -128,6 +133,15 @@ function slideHTML({ W, H, index, count, kicker, headline, accentWord, sub, shot
         padding:${bezelPx}px; box-shadow:0 0 0 1.5px ${C.bezelEdge}, 0 ${Math.round(H * 0.02)}px ${Math.round(H * 0.08)}px rgba(0,0,0,0.75),
         0 0 ${Math.round(H * 0.10)}px rgba(227,154,92,0.10); }
   .device img { display:block; width:${shotW}px; border-radius:${screenRadius}px; }
+  .watch { position:absolute; }
+  .wcase { position:relative; border-radius:22%; padding:4.2%;
+        background:linear-gradient(160deg, #3b3733 0%, #1d1a18 60%, #141210 100%);
+        box-shadow:0 0 0 1.5px ${C.bezelEdge}, 0 ${Math.round(H * 0.015)}px ${Math.round(H * 0.05)}px rgba(0,0,0,0.8),
+        0 0 ${Math.round(H * 0.06)}px rgba(227,154,92,0.14); }
+  .wcase img { display:block; width:100%; border-radius:19%; }
+  .wcrown { position:absolute; right:-3.6%; top:22%; width:5%; height:17%; border-radius:30%;
+        background:linear-gradient(90deg, #57524e, #2d2a27); box-shadow:0 0 0 1px rgba(0,0,0,0.5); }
+  .wbtn { position:absolute; right:-2.6%; top:46%; width:3.4%; height:15%; border-radius:3px; background:#3b3733; }
   </style></head><body>
     <div class="bg"><img src="data:image/svg+xml;base64,${svg}"></div>
     <div class="vignette"></div>
@@ -138,6 +152,7 @@ function slideHTML({ W, H, index, count, kicker, headline, accentWord, sub, shot
       ${subHTML}
     </div>
     <div class="device"><img src="${shotB64}"></div>
+    ${watchHTML}
   </body></html>`;
 }
 
@@ -150,6 +165,11 @@ const iphoneSlides = [
   { file: "iphone-06-exercise-detail.png", kicker: "Exercise intelligence", headline: "Every movement, mapped.", accentWord: "mapped.", sub: "Animated form guides show exactly which muscles fire." },
   { file: "iphone-01-today.png", kicker: "Smart training plans", headline: "A plan built for you.", accentWord: "for you.", sub: "Three questions. A full week of training that fits your life.", brand: true },
   { file: "iphone-07-session.png", kicker: "Effortless logging", headline: "Log sets in seconds.", accentWord: "seconds.", sub: "One tap per set. Volume, targets and records tracked for you." },
+  { file: "iphone-07-session.png", kicker: "Apple Watch companion", headline: "Log sets from your wrist.", accentWord: "your wrist.", sub: "Say the reps, turn the crown, follow the form — all on your wrist. Every set lands on your iPhone.",
+    watches: [
+      { file: "watch-2-logging.png", x: 0.21, y: 0.79, w: 0.34, rotate: -7 },
+      { file: "watch-1-animation.png", x: 0.80, y: 0.70, w: 0.34, rotate: 7 },
+    ] },
   { file: "iphone-08-rest-timer.png", kicker: "Automatic rest", headline: "Rest. Then go again.", accentWord: "go again.", sub: "Rest timers start themselves the moment you log a set." },
   { file: "iphone-03-muscle-detail.png", kicker: "Built-in muscle guide", headline: "Know what fires.", accentWord: "fires.", sub: "Function, origin, insertion and training guidance for every muscle." },
   { file: "iphone-09-coach.png", kicker: "AI coach", headline: "Ask anything.", accentWord: "anything.", sub: "A coach that knows your plan, your muscles and your week." },
@@ -161,6 +181,11 @@ const ipadSlides = [
   { file: "ipad-06-exercise-detail.png", kicker: "Exercise intelligence", headline: "Every movement, mapped.", accentWord: "mapped.", sub: "Animated form guides show exactly which muscles fire." },
   { file: "ipad-01-today.png", kicker: "Smart training plans", headline: "A plan built for you.", accentWord: "for you.", sub: "Three questions. A full week of training that fits your life.", brand: true },
   { file: "ipad-07-session.png", kicker: "Effortless logging", headline: "Log sets in seconds.", accentWord: "seconds.", sub: "One tap per set — with an animated form guide beside your log." },
+  { file: "ipad-07-session.png", kicker: "Apple Watch companion", headline: "Log sets from your wrist.", accentWord: "your wrist.", sub: "Say the reps, turn the crown, follow the form — all on your wrist. Every set lands on your iPad.",
+    watches: [
+      { file: "watch-2-logging.png", x: 0.165, y: 0.80, w: 0.22, rotate: -6 },
+      { file: "watch-1-animation.png", x: 0.84, y: 0.73, w: 0.22, rotate: 6 },
+    ] },
   { file: "ipad-03-muscle-detail.png", kicker: "Built-in muscle guide", headline: "Know what fires.", accentWord: "fires.", sub: "Function, origin, insertion and training guidance for every muscle." },
   { file: "ipad-04-coach.png", kicker: "AI coach", headline: "Ask anything.", accentWord: "anything.", sub: "A coach that knows your plan, your muscles and your week." },
   { file: "ipad-05-library.png", kicker: "Exercise library", headline: "208 movements, organised.", accentWord: "organised.", sub: "Browse by muscle, equipment, movement pattern or difficulty." },
@@ -172,7 +197,9 @@ const watchSlides = [
   { file: `${WATCH}/watch-3-session-410x502.png`, kicker: "Live session", headline: "Adjust. Log. Rest.", accentWord: "Rest." },
 ];
 
-const browser = await chromium.launch();
+// Playwright's own Chromium when it is installed; otherwise the Chrome already
+// on the machine — the slides are plain HTML/CSS, so either renders them alike.
+const browser = await chromium.launch().catch(() => chromium.launch({ channel: "chrome" }));
 const jobs = [
   { dir: "iphone", cfg: IPHONE, slides: iphoneSlides, base: RAW, seed: 0 },
   { dir: "ipad", cfg: IPAD, slides: ipadSlides, base: RAW, seed: 7 },
@@ -189,6 +216,7 @@ for (const job of jobs) {
       W: job.cfg.W, H: job.cfg.H, index: i, count: job.slides.length,
       kicker: s.kicker, headline: s.headline, accentWord: s.accentWord, sub: s.sub,
       shotB64: b64(shotPath), frame: job.cfg.frame, seed: job.seed, brand: s.brand,
+      watches: (s.watches ?? []).map((w) => ({ ...w, b64: b64(`${WATCH}/${w.file}`) })),
     });
     await page.setContent(html, { waitUntil: "networkidle" });
     const out = `${OUT}/${job.dir}/${String(i + 1).padStart(2, "0")}.png`;
