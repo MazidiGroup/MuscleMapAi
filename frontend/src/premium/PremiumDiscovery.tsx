@@ -26,7 +26,7 @@ const BENEFITS = [
  * inside it the real logging face — weight dial, rep stepper, Log set. Vector
  * so it stays sharp at any size and needs no image asset.
  */
-function WatchMock({ accent }: { accent: string }) {
+export function WatchMock({ accent }: { accent: string }) {
   const styles = watchStyles;
   const R = 25;
   const C = 2 * Math.PI * R;

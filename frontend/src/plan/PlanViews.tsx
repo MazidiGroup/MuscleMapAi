@@ -31,6 +31,7 @@ import { startOfWeek, weekSummary } from "@/src/history/metrics";
 import { usePremium } from "@/src/premium/PremiumContext";
 import { LiquidSheen } from "@/src/ui/GlassSurface";
 import { PremiumDiscoveryCard, PremiumValueMoment } from "@/src/premium/PremiumDiscovery";
+import { WatchPromoCard } from "@/src/watch/WatchPromoCard";
 
 export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number) => void; onEditAnswers: () => void }) {
   const { T } = useTheme();
@@ -263,6 +264,10 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
           ))}
         </View>
       )}
+
+      {/* The wrist is the fastest way to log a session: say so once, here where
+          every subscriber lands, and step aside (see WatchPromoCard). */}
+      <WatchPromoCard style={{ marginTop: BLOCK_GAP }} />
 
       {/* Discovery only appears once entitlement is actually resolved: a
           subscriber must never see a Premium pitch while RevenueCat loads. */}
