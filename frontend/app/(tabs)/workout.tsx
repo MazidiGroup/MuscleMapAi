@@ -46,10 +46,21 @@ export default function WorkoutScreen() {
   // end, so it is clamped whenever the session shrinks.
   const [current, setCurrent] = useState(0);
   const sessionLength = w.session?.length ?? 0;
+  // Clamped for THIS render, not just corrected afterwards: the effect below
+  // runs after a render that has already used `current`. The tab is frozen
+  // while another tab is up (freezeOnBlur), so a session can be cancelled and
+  // a different, shorter one started with this index still pointing at an
+  // exercise that no longer exists — that render must never index past the end.
+  const safeCurrent = sessionLength > 0 ? Math.min(Math.max(0, current), sessionLength - 1) : 0;
   useEffect(() => {
-    if (sessionLength > 0 && current > sessionLength - 1) setCurrent(sessionLength - 1);
-  }, [sessionLength, current]);
-  const front = w.session && sessionLength > 0 ? w.session[Math.min(current, sessionLength - 1)] : null;
+    if (current !== safeCurrent) setCurrent(safeCurrent);
+  }, [current, safeCurrent]);
+  // A new workout starts on its first exercise, whatever card the last one
+  // was left on.
+  useEffect(() => {
+    setCurrent(0);
+  }, [w.sessionId]);
+  const front = w.session && sessionLength > 0 ? w.session[safeCurrent] ?? null : null;
   const frontEx = front ? getExercise(front.exerciseId) : null;
   const reduceMotion = useReducedMotion();
   // An empty Workout tab has nothing to offer, so it hands back to Today rather
@@ -150,9 +161,14 @@ export default function WorkoutScreen() {
                     or the arrows below move through the session, and the demo
                     card underneath always follows the exercise in front. */}
                 <ExerciseStack
+                  // A different workout is a different deck. Keying on the
+                  // session id remounts the stack, so its animated position
+                  // (a shared value that outlives renders) restarts at the
+                  // front card instead of carrying the last workout's index.
+                  key={w.sessionId ?? "session"}
                   items={w.session}
                   keyOf={(se) => se.exerciseId}
-                  index={current}
+                  index={safeCurrent}
                   onIndexChange={setCurrent}
                   reduceMotion={reduceMotion}
                   testID="exercise-stack"
@@ -174,26 +190,26 @@ export default function WorkoutScreen() {
                 <View style={styles.stackNav}>
                   <A11yControl
                     label="Previous exercise"
-                    onPress={() => setCurrent((c) => Math.max(0, c - 1))}
-                    disabled={current === 0}
+                    onPress={() => setCurrent(Math.max(0, safeCurrent - 1))}
+                    disabled={safeCurrent === 0}
                     style={styles.stackNavBtn}
                     testID="stack-prev"
                   >
                     <LiquidSheen tone="neutral" />
-                    <Ionicons name="chevron-back" size={20} color={current === 0 ? T.textFaint : T.text} />
+                    <Ionicons name="chevron-back" size={20} color={safeCurrent === 0 ? T.textFaint : T.text} />
                   </A11yControl>
                   <Text style={styles.stackCount} accessibilityLiveRegion="polite">
-                    {Math.min(current, sessionLength - 1) + 1} of {sessionLength}
+                    {safeCurrent + 1} of {sessionLength}
                   </Text>
                   <A11yControl
                     label="Next exercise"
-                    onPress={() => setCurrent((c) => Math.min(sessionLength - 1, c + 1))}
-                    disabled={current >= sessionLength - 1}
+                    onPress={() => setCurrent(Math.min(sessionLength - 1, safeCurrent + 1))}
+                    disabled={safeCurrent >= sessionLength - 1}
                     style={styles.stackNavBtn}
                     testID="stack-next"
                   >
                     <LiquidSheen tone="neutral" />
-                    <Ionicons name="chevron-forward" size={20} color={current >= sessionLength - 1 ? T.textFaint : T.text} />
+                    <Ionicons name="chevron-forward" size={20} color={safeCurrent >= sessionLength - 1 ? T.textFaint : T.text} />
                   </A11yControl>
                 </View>
 

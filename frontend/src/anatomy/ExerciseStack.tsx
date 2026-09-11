@@ -69,19 +69,25 @@ export function ExerciseStack<T>({
   testID?: string;
 }) {
   const total = items.length;
+  // `index` is clamped HERE, at the moment of use, not only by the caller: a
+  // parent's clamp runs in an effect after render, and the render that used the
+  // stale index has already indexed past the end by then. A session that shrank
+  // (an exercise removed, a different workout resumed) while this stack held an
+  // older index used to render `items[undefined]` — a blank screen.
+  const safeIndex = total > 0 ? Math.min(Math.max(0, index), total - 1) : 0;
   const { mode } = useTheme();
   // Every card carries the same opaque fill, so depth has to come from the
   // shadow: without it, overlapping cards of one colour read as a single blob.
   const cardShadow = useMemo(() => liquidShadow(mode, true), [mode]);
-  const progress = useSharedValue(index);
-  const start = useSharedValue(index);
+  const progress = useSharedValue(safeIndex);
+  const start = useSharedValue(safeIndex);
   const [heights, setHeights] = useState<Record<string, number>>({});
 
   // Index changes from outside (the arrows, a removed exercise) animate the
   // stack the same way a swipe does. Reduce Motion settles instantly.
   useEffect(() => {
-    progress.value = reduceMotion ? withTiming(index, { duration: 0 }) : withSpring(index, SPRING);
-  }, [index, reduceMotion, progress]);
+    progress.value = reduceMotion ? withTiming(safeIndex, { duration: 0 }) : withSpring(safeIndex, SPRING);
+  }, [safeIndex, reduceMotion, progress]);
 
   const settle = useCallback((target: number) => onIndexChange(target), [onIndexChange]);
 
@@ -112,12 +118,14 @@ export function ExerciseStack<T>({
   // the page does not jump as the front card changes.
   const height = useMemo(() => {
     let max = 0;
-    for (let i = Math.max(0, index - 1); i <= Math.min(total - 1, index + 1); i++) {
-      const h = heights[keyOf(items[i])];
+    for (let i = Math.max(0, safeIndex - 1); i <= Math.min(total - 1, safeIndex + 1); i++) {
+      const item = items[i];
+      if (!item) continue;
+      const h = heights[keyOf(item)];
       if (h && h > max) max = h;
     }
     return (max || FALLBACK_HEIGHT) + Y;
-  }, [heights, index, items, keyOf, total]);
+  }, [heights, safeIndex, items, keyOf, total]);
 
   const onHeight = useCallback((key: string, h: number) => {
     setHeights((prev) => (prev[key] === h ? prev : { ...prev, [key]: h }));
@@ -135,9 +143,9 @@ export function ExerciseStack<T>({
     () =>
       items
         .map((_, i) => i)
-        .filter((i) => Math.abs(i - index) <= WINDOW)
-        .sort((a, b) => Math.abs(b - index) - Math.abs(a - index)),
-    [items, index],
+        .filter((i) => Math.abs(i - safeIndex) <= WINDOW)
+        .sort((a, b) => Math.abs(b - safeIndex) - Math.abs(a - safeIndex)),
+    [items, safeIndex],
   );
 
   return (
@@ -145,8 +153,9 @@ export function ExerciseStack<T>({
       <View style={[styles.stage, { height }]} testID={testID}>
         {order.map((i) => {
           const item = items[i];
+          if (!item) return null;
           const key = keyOf(item);
-          const isFront = i === index;
+          const isFront = i === safeIndex;
           return (
             <StackCard key={key} i={i} progress={progress} isFront={isFront} shadow={cardShadow} onHeight={(h) => onHeight(key, h)}>
               {renderCard(item, i, isFront)}

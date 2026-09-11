@@ -110,3 +110,28 @@ test("ending a session clears only that owner's session", async () => {
   setOwner(guest);
   assert.ok(await readActiveSession(store, guest));
 });
+
+// --- the card stack can never index past the session -------------------------
+//
+// The white-screen crash: start a workout, back out without finishing, open a
+// different day from Today and tap "Continue workout". The Workout tab is frozen
+// behind the other tab (freezeOnBlur), so its exercise index still points into
+// the workout it last showed; the stack rendered `items[undefined]` for a
+// shorter session and the whole tree came down. The index is now clamped at
+// the point of use (both in the tab and inside the stack) and the stack is
+// remounted per session id. These assertions pin the shape of that guard.
+test("the exercise stack clamps its index in-render and skips missing items", () => {
+  const fs = require("node:fs") as typeof import("node:fs");
+  const path = require("node:path") as typeof import("node:path");
+  const root = process.env.MMA_TEST_ROOT as string;
+  const stack = fs.readFileSync(path.join(root, "src/anatomy/ExerciseStack.tsx"), "utf8");
+  assert.match(stack, /const safeIndex = total > 0 \? Math\.min\(Math\.max\(0, index\), total - 1\) : 0;/, "clamped before any use");
+  assert.match(stack, /const item = items\[i\];\s*if \(!item\) return null;/, "a missing item renders nothing, never a crash");
+  assert.ok(!/Math\.abs\(i - index\)/.test(stack), "no neighbourhood arithmetic on the raw index");
+
+  const tab = fs.readFileSync(path.join(root, "app/(tabs)/workout.tsx"), "utf8");
+  assert.match(tab, /const safeCurrent = sessionLength > 0 \? Math\.min\(Math\.max\(0, current\), sessionLength - 1\) : 0;/);
+  assert.match(tab, /index=\{safeCurrent\}/, "the stack is driven by the clamped index");
+  assert.match(tab, /key=\{w\.sessionId \?\? "session"\}/, "a new workout remounts the stack");
+  assert.ok(!/w\.session\[Math\.min\(current/.test(tab), "the front card is read through the clamp");
+});
