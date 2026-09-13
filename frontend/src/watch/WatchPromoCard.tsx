@@ -3,8 +3,9 @@
 // It says the one thing a person with a watch needs to hear (open Muscle Map on
 // the wrist during a session and the sets log themselves) and shows the actual
 // logging face, drawn rather than photographed so it is sharp at any size and
-// needs no image asset. It steps aside on its own once the watch app is
-// installed on a paired watch, and a person without a watch can dismiss it for
+// needs no image asset. It never hides itself for having the watch app
+// installed — that person is exactly who needs to hear HOW to use it — it
+// changes what it says instead. A person without a watch can dismiss it for
 // good. iOS only: the companion exists nowhere else.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -30,7 +31,10 @@ const MOCK_SCALE = 0.62;
 export const WATCH_PROMO_COPY = {
   eyebrow: "Apple Watch",
   title: "Log sets from your wrist",
+  /** Watch app not yet on a paired watch: how to get there. */
   body: "Open Muscle Map on your watch during a session — say the reps or turn the crown, and every set lands here.",
+  /** Watch app installed: the same card, now the how-to. */
+  bodyInstalled: "Your watch is set up. Open Muscle Map on it during a session — say the reps or turn the crown, and every set lands here.",
   a11y: "Log sets from your Apple Watch. Say the reps or turn the crown and every set lands here. Learn how.",
   dismiss: "Dismiss the Apple Watch tip",
 } as const;
@@ -55,8 +59,10 @@ export function WatchPromoCard({ style }: { style?: object }) {
   }, []);
 
   if (Platform.OS !== "ios" || dismissed !== false) return null;
-  // Already on the wrist: there is nothing left to prompt.
-  if (link.paired && link.watchAppInstalled) return null;
+  // Installed on the wrist is the state the card exists FOR, not a reason to
+  // hide: it used to return null here, which made the tip vanish for every
+  // person who had actually set the watch up — the reviewer included.
+  const installed = link.paired && link.watchAppInstalled;
 
   const dismiss = () => {
     setDismissed(true);
@@ -81,7 +87,7 @@ export function WatchPromoCard({ style }: { style?: object }) {
           <View style={{ flex: 1 }}>
             <Text style={styles.eyebrow}>{WATCH_PROMO_COPY.eyebrow.toUpperCase()}</Text>
             <Text style={styles.title}>{WATCH_PROMO_COPY.title}</Text>
-            <Text style={styles.body}>{WATCH_PROMO_COPY.body}</Text>
+            <Text style={styles.body}>{installed ? WATCH_PROMO_COPY.bodyInstalled : WATCH_PROMO_COPY.body}</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={t.color.textFaint} />
         </View>

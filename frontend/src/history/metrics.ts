@@ -313,6 +313,17 @@ export type Performance = {
 };
 
 /** Grouped by EXACT identifier plus ID space — display names are never used. */
+/**
+ * Per-history memo for exercisePerformances. Keyed on the history ARRAY
+ * identity (a WeakMap, so a replaced history drops its entries with it), then
+ * on exercise, id space and unit. The Workout tab mounts up to five session
+ * cards at once and each asked for its own full scan of the history on every
+ * render; with a year of training that was the visible hitch on "Continue
+ * workout". A history that has not changed gives the same answer, so it is
+ * computed once. Callers already treat the result as read-only.
+ */
+const PERF_CACHE: WeakMap<Workout[], Map<string, Performance[]>> = new WeakMap();
+
 export function exercisePerformances(
   workouts: Workout[],
   exerciseId: string,
@@ -328,6 +339,13 @@ export function exercisePerformances(
    */
   displayUnit?: WeightUnit,
 ): Performance[] {
+  const key = `${exerciseId}\u0000${idSpace}\u0000${displayUnit ?? ""}`;
+  const cached = PERF_CACHE.get(workouts);
+  if (cached) {
+    const hit = cached.get(key);
+    if (hit) return hit;
+  }
+
   const out: Performance[] = [];
   for (const w of workouts) {
     for (const e of w.exercises || []) {
@@ -355,7 +373,15 @@ export function exercisePerformances(
       });
     }
   }
-  return out.sort((a, b) => b.date - a.date);
+  const result = out.sort((a, b) => b.date - a.date);
+  let bucket = PERF_CACHE.get(workouts);
+  if (!bucket) {
+    bucket = new Map();
+    PERF_CACHE.set(workouts, bucket);
+  }
+  bucket.set(key, result);
+  return result;
+
 }
 
 export type PersonalRecord = {

@@ -504,3 +504,19 @@ test("a confirmation always names the exercise, the reps and the load", () => {
   assert.ok(line.includes("82.5 kg"), line);
   assert.ok(!confirmSetLine("Squat", 5, 100, "kg").includes("100.0"), "no trailing zeros");
 });
+
+// --- the Today watch prompt never hides for the person who has the watch ------
+//
+// It used to return null once the watch app was installed on a paired watch —
+// which made it vanish for exactly the person it exists for (and for App
+// Review's paired device). Installed now changes the copy, never the presence.
+test("the Today watch card adapts its copy for an installed watch instead of disappearing", () => {
+  const fs = require("node:fs") as typeof import("node:fs");
+  const path = require("node:path") as typeof import("node:path");
+  const src = fs.readFileSync(path.join(process.env.MMA_TEST_ROOT as string, "src/watch/WatchPromoCard.tsx"), "utf8");
+  assert.ok(!/watchAppInstalled\)\s*return null/.test(src), "an installed watch must not hide the card");
+  assert.match(src, /const installed = link\.paired && link\.watchAppInstalled;/);
+  assert.match(src, /installed \? WATCH_PROMO_COPY\.bodyInstalled : WATCH_PROMO_COPY\.body/, "installed switches the copy");
+  // The only ways the card leaves: not iOS, or the person dismissed it.
+  assert.match(src, /Platform\.OS !== "ios" \|\| dismissed !== false\) return null/);
+});

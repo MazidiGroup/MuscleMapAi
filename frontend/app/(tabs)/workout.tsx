@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from "react-native";
+import { InteractionManager, View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -61,6 +61,21 @@ export default function WorkoutScreen() {
     setCurrent(0);
   }, [w.sessionId]);
   const front = w.session && sessionLength > 0 ? w.session[safeCurrent] ?? null : null;
+  // The tab-switch animation runs on the JS thread's schedule too. Everything
+  // heavy this screen does on entry — each card's history scan, the demo
+  // card's manifest fetch, poster and video player — used to land in the same
+  // frame as the push, and "Continue workout" hitched. Now the deck renders
+  // its cards immediately but the demo card, the single heaviest child, waits
+  // until the transition has settled.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!isFocused) {
+      setSettled(false);
+      return;
+    }
+    const task = InteractionManager.runAfterInteractions(() => setSettled(true));
+    return () => task.cancel();
+  }, [isFocused]);
   const frontEx = front ? getExercise(front.exerciseId) : null;
   const reduceMotion = useReducedMotion();
   // An empty Workout tab has nothing to offer, so it hands back to Today rather
@@ -215,7 +230,7 @@ export default function WorkoutScreen() {
 
                 {/* How the exercise in front is done. The form demo lives here,
                     once, instead of on every card. */}
-                {front && (
+                {front && settled && (
                   <View style={styles.demoCard} testID="demo-card">
                     <LiquidSheen tone="subtle" />
                     <Text style={styles.demoTitle}>HOW TO DO IT</Text>
