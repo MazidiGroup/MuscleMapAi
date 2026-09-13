@@ -117,7 +117,7 @@ const EXPECTED_SLUG = "apex-ai";
  * approved project and profile — see `resolveSlugPolicy()`.
  */
 const MANAGED_CLOUD_SLUG = "ai-coach-trainer-2";
-const EXPECTED_VERSION = "1.4.0";
+const EXPECTED_VERSION = "1.4.1";
 const EXPECTED_PROJECT_ID = "7f9b67dd-01d1-41ed-a962-1cdfad0f5f32";
 const LEGACY_IDENTITY_MARKERS = ["frontend", "muscle-map-ai", "musclemapai", "expo-template", "my-app"];
 

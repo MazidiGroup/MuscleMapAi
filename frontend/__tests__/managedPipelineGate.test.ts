@@ -409,7 +409,7 @@ test("14 — the committed eas-build-pre-install chain succeeds in a pipeline-sh
 
 const MANAGED_SLUG = "ai-coach-trainer-2";
 const COMMITTED_SLUG = "apex-ai";
-const EXPECTED_VERSION = "1.4.0";
+const EXPECTED_VERSION = "1.4.1";
 
 /** Cloud environment as the managed wrapper supplies it for a production build. */
 function managedCloudEnv(extra: Record<string, string> = {}, shimDir?: string) {
