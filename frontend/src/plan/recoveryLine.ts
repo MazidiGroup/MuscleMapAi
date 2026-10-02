@@ -5,9 +5,9 @@
 //
 // Pure logic — no React, no storage.
 
-import { getExercise } from "@/src/anatomy/exercises";
-import { GYM_GROUPS } from "@/src/anatomy/groups";
-import { getMuscleInfo } from "@/src/anatomy/muscleData";
+import { primaryGroupsOf } from "@/src/anatomy/sessionGroups";
+
+export { primaryGroupsOf };
 
 /** Structural slice of computeRecovery()'s GroupRecovery. */
 export type GroupRecoveryLike = {
@@ -17,17 +17,6 @@ export type GroupRecoveryLike = {
   hoursLeft: number;
   lastTs: number | null;
 };
-
-/** Gym groups an exercise's primary muscles belong to; the plan's muscle key is the fallback. */
-export function primaryGroupsOf(exerciseId: string, fallbackGroup?: string): string[] {
-  const groups = new Set<string>();
-  for (const node of getExercise(exerciseId)?.primary || []) {
-    const g = getMuscleInfo(node)?.group;
-    if (g) groups.add(g);
-  }
-  if (groups.size === 0 && fallbackGroup && GYM_GROUPS[fallbackGroup]) groups.add(fallbackGroup);
-  return [...groups];
-}
 
 export type RecoveryLine = {
   /** "ready" when nothing today trains is still recovering; otherwise the worst state present. */

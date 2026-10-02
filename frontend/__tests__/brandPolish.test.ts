@@ -6,6 +6,9 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+import { sessionSetsByGroup } from "../src/anatomy/sessionGroups";
+import { COPPER_RAMP, copperForCount } from "../src/anatomy/ui";
+
 const ROOT = process.env.MMA_TEST_ROOT as string;
 const read = (f: string) => fs.readFileSync(path.join(ROOT, f), "utf8");
 
@@ -42,4 +45,32 @@ test("no pre-copper blue remains in UI chrome; red / amber / green stay legend-o
   }
   assert.ok(!read("src/anatomy/ui.ts").includes("GROUP_COLORS"), "the per-group rainbow is gone");
   assert.ok(!fs.existsSync(path.join(ROOT, "src/theme.ts")), "the legacy blue token file is gone");
+});
+
+// --- post-workout share card -------------------------------------------------------
+
+test("the share card counts WORKING sets per primary group — warm-ups and 0-rep ticks never count", () => {
+  const s = (reps: number, done = true, warmup = false) => ({ weight: 50, reps, done, warmup });
+  const counts = sessionSetsByGroup([
+    { exerciseId: "bench-press", sets: [s(8), s(8), s(10, true, true), s(0), s(8, false)] },
+    { exerciseId: "push-up", sets: [s(12)] },
+    { exerciseId: "no-such-exercise", sets: [s(8)] },
+  ]);
+  assert.equal(counts.chest, 3, "2 working bench sets + 1 push-up set");
+});
+
+test("the copper ramp encodes amount: idle at zero, brightest at the session max", () => {
+  assert.equal(copperForCount(0, 6), COPPER_RAMP[0]);
+  assert.equal(copperForCount(6, 6), COPPER_RAMP[4]);
+  assert.equal(copperForCount(1, 6), COPPER_RAMP[1], "any work is visibly above idle");
+});
+
+test("Share previews a true 9:16 card and outputs 1080×1920, with text as the fallback", () => {
+  const sheet = read("src/history/ShareCardSheet.tsx");
+  assert.ok(sheet.includes("(cardW * 16) / 9"), "the captured view is itself 9:16");
+  assert.ok(sheet.includes("width: OUT_W / scale") && sheet.includes("const OUT_W = 1080") && sheet.includes("const OUT_H = 1920"), "pixel ratio divided out");
+  assert.ok(sheet.includes("Sharing.shareAsync") && sheet.includes("Share.share({ message: textMessage })"));
+  const summary = read("app/summary.tsx");
+  assert.ok(summary.includes('testID="summary-share"'), "the existing Share control and its testID stay");
+  assert.ok(summary.includes("<ShareCardSheet"));
 });

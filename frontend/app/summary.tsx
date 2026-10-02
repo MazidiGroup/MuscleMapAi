@@ -9,7 +9,7 @@
 // entered, so the screen reviews it rather than rewriting it.
 
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Share, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Circle } from "react-native-svg";
@@ -32,6 +32,7 @@ import { isCountableSet } from "@/src/anatomy/setRules";
 import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { ShareCardSheet } from "@/src/history/ShareCardSheet";
 
 const RING = 116;
 const RING_STROKE = 9;
@@ -59,6 +60,7 @@ export default function SummaryScreen() {
   const { history, unit } = useWorkout();
   const workout = getWorkoutById(history, String(id));
   const [expanded, setExpanded] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   let newPRs: string[] = [];
   try {
@@ -101,13 +103,13 @@ export default function SummaryScreen() {
         ? "All of it counts towards your totals and records."
         : "Only completed sets count towards your totals and records.";
 
-  const share = () =>
-    Share.share({
-      message: [
-        `${routineName(workout)} — ${sessionDateLabel(workout.date)}`,
-        `${setProgressLabel(stats.completedSets, stats.totalSets)} sets · ${stats.volume} ${unit} · ${clock(workout.durationSec)}`,
-      ].join("\n"),
-    }).catch(() => {});
+  // Share opens a preview of the image card; the plain-text share it replaced
+  // stays one tap away inside the sheet.
+  const shareText = [
+    `${routineName(workout)} — ${sessionDateLabel(workout.date)}`,
+    `${setProgressLabel(stats.completedSets, stats.totalSets)} sets · ${stats.volume} ${unit} · ${clock(workout.durationSec)}`,
+  ].join("\n");
+  const share = () => setSharing(true);
 
   return (
     <View style={styles.root}>
@@ -340,6 +342,15 @@ export default function SummaryScreen() {
           <Text style={styles.doneText}>Done</Text>
         </TouchableOpacity>
       </View>
+      <ShareCardSheet
+        visible={sharing}
+        onClose={() => setSharing(false)}
+        workout={workout}
+        unit={unit}
+        newPRs={newPRs}
+        duration={clock(workout.durationSec)}
+        textMessage={shareText}
+      />
     </View>
   );
 }

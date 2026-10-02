@@ -53,3 +53,17 @@ export function legacyPalette(mode: ThemeMode = DEFAULT_MODE): LegacyPalette {
 }
 
 export const T: LegacyPalette = legacyPalette(DEFAULT_MODE);
+
+/**
+ * The copper ramp — five tonal steps from the idle body (#3a322c) to the
+ * brightest gradient stop. It encodes AMOUNT (sets on the share card), never
+ * identity: red / amber / green stay with the recovery and role legends.
+ */
+export const COPPER_RAMP = ["#3a322c", "#6b4a33", "#9c6136", "#d0783a", "#f5c08c"] as const;
+
+/** Ramp step for a count against a maximum: idle at zero, brightest at the max, any work above idle. */
+export function copperForCount(count: number, max: number): string {
+  if (count <= 0 || max <= 0) return COPPER_RAMP[0];
+  const step = Math.ceil((Math.min(count, max) / max) * (COPPER_RAMP.length - 1));
+  return COPPER_RAMP[Math.max(1, step)];
+}
