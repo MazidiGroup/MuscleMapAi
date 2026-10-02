@@ -22,7 +22,7 @@
       "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#0d0b0a"
       },
       "edgeToEdgeEnabled": true
     },
@@ -39,7 +39,7 @@
           "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0e1729"
+          "backgroundColor": "#0d0b0a"
         }
       ],
       "expo-asset",

@@ -2,8 +2,6 @@ import React from "react";
 import { View } from "react-native";
 import Svg, { Path, Defs, LinearGradient, Stop, G, Circle } from "react-native-svg";
 
-import { COLORS } from "@/src/theme";
-
 export type MuscleStatus = "green" | "yellow" | "red" | "none";
 
 export type MuscleMap = Partial<Record<

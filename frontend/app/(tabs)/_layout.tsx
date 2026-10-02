@@ -32,14 +32,17 @@ function DeckButton({ children, style, ...props }: any) {
   );
 }
 
+// Stops are the mode's own page/card tokens with alpha, so the deck is the same
+// warm graphite as the screen above it rather than a cooler blue-grey slab.
 function DeckBackground({ mode }: { mode: string }) {
   const colors = mode === "day"
-    ? ["rgba(237,243,251,0.28)", "rgba(255,255,255,0.82)", "rgba(241,247,255,0.92)"]
+    ? ["rgba(246,243,240,0.28)", "rgba(255,255,255,0.82)", "rgba(246,243,240,0.92)"]
     : mode === "dim"
-      ? ["rgba(21,25,32,0.32)", "rgba(42,48,61,0.84)", "rgba(27,32,42,0.94)"]
-      : ["rgba(7,10,16,0.28)", "rgba(22,28,39,0.84)", "rgba(9,13,21,0.94)"];
+      ? ["rgba(27,25,23,0.32)", "rgba(48,43,39,0.84)", "rgba(27,25,23,0.94)"]
+      : ["rgba(13,11,10,0.28)", "rgba(30,26,23,0.84)", "rgba(13,11,10,0.94)"];
+  const borderColor = mode === "day" ? "rgba(60,48,40,0.10)" : "rgba(240,228,215,0.10)";
   return (
-    <View style={styles.deckBackground} pointerEvents="none">
+    <View style={[styles.deckBackground, { borderColor }]} pointerEvents="none">
       <BlurView intensity={62} tint={mode === "day" ? "light" : "dark"} style={StyleSheet.absoluteFill} />
       <LinearGradient
         colors={colors as [string, string, ...string[]]}
@@ -158,7 +161,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     overflow: "hidden",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(120,130,150,0.18)",
   },
   lockBadge: {
     position: "absolute",
