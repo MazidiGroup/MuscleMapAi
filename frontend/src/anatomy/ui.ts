@@ -54,16 +54,16 @@ export function legacyPalette(mode: ThemeMode = DEFAULT_MODE): LegacyPalette {
 
 export const T: LegacyPalette = legacyPalette(DEFAULT_MODE);
 
-export const GROUP_COLORS: Record<string, string> = {
-  chest: "#FF6B5E",
-  back: "#5EA8FF",
-  shoulders: "#FFB020",
-  arms: "#B98BFF",
-  forearms: "#8B9BFF",
-  core: "#FF5EA8",
-  glutes: "#FF8A3D",
-  quads: "#3DDC97",
-  hamstrings: "#36C5C0",
-  adductors: "#9DD63D",
-  calves: "#E0C341",
-};
+/**
+ * The copper ramp — five tonal steps from the idle body (#3a322c) to the
+ * brightest gradient stop. It encodes AMOUNT (sets on the share card), never
+ * identity: red / amber / green stay with the recovery and role legends.
+ */
+export const COPPER_RAMP = ["#3a322c", "#6b4a33", "#9c6136", "#d0783a", "#f5c08c"] as const;
+
+/** Ramp step for a count against a maximum: idle at zero, brightest at the max, any work above idle. */
+export function copperForCount(count: number, max: number): string {
+  if (count <= 0 || max <= 0) return COPPER_RAMP[0];
+  const step = Math.ceil((Math.min(count, max) / max) * (COPPER_RAMP.length - 1));
+  return COPPER_RAMP[Math.max(1, step)];
+}

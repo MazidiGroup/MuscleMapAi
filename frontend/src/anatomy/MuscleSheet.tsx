@@ -14,7 +14,14 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import { legacyPalette, LegacyPalette, GROUP_COLORS } from "./ui";
+import { legacyPalette, LegacyPalette } from "./ui";
+
+/**
+ * Rep bands are one ordered scale — heaviest to lightest — so they read as
+ * three steps of the copper ramp, not as red / green / blue, which belong to
+ * the recovery and prime-mover legends.
+ */
+const REP_TONE = { strength: "#d0783a", hypertrophy: "#e39a5c", endurance: "#f5c08c" } as const;
 import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS } from "./groups";
 import { getExercise } from "./exercises";
@@ -83,7 +90,8 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
   const title = info?.label || prettyName(nodeName);
   const groupKey = info?.group;
   const groupLabel = groupKey ? GYM_GROUPS[groupKey]?.label : "Anatomical structure";
-  const accent = groupKey ? GROUP_COLORS[groupKey] || T.accent : T.accent;
+  // The tag names the group; it no longer carries a hue of its own.
+  const accent = T.accent;
   const guide = getGuide(groupKey);
   // Only a written summary earns the subtitle line — falling back to `fn` here
   // printed the same sentence twice, once under the title and once as the
@@ -208,11 +216,11 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
                         </View>
                         <View style={styles.previewRule} />
                         <View style={styles.repBand}>
-                          <RepCell color="#FF6B5E" label="Strength" value={compactReps(guide.repRanges.strength)} />
+                          <RepCell color={REP_TONE.strength} label="Strength" value={compactReps(guide.repRanges.strength)} />
                           <View style={styles.previewStatDivider} />
-                          <RepCell color="#3DDC97" label="Hypertrophy" value={compactReps(guide.repRanges.hypertrophy)} />
+                          <RepCell color={REP_TONE.hypertrophy} label="Hypertrophy" value={compactReps(guide.repRanges.hypertrophy)} />
                           <View style={styles.previewStatDivider} />
-                          <RepCell color="#5EA8FF" label="Endurance" value={compactReps(guide.repRanges.endurance)} />
+                          <RepCell color={REP_TONE.endurance} label="Endurance" value={compactReps(guide.repRanges.endurance)} />
                         </View>
                       </>
                     ) : (
@@ -370,9 +378,9 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
               <Stat icon="layers" label="Volume" value={guide.weeklyVolume} />
             </View>
             <Text style={styles.subLabel}>Best Rep Ranges</Text>
-            <RepRow color="#FF6B5E" label="Strength" value={guide.repRanges.strength} />
-            <RepRow color="#3DDC97" label="Hypertrophy" value={guide.repRanges.hypertrophy} />
-            <RepRow color="#5EA8FF" label="Endurance" value={guide.repRanges.endurance} />
+            <RepRow color={REP_TONE.strength} label="Strength" value={guide.repRanges.strength} />
+            <RepRow color={REP_TONE.hypertrophy} label="Hypertrophy" value={guide.repRanges.hypertrophy} />
+            <RepRow color={REP_TONE.endurance} label="Endurance" value={guide.repRanges.endurance} />
           </Card>
         )}
 

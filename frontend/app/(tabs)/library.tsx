@@ -31,7 +31,7 @@ import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { muscleAliasMatches } from "@/src/anatomy/search";
 import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
-import { legacyPalette, LegacyPalette, GROUP_COLORS } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 
 /** The shipped version, straight from app.json. Never hand-typed in a screen. */
@@ -71,17 +71,10 @@ const ATLAS_REGIONS: { key: AtlasRegion; label: string }[] = [
 ];
 
 /**
- * The dot beside each region. Taken from the shared group palette so a region's
- * dot here and its chip inside the muscle sheet are the same colour.
+ * The dot beside each region is the one accent: the label names the region,
+ * and a per-region hue would compete with the red / amber / green recovery
+ * legend the same muscles wear in Insights.
  */
-const REGION_COLORS: Record<AtlasRegion, string> = {
-  chest: GROUP_COLORS.chest,
-  back: GROUP_COLORS.back,
-  shoulders: GROUP_COLORS.shoulders,
-  arms: GROUP_COLORS.arms,
-  core: GROUP_COLORS.core,
-  legs: GROUP_COLORS.quads,
-};
 
 /**
  * The pithy half of a stored function line — the part after the dash when the
@@ -321,13 +314,13 @@ export default function LibraryScreen() {
         return {
           key: r.key,
           label: r.label,
-          color: REGION_COLORS[r.key],
+          color: T.accent,
           items: azSort
             ? [...items].sort((a, b) => (MUSCLE_DATA[a]?.label || a).localeCompare(MUSCLE_DATA[b]?.label || b))
             : items,
         };
       }),
-    [azSort],
+    [azSort, T.accent],
   );
 
   // Facet counts come from the catalogue itself, so the browse tiles can never
