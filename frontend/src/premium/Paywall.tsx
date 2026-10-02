@@ -38,6 +38,12 @@ import {
 /** Preferred display order; anything unknown sorts last, nothing is invented. */
 const ORDER = ["WEEKLY", "MONTHLY", "ANNUAL", "LIFETIME"];
 
+
+/** " every year" / " every 3 months" from the store's period words ("1 year" reads as "every 1 year"). */
+function everyPeriod(period: string): string {
+  return period ? ` every ${period.replace(/^1 /, "")}` : "";
+}
+
 export function Paywall({
   title = PAYWALL_COPY.title,
   body = PAYWALL_COPY.subtitle,
@@ -87,8 +93,8 @@ export function Paywall({
     : null;
   const renewalSummary = chosenTerms
     ? chosenTerms.trial
-      ? `${chosenTerms.trial} ${chosenTerms.price}${chosenTerms.period ? ` every ${chosenTerms.period}` : ""}. Cancel anytime.`
-      : `${chosenTerms.price}${chosenTerms.period ? ` every ${chosenTerms.period}` : ""}. Cancel anytime.`
+      ? `${chosenTerms.trial} ${chosenTerms.price}${everyPeriod(chosenTerms.period)}. Cancel anytime.`
+      : `${chosenTerms.price}${everyPeriod(chosenTerms.period)}. Cancel anytime.`
     : PAYWALL_COPY.selectPrompt;
 
   // Remove a needless first tap while keeping the selection fully visible and
@@ -163,10 +169,10 @@ export function Paywall({
 
   return (
     <View style={styles.root}>
+      {/* The app's own warm radial ground, not a blue wash: the paywall is the
+          first screen after onboarding and must read as the same product. */}
       <LinearGradient
-        colors={t.mode === "day"
-          ? ["rgba(40,120,232,0.15)", "rgba(40,120,232,0.035)", "transparent"]
-          : ["rgba(76,156,255,0.23)", "rgba(76,156,255,0.045)", "transparent"]}
+        colors={[t.palette.bgRadialFrom, t.palette.bgRadialFrom + "00", "transparent"]}
         locations={[0, 0.38, 1]}
         style={styles.ambient}
         pointerEvents="none"
@@ -262,7 +268,11 @@ export function Paywall({
                   onPress={() => setSelected(p.identifier)}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: active }}
-                  accessibilityLabel={[p.label, terms.price, terms.period && `every ${terms.period}`, terms.trial]
+                  accessibilityLabel={[
+                    p.label,
+                    `${terms.trial ? `${terms.trial} ` : ""}${terms.price}${everyPeriod(terms.period)}`,
+                    recommended ? "best value" : "",
+                  ]
                     .filter(Boolean)
                     .join(", ")}
                   testID={`paywall-option-${p.packageType.toLowerCase()}`}
@@ -283,12 +293,17 @@ export function Paywall({
                           <Text style={styles.selectedText} testID="paywall-selected-text">Selected</Text>
                         ) : null}
                       </View>
+                      {/* The trial and what follows it are one sentence, so they
+                          are one line: "Free for 1 week, then $24.99" — not a
+                          "then" that dangles across the row. The plan name
+                          carries the period, and the note under the CTA repeats
+                          the full renewal terms. */}
                       {terms.trial ? (
                         <Text style={[t.type.caption, { color: t.status.success.fg }]} testID={`paywall-trial-${p.packageType.toLowerCase()}`}>
-                          {terms.trial}
+                          {`${terms.trial} ${terms.price}`}
                         </Text>
                       ) : terms.period ? (
-                        <Text style={[t.type.caption, { color: t.color.textFaint }]}>{`Renews every ${terms.period}`}</Text>
+                        <Text style={[t.type.caption, { color: t.color.textFaint }]}>{`Renews${everyPeriod(terms.period)}`}</Text>
                       ) : null}
                     </View>
                     <View style={{ alignItems: "flex-end" }}>
@@ -580,7 +595,7 @@ const makeStyles = (t: ReturnType<typeof useSemanticTokens>) =>
     radio: { width: 22, height: 22, borderRadius: 22, borderWidth: 1.5, borderColor: t.color.textFaint, alignItems: "center", justifyContent: "center" },
     radioActive: { backgroundColor: t.color.accent, borderColor: t.color.accent },
     optionTitleRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-    recommended: { backgroundColor: t.mode === "day" ? "rgba(40,120,232,0.11)" : "rgba(76,156,255,0.16)", borderRadius: t.radius.pill, paddingHorizontal: 7, paddingVertical: 3 },
+    recommended: { backgroundColor: t.color.accent + "26", borderRadius: t.radius.pill, paddingHorizontal: 7, paddingVertical: 3 },
     recommendedText: { color: t.color.accentSoft, fontSize: 9, lineHeight: 11, fontWeight: "800", letterSpacing: 0.6 },
     selectedText: { color: t.color.accentSoft, fontSize: 10, lineHeight: 13, fontWeight: "700" },
     disclosure: {
