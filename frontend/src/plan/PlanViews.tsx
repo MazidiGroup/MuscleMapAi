@@ -1,7 +1,7 @@
 // Weekly plan + Workout day + Swap sheet.
 //
-// - Weekly view: header (logo + "Adjust plan" + theme toggle), summary chips,
-//   7 day cards Mon-Sun with poster stack + target muscles line.
+// - Weekly view: hero (Today + readiness), the free 2D recovery body, today's
+//   card, week summary + plan chips, then 7 day cards Mon-Sun.
 // - Day view: exercise cards with poster, muscle caps, badges, and tap-to-tick.
 // - Swap sheet: bottom-sheet listing up to 6 alternatives; "Use" replaces.
 
@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { useTheme } from "@/src/theme/ThemeContext";
-import { useSemanticTokens } from "@/src/theme/semantic";
+import { NUMERAL_TYPE, useSemanticTokens } from "@/src/theme/semantic";
 import { R } from "@/src/theme/tokens";
 import { ActionButton, InfoBanner, InterruptedSessionCard, RetryPanel } from "@/src/ui/state";
 import { A11yControl } from "@/src/ui/A11yControl";
@@ -23,7 +23,11 @@ import { daysSummary } from "./onboarding";
 import { entryFor, alternativesFor, MUSCLE_LABEL, GOAL_LABEL, REGION_LABEL } from "./planAdapter";
 import type { PlanDay, PlanExerciseEntry } from "./exercises";
 import { posterUrl } from "@/src/anatomy/media";
-import { useWorkout } from "@/src/anatomy/workoutStore";
+import { computeRecovery, useWorkout } from "@/src/anatomy/workoutStore";
+import { BodyMap2D, BodyMapLegend, type BodyView } from "@/src/anatomy/BodyMap2D";
+import {
+  bodyStatesFromRecovery, fitsRecovery, primaryGroupsOf, readinessPercent, untrackedBody,
+} from "@/src/anatomy/bodyMap";
 import { isCountableSet } from "@/src/anatomy/setRules";
 import { startOfWeek, weekSummary } from "@/src/history/metrics";
 import { usePremium } from "@/src/premium/PremiumContext";
@@ -40,6 +44,16 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
   const { resolution } = usePremium();
   const [adjusting, setAdjusting] = useState(false);
   const swaps = usePlanStore(s => s.swaps);
+  const [bodyView, setBodyView] = useState<BodyView>("front");
+  // Recovery is read from completed History only, through the same engine the
+  // Insights heat map uses. Free: no entitlement is consulted here.
+  const recovery = useMemo(() => computeRecovery(w.history), [w.history]);
+  const tracked = recovery.groups.some((g) => g.lastTs !== null);
+  const bodyStates = useMemo(
+    () => (tracked ? bodyStatesFromRecovery(recovery.groups) : untrackedBody()),
+    [recovery, tracked],
+  );
+  const readiness = readinessPercent(recovery.groups);
   if (!plan) return null;
   const { answers, splitLabel, days } = plan;
 
@@ -73,7 +87,15 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
   const staleSession =
     hasActiveWorkout && w.sessionPlanSeed !== null && w.sessionPlanSeed !== plan.seed;
 
+  // Today's primary muscle groups, after swaps, through the engine's node → group mapping.
+  const todayGroups = todayDay && !todayDay.rest
+    ? Array.from(new Set(resolveDayExercises(todayDay.exercises, swaps, answers).flatMap((e) => primaryGroupsOf(e.id, e.muscle))))
+    : [];
+  const todayFits = tracked && fitsRecovery(todayGroups, bodyStates);
+
   const openSession = () => router.push({ pathname: "/(tabs)/workout", params: { seg: "session" } });
+  // Explore stays Premium: its own PremiumGate decides what a free user sees there.
+  const openExplore = () => router.push("/(tabs)/explore");
   const previewPremium = () => router.push("/(tabs)/coach");
 
   // "Start today's workout" goes straight into the session with every
@@ -96,46 +118,69 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={styles.wpScroll}>
-      <View style={styles.wpHeader}>
+      {/* Hero: the day on the left, how ready the body is on the right. */}
+      <View style={styles.wpHeader} testID="today-hero">
         <View style={{ flex: 1 }}>
           <Text style={[styles.wpEyebrow, { color: T.textFaint }]}>{todayLabel}</Text>
           <Text style={[styles.wpTitle, { color: T.text }]}>Today</Text>
         </View>
-        <TouchableOpacity
-          style={[styles.adjustBtn, { backgroundColor: T.cardAlt, }]}
-          onPress={() => setAdjusting(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Adjust plan"
-          testID="wp-adjust"
+        <View
+          style={styles.readiness}
+          accessible
+          accessibilityLabel={readiness === null ? "Readiness not tracked yet" : `Readiness ${readiness} percent`}
+          testID="today-readiness"
         >
-          <LiquidSheen tone="neutral" />
-          <Ionicons name="options-outline" size={14} color={T.text2} />
-          <Text style={[styles.adjustText, { color: T.text2 }]}>Adjust plan</Text>
-        </TouchableOpacity>
+          <Text style={[styles.readinessValue, { color: readiness === null ? T.textFaint : T.text }]}>
+            {readiness === null ? "—" : `${readiness}%`}
+          </Text>
+          <Text style={[styles.readinessCaps, { color: T.textCaps }]}>READINESS</Text>
+        </View>
       </View>
 
-      {/* Where the week actually stands, before anything is asked of the user. */}
-      <View style={[styles.summaryRow, { backgroundColor: T.card, }]} testID="today-summary">
+      <View style={[styles.bodyCard, { backgroundColor: T.card }]} testID="today-body">
         <LiquidSheen tone="neutral" />
-        <SummaryStat value={String(week.count)} label={week.count === 1 ? "workout" : "workouts"} T={T} styles={styles} />
-        <View style={[styles.summaryDivider, { backgroundColor: T.border }]} />
-        <SummaryStat value={String(weekSets)} label="sets logged" T={T} styles={styles} />
-        <View style={[styles.summaryDivider, { backgroundColor: T.border }]} />
-        <SummaryStat value={`${weekVolume}`} label={`${w.unit} volume`} T={T} styles={styles} />
-      </View>
-
-      <View style={styles.chipsRow}>
-        <Chip label={GOAL_LABEL[answers.goal]} />
-        <Chip label={daysSummary(answers.days)} />
-        <Chip label={splitLabel} />
-        {answers.focus.map(f => (
-          <Chip key={f} label={`Focus: ${REGION_LABEL[f]}`} tone="focus" />
-        ))}
-        {answers.posture && <Chip label="Posture work" tone="posture" />}
+        <View style={styles.bodyToggle} accessibilityRole="tablist">
+          {(["front", "back"] as BodyView[]).map((v) => (
+            <TouchableOpacity
+              key={v}
+              style={[styles.bodyToggleBtn, bodyView === v && { backgroundColor: T.cardAlt }]}
+              onPress={() => setBodyView(v)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: bodyView === v }}
+              accessibilityLabel={v === "front" ? "Front of body" : "Back of body"}
+              testID={`today-body-${v}`}
+            >
+              <Text style={[styles.bodyToggleText, { color: bodyView === v ? T.text : T.textMuted }]}>
+                {v === "front" ? "Front" : "Back"}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <A11yControl
+          label={tracked ? "Recovery map" : "Recovery map, nothing tracked yet"}
+          hint="Opens Explore"
+          onPress={openExplore}
+          style={styles.bodyPress}
+          testID="today-body-open"
+        >
+          <BodyMap2D states={bodyStates} view={bodyView} onPressMuscle={openExplore} width={150} />
+        </A11yControl>
+        {tracked ? (
+          <BodyMapLegend testID="today-body-legend" />
+        ) : (
+          <Text style={[styles.bodyEmpty, { color: T.textMuted }]} testID="today-body-empty">
+            Log your first workout to see your recovery map.
+          </Text>
+        )}
       </View>
 
       {/* Resuming an active session and starting a new workout are separate actions. */}
-      <View style={{ marginTop: 20 }}>
+      <View style={{ marginTop: 16 }}>
+        {!hasActiveWorkout && todayFits ? (
+          <Text style={[styles.upNext, { color: T.textCaps }]} testID="today-fits-recovery">
+            UP NEXT · FITS YOUR RECOVERY
+          </Text>
+        ) : null}
         {hasActiveWorkout ? (
           <InterruptedSessionCard
             title={staleSession ? "Workout from your previous plan" : "Workout in progress"}
@@ -188,6 +233,37 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
           />
         </View>
       ) : null}
+
+      {/* Where the week stands, from completed History. */}
+      <View style={[styles.summaryRow, { backgroundColor: T.card, }]} testID="today-summary">
+        <LiquidSheen tone="neutral" />
+        <SummaryStat value={String(week.count)} label={week.count === 1 ? "workout" : "workouts"} T={T} styles={styles} />
+        <View style={[styles.summaryDivider, { backgroundColor: T.border }]} />
+        <SummaryStat value={String(weekSets)} label="sets logged" T={T} styles={styles} />
+        <View style={[styles.summaryDivider, { backgroundColor: T.border }]} />
+        <SummaryStat value={`${weekVolume}`} label={`${w.unit} volume`} T={T} styles={styles} />
+      </View>
+
+      <View style={styles.chipsRow}>
+        <Chip label={GOAL_LABEL[answers.goal]} />
+        <Chip label={daysSummary(answers.days)} />
+        <Chip label={splitLabel} />
+        {answers.focus.map(f => (
+          <Chip key={f} label={`Focus: ${REGION_LABEL[f]}`} tone="focus" />
+        ))}
+        {answers.posture && <Chip label="Posture work" tone="posture" />}
+        <TouchableOpacity
+          style={[styles.adjustBtn, { backgroundColor: T.cardAlt, }]}
+          onPress={() => setAdjusting(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Adjust plan"
+          testID="wp-adjust"
+        >
+          <LiquidSheen tone="neutral" />
+          <Ionicons name="options-outline" size={14} color={T.text2} />
+          <Text style={[styles.adjustText, { color: T.text2 }]}>Adjust plan</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.progressRow}>
         <ProgressLink
@@ -635,6 +711,16 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   wpTitle: { fontSize: 26, fontWeight: "700" },
+  readiness: { alignItems: "flex-end" },
+  readinessValue: { ...NUMERAL_TYPE },
+  readinessCaps: { fontSize: 10.5, fontWeight: "800", letterSpacing: 1.2, marginTop: 2 },
+  bodyCard: { marginTop: 14, borderRadius: R.xl, paddingVertical: 14, paddingHorizontal: 12, alignItems: "center", gap: 10, overflow: "hidden" },
+  bodyToggle: { flexDirection: "row", gap: 4, alignSelf: "center" },
+  bodyToggleBtn: { minHeight: 44, minWidth: 72, paddingHorizontal: 14, borderRadius: R.pill, alignItems: "center", justifyContent: "center" },
+  bodyToggleText: { fontSize: 12.5, fontWeight: "800" },
+  bodyPress: { alignItems: "center", borderRadius: R.lg },
+  bodyEmpty: { fontSize: 12.5, fontWeight: "600", textAlign: "center", paddingHorizontal: 12 },
+  upNext: { fontSize: 11, fontWeight: "800", letterSpacing: 0.9, marginBottom: 8 },
   dayHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingTop: 56, paddingHorizontal: 20, paddingBottom: 8,
