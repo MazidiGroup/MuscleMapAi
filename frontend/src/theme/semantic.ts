@@ -79,14 +79,14 @@ export type SemanticTokens = {
 };
 
 const NIGHT_STATUS: Record<StatusRole, StatusColors> = {
-  info: { fg: "#8fd0ff", text: "#c7d6ef", bg: "rgba(47,141,255,0.10)", border: "rgba(47,141,255,0.34)" },
-  success: { fg: "#3DDC97", text: "#c7d6ef", bg: "rgba(61,220,151,0.10)", border: "rgba(61,220,151,0.34)" },
+  info: { fg: "#f2c39a", text: "#d6cec6", bg: "rgba(227,154,92,0.10)", border: "rgba(227,154,92,0.30)" },
+  success: { fg: "#3DDC97", text: "#d6cec6", bg: "rgba(61,220,151,0.10)", border: "rgba(61,220,151,0.34)" },
   warning: { fg: "#FFB020", text: "#f2e0b8", bg: "rgba(255,176,32,0.12)", border: "rgba(255,176,32,0.40)" },
   error: { fg: "#EF4444", text: "#fca5a5", bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.42)" },
 };
 
 const DAY_STATUS: Record<StatusRole, StatusColors> = {
-  info: { fg: "#175cbf", text: "#293750", bg: "rgba(40,120,232,0.08)", border: "rgba(40,120,232,0.24)" },
+  info: { fg: "#8f4a1e", text: "#4a423b", bg: "rgba(180,98,44,0.08)", border: "rgba(180,98,44,0.24)" },
   success: { fg: "#087a50", text: "#225846", bg: "rgba(8,122,80,0.08)", border: "rgba(8,122,80,0.24)" },
   warning: { fg: "#9a5a00", text: "#68471c", bg: "rgba(154,90,0,0.08)", border: "rgba(154,90,0,0.24)" },
   error: { fg: "#c73535", text: "#6f3030", bg: "rgba(199,53,53,0.08)", border: "rgba(199,53,53,0.24)" },

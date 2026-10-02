@@ -185,7 +185,7 @@ export default function LoginScreen() {
               testID="login-send-code"
             >
               {busy === "email" ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={T.bg} />
               ) : (
                 <Text style={styles.btnPrimaryText}>Send sign-in code</Text>
               )}
@@ -226,7 +226,7 @@ export default function LoginScreen() {
               testID="login-verify"
             >
               {busy === "verify" ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={T.bg} />
               ) : (
                 <Text style={styles.btnPrimaryText}>Sign in</Text>
               )}
@@ -301,8 +301,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   btnGoogleText: { color: "#000", fontSize: 16, fontWeight: "700" },
   btnEmail: { backgroundColor: T.surface, },
   btnEmailText: { color: T.text, fontSize: 16, fontWeight: "700" },
-  btnPrimary: { backgroundColor: "#0A84FF" },
-  btnPrimaryText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  btnPrimary: { backgroundColor: T.accent },
+  btnPrimaryText: { color: T.bg, fontSize: 16, fontWeight: "800" },
   btnDisabled: { opacity: 0.4 },
   stepLabel: { color: T.textDim, fontSize: 14, lineHeight: 21, textAlign: "center", marginBottom: 4 },
   input: {
@@ -317,14 +317,14 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   },
   codeInput: { textAlign: "center", fontSize: 24, letterSpacing: 12, fontWeight: "700" },
   devCodeBox: {
-    backgroundColor: "rgba(10,132,255,0.12)",
+    backgroundColor: T.accent + "1F",
     borderWidth: 1,
-    borderColor: "rgba(10,132,255,0.35)",
+    borderColor: T.accent + "59",
     borderRadius: 22,
     padding: 12,
     overflow: "hidden",
   },
-  devCodeText: { color: "#7CB8FF", fontSize: 13, textAlign: "center" },
+  devCodeText: { color: T.accentDim, fontSize: 13, textAlign: "center" },
   backLink: { alignItems: "center", justifyContent: "center", minHeight: 44, paddingHorizontal: 16, borderRadius: 999, backgroundColor: T.surface },
   backLinkText: { color: T.textDim, fontSize: 14, fontWeight: "600" },
   guestLink: { alignItems: "center", paddingVertical: 12, paddingHorizontal: 16, minHeight: 44, justifyContent: "center", borderRadius: 999, backgroundColor: T.surface },

@@ -53,17 +53,3 @@ export function legacyPalette(mode: ThemeMode = DEFAULT_MODE): LegacyPalette {
 }
 
 export const T: LegacyPalette = legacyPalette(DEFAULT_MODE);
-
-export const GROUP_COLORS: Record<string, string> = {
-  chest: "#FF6B5E",
-  back: "#5EA8FF",
-  shoulders: "#FFB020",
-  arms: "#B98BFF",
-  forearms: "#8B9BFF",
-  core: "#FF5EA8",
-  glutes: "#FF8A3D",
-  quads: "#3DDC97",
-  hamstrings: "#36C5C0",
-  adductors: "#9DD63D",
-  calves: "#E0C341",
-};
