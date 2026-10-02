@@ -1,9 +1,11 @@
-// Today: the date strip marks completed days and dims rest days.
+// Today: the date strip marks completed days and dims rest days, and the
+// card says whether what today trains is recovered.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+import { primaryGroupsOf, recoveryLine } from "../src/plan/recoveryLine";
 import { completedDayIndexes, mondayIndex } from "../src/plan/weekStrip";
 
 const ROOT = process.env.MMA_TEST_ROOT as string;
@@ -40,4 +42,43 @@ test("the strip dims rest days, disables them, and names completed days", () => 
   assert.ok(strip.includes("disabled={day.rest}"), "a rest day is not presented as a control");
   assert.ok(strip.includes('(done ? ", completed" : "")'), "completion is in the accessible name");
   assert.ok(src.includes("doneDays={completedDayIndexes(w.history, weekStart)}"), "fed from completed History only");
+});
+
+// --- recovery line ---------------------------------------------------------------
+
+const grp = (group: string, state: string, hoursLeft = 0, lastTs: number | null = 1) => ({
+  group,
+  label: group[0].toUpperCase() + group.slice(1),
+  state,
+  hoursLeft,
+  lastTs,
+});
+
+test("no history means no recovery line — nothing is invented", () => {
+  assert.equal(recoveryLine(["quads"], [grp("quads", "untrained", 0, null)]), null);
+  assert.equal(recoveryLine([], [grp("quads", "ready")]), null, "rest day / empty day");
+});
+
+test("all of today's groups recovered (untracked counts as fresh)", () => {
+  const line = recoveryLine(["quads", "calves"], [grp("quads", "ready"), grp("calves", "untrained", 0, null), grp("chest", "fatigued", 30)]);
+  assert.deepEqual(line, { tone: "ready", text: "Every muscle today trains is recovered" });
+});
+
+test("still-recovering groups are named, longest wait first, capped at two", () => {
+  const line = recoveryLine(
+    ["quads", "hamstrings", "glutes", "calves"],
+    [grp("quads", "recovering", 5), grp("hamstrings", "fatigued", 40), grp("glutes", "recovering", 12), grp("calves", "ready")],
+  );
+  assert.deepEqual(line, { tone: "fatigued", text: "Still recovering: Hamstrings ~2 days, Glutes ~12 h +1 more" });
+});
+
+test("today's groups come from the engine's node → group mapping", () => {
+  assert.deepEqual(primaryGroupsOf("bench-press"), ["chest"]);
+  assert.deepEqual(primaryGroupsOf("no-such-exercise", "quads"), ["quads"]);
+});
+
+test("the Today card shows the line and reads the same engine as Insights", () => {
+  const src = read("src/plan/PlanViews.tsx");
+  assert.ok(src.includes('testID="today-recovery"'));
+  assert.ok(src.includes("computeRecovery(w.history).groups"));
 });

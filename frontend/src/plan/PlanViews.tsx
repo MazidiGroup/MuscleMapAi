@@ -20,13 +20,14 @@ import { ActionButton, InfoBanner, InterruptedSessionCard, RetryPanel } from "@/
 import { A11yControl } from "@/src/ui/A11yControl";
 import { usePlanStore, todayISO } from "./planStore";
 import { completedDayIndexes } from "./weekStrip";
+import { primaryGroupsOf, recoveryLine } from "./recoveryLine";
 import { AdjustPlanSheet } from "./AdjustPlanSheet";
 import { daysSummary } from "./onboarding";
 import { entryFor, alternativesFor, MUSCLE_LABEL, GOAL_LABEL, REGION_LABEL } from "./planAdapter";
 import type { PlanDay, PlanExerciseEntry } from "./exercises";
 import { EXERCISES } from "./exercises";
 import { posterUrl } from "@/src/anatomy/media";
-import { useWorkout } from "@/src/anatomy/workoutStore";
+import { useWorkout, computeRecovery, RECOVERY_COLORS } from "@/src/anatomy/workoutStore";
 import { isCountableSet } from "@/src/anatomy/setRules";
 import { startOfWeek, weekSummary } from "@/src/history/metrics";
 import { usePremium } from "@/src/premium/PremiumContext";
@@ -86,6 +87,15 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
         .filter(Boolean),
     ),
   ).map((m) => MUSCLE_LABEL[m as keyof typeof MUSCLE_LABEL] || String(m));
+
+  // Is what today trains recovered? Primary groups of today's (swap-resolved)
+  // exercises against the recovery engine — the Insights heat map's own source.
+  const recovery = recoveryLine(
+    todayDay && !todayDay.rest
+      ? Array.from(new Set(resolveDayExercises(todayDay.exercises, swaps, answers).flatMap((e) => primaryGroupsOf(e.id, e.muscle))))
+      : [],
+    computeRecovery(w.history).groups,
+  );
 
   // The next training day, wrapping past Sunday so Saturday still has a "next".
   const nextDay = (() => {
@@ -155,6 +165,12 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
             </View>
             <Text style={[styles.heroTitle, { color: T.text }]}>{todayDay.typeName}</Text>
             <Text style={[styles.heroMuscles, { color: T.text2 }]}>{todayMuscles.join("  ·  ")}</Text>
+            {recovery ? (
+              <View style={styles.recoveryRow} testID="today-recovery" accessible accessibilityLabel={recovery.text}>
+                <View style={[styles.recoveryDot, { backgroundColor: RECOVERY_COLORS[recovery.tone] }]} />
+                <Text style={[styles.recoveryText, { color: T.text2 }]}>{recovery.text}</Text>
+              </View>
+            ) : null}
             <Text style={[styles.heroMeta, { color: T.textMuted }]}>
               {GOAL_LABEL[answers.goal]}  ·  {daysSummary(answers.days)}
             </Text>
@@ -996,6 +1012,9 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 27, fontWeight: "800", marginTop: 8, letterSpacing: -0.4 },
   heroMuscles: { fontSize: 15, marginTop: 10 },
   heroMeta: { fontSize: 13.5, marginTop: 10 },
+  recoveryRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  recoveryDot: { width: 8, height: 8, borderRadius: 4 },
+  recoveryText: { fontSize: 13.5, fontWeight: "600", flexShrink: 1 },
   heroRule: { height: StyleSheet.hairlineWidth, marginTop: 16 },
   heroStats: { flexDirection: "row", alignItems: "center", marginTop: 14 },
   heroStatCell: { flex: 1, alignItems: "center", gap: 2 },
