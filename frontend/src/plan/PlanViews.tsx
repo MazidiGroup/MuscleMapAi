@@ -19,6 +19,7 @@ import { R } from "@/src/theme/tokens";
 import { ActionButton, InfoBanner, InterruptedSessionCard, RetryPanel } from "@/src/ui/state";
 import { A11yControl } from "@/src/ui/A11yControl";
 import { usePlanStore, todayISO } from "./planStore";
+import { completedDayIndexes } from "./weekStrip";
 import { AdjustPlanSheet } from "./AdjustPlanSheet";
 import { daysSummary } from "./onboarding";
 import { entryFor, alternativesFor, MUSCLE_LABEL, GOAL_LABEL, REGION_LABEL } from "./planAdapter";
@@ -138,7 +139,7 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
 
       {/* The week as a strip: where today sits among the days around it, and
           the one control that moves between them. */}
-      <DateStrip todayIdx={todayIdx} days={days} onOpenDay={onOpenDay} />
+      <DateStrip todayIdx={todayIdx} days={days} doneDays={completedDayIndexes(w.history, weekStart)} onOpenDay={onOpenDay} />
 
       {/* One card carries the whole answer to "what am I doing today": what it
           is, how long, what it trains, the plan it came from, the action, and
@@ -329,10 +330,13 @@ export function WeeklyPlan({ onOpenDay, onEditAnswers }: { onOpenDay: (i: number
 function DateStrip({
   todayIdx,
   days,
+  doneDays,
   onOpenDay,
 }: {
   todayIdx: number;
   days: PlanDay[];
+  /** Weekday indexes (0 = Mon) that already hold a completed workout. */
+  doneDays: Set<number>;
   onOpenDay: (i: number) => void;
 }) {
   const { T } = useTheme();
@@ -347,24 +351,43 @@ function DateStrip({
         const date = new Date(monday);
         date.setDate(monday.getDate() + i);
         const isToday = i === todayIdx;
+        const done = doneDays.has(i);
+        // The strip says where the week stands, not only where today is: a
+        // completed day carries a tick, and a rest day is dimmed and inert —
+        // it opened nothing before, so it no longer looks like it might.
         return (
           <A11yControl
             key={i}
             selected={isToday}
-            label={`${day.dow} ${date.getDate()}${day.rest ? ", rest day" : `, ${day.typeName}`}`}
+            disabled={day.rest}
+            label={
+              `${day.dow} ${date.getDate()}` +
+              (day.rest ? ", rest day" : `, ${day.typeName}`) +
+              (done ? ", completed" : "")
+            }
             onPress={() => !day.rest && onOpenDay(i)}
-            style={styles.stripCell}
+            style={[styles.stripCell, day.rest && !isToday && !done && styles.stripRest]}
             testID={`strip-${i}`}
           >
-            <View style={[styles.stripPill, isToday && { backgroundColor: T.accent }]}>
-              <Text
-                style={[
-                  styles.stripDow,
-                  { color: isToday ? T.ctaText : T.textMuted },
-                ]}
-              >
-                {day.dow[0]}
-              </Text>
+            <View
+              style={[
+                styles.stripPill,
+                isToday && { backgroundColor: T.accent },
+                done && !isToday && { borderWidth: 1.5, borderColor: T.accent },
+              ]}
+            >
+              {done && !isToday ? (
+                <Ionicons name="checkmark" size={16} color={T.accent} testID={`strip-done-${i}`} />
+              ) : (
+                <Text
+                  style={[
+                    styles.stripDow,
+                    { color: isToday ? T.ctaText : T.textMuted },
+                  ]}
+                >
+                  {day.dow[0]}
+                </Text>
+              )}
             </View>
             <Text
               style={[
@@ -964,6 +987,7 @@ const styles = StyleSheet.create({
   stripPill: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   stripDow: { fontSize: 13, fontWeight: "700" },
   stripDate: { fontSize: 13, fontWeight: "600" },
+  stripRest: { opacity: 0.4 },
 
   heroCard: { borderRadius: 24, padding: 18, marginTop: 14, overflow: "hidden" },
   heroEyebrowRow: { flexDirection: "row", alignItems: "center", gap: 7 },
