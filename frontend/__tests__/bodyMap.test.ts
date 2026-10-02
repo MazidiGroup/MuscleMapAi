@@ -1,4 +1,4 @@
-// v1.5.0 — body-first Today. The 2D body reads the recovery engine's own
+// v1.5.0 — body-first Today and the shareable finish card. The 2D body reads the recovery engine's own
 // per-group output, never invents a readiness number, and is free.
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -10,8 +10,11 @@ import {
   fitsRecovery,
   primaryGroupsOf,
   readinessPercent,
+  revealOrder,
+  sessionSetsByGroup,
   untrackedBody,
 } from "../src/anatomy/bodyMap";
+import { COPPER_RAMP, copperForCount } from "../src/anatomy/ui";
 import { GYM_GROUPS } from "../src/anatomy/groups";
 
 const ROOT = process.env.MMA_TEST_ROOT as string;
@@ -85,4 +88,41 @@ test("Today shows the body above today's card, routes to Explore, and has the em
   assert.ok(plan.includes("computeRecovery(w.history)"), "the same engine as the Insights heat map");
   // Explore keeps its gate; Today does not add one.
   assert.ok(read("app/(tabs)/explore.tsx").includes('<PremiumGate surface="explore">'));
+});
+
+// --- finish card --------------------------------------------------------------
+
+const set = (reps: number, done = true, warmup = false) => ({ weight: 50, reps, done, warmup });
+
+test("the finish body counts WORKING sets per primary group — warm-ups and 0-rep ticks do not count", () => {
+  const counts = sessionSetsByGroup([
+    { exerciseId: "bench-press", sets: [set(8), set(8), set(10, true, true), set(0), set(8, false)] },
+    { exerciseId: "push-up", sets: [set(12)] },
+    { exerciseId: "no-such-exercise", sets: [set(8)] },
+  ]);
+  assert.equal(counts.chest, 3, "2 working bench sets + 1 push-up set");
+  assert.ok(!("undefined" in counts));
+});
+
+test("muscles reveal most-worked first, ties in head-to-toe order", () => {
+  assert.deepEqual(revealOrder({ quads: 3, chest: 6, back: 3, calves: 0 }), ["chest", "back", "quads"]);
+});
+
+test("the copper ramp encodes amount: idle at zero, brightest at the session max", () => {
+  assert.equal(copperForCount(0, 6), COPPER_RAMP[0]);
+  assert.equal(copperForCount(6, 6), COPPER_RAMP[4]);
+  assert.equal(copperForCount(1, 6), COPPER_RAMP[1], "any work is visibly above idle");
+  assert.equal(copperForCount(5, 0), COPPER_RAMP[0]);
+});
+
+test("the finish screen shares a 9:16 card and does not bring back activation percentages", () => {
+  const src = read("app/summary.tsx");
+  assert.ok(src.includes('testID="summary-share"'));
+  assert.ok(src.includes("captureRef(heroRef"), "the hero itself is captured");
+  assert.ok(/width: 1080, height: 1920/.test(src), "9:16 output");
+  assert.ok(src.includes("(heroW * 16) / 9"), "the captured view is itself 9:16, so nothing stretches");
+  assert.ok(src.includes("Sharing.shareAsync"));
+  assert.ok(src.includes("<BrandMark"), "the card carries the logo and wordmark");
+  assert.ok(!/MUSCLE ACTIVATION|Muscle Activation|activation %|pct\s*\*\s*100/i.test(src));
+  assert.ok(src.includes('testID="summary-done"'), "existing testIDs survive");
 });

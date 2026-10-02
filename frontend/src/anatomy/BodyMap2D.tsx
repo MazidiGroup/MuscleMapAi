@@ -8,12 +8,16 @@
 //   · `states` — the five recovery states, in the Insights heat-map colours.
 //   · `fills`  — an explicit colour per group (the finish card's copper ramp).
 //
+// With `reveal`, the listed groups fill from `from` to their final colour one
+// after another (~60 ms apart) on mount; under Reduce Motion they simply
+// appear in their final colour.
+//
 // Fatigued and recovering regions get a soft glow: a blurred duplicate layer
 // under the body at ~0.6 opacity. It breathes slowly, unless Reduce Motion is
 // on, when it holds still. There is no premium check anywhere in here — the
 // Today body is free.
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import Svg, { Defs, Ellipse, FeGaussianBlur, Filter, G, Path } from "react-native-svg";
 
@@ -41,6 +45,8 @@ export const BODY_STATE_COLORS: Record<BodyState, string> = {
   undertrained: RECOVERY_COLORS.undertrained,
   untracked: RECOVERY_COLORS.untrained,
 };
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 const GLOW_STATES: ReadonlySet<BodyState> = new Set(["fatigued", "recovering"]);
 
@@ -108,6 +114,8 @@ type Props = {
   width?: number;
   /** Glow on fatigued/recovering regions. Off for `fills`-only bodies. */
   glow?: boolean;
+  /** Animate these groups' fills in, in this order, starting from `from`. */
+  reveal?: { order: string[]; from: string; stepMs?: number; durationMs?: number };
   accessibilityLabel?: string;
   testID?: string;
 };
@@ -119,6 +127,7 @@ export function BodyMap2D({
   onPressMuscle,
   width = 170,
   glow = true,
+  reveal,
   accessibilityLabel,
   testID,
 }: Props) {
@@ -149,12 +158,52 @@ export function BodyMap2D({
     return () => loop.stop();
   }, [reduceMotion, glowing.length, pulse]);
 
-  const regionPaths = (r: Region, i: number, fill: string, pressable: boolean) => (
-    <G key={`${r.group}-${i}`} onPress={pressable && onPressMuscle ? () => onPressMuscle(r.group) : undefined}>
-      <Path d={r.d} fill={fill} stroke={T.bg} strokeWidth={1.2} />
-      <Path d={r.d} fill={fill} stroke={T.bg} strokeWidth={1.2} transform={MIRROR} />
-    </G>
-  );
+  // One driver per revealed group. Groups off this view still get a driver so
+  // a front and a back body given the same order stay in step.
+  const revealKey = reveal ? `${reveal.from}|${reveal.order.join(",")}` : "";
+  const fillAnims = useMemo(() => {
+    const m: Record<string, Animated.Value> = {};
+    for (const g of reveal?.order ?? []) m[g] = new Animated.Value(0);
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealKey]);
+  useEffect(() => {
+    if (!reveal) return;
+    const values = reveal.order.map((g) => fillAnims[g]);
+    if (reduceMotion) {
+      values.forEach((v) => v.setValue(1));
+      return;
+    }
+    const run = Animated.stagger(
+      reveal.stepMs ?? 60,
+      values.map((v) =>
+        Animated.timing(v, { toValue: 1, duration: reveal.durationMs ?? 420, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+      ),
+    );
+    run.start();
+    return () => run.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fillAnims, reduceMotion]);
+
+  const regionPaths = (r: Region, i: number, fill: string, pressable: boolean) => {
+    const anim = reveal ? fillAnims[r.group] : undefined;
+    const onPress = pressable && onPressMuscle ? () => onPressMuscle(r.group) : undefined;
+    if (anim) {
+      const animated = anim.interpolate({ inputRange: [0, 1], outputRange: [reveal!.from, fill] });
+      return (
+        <G key={`${r.group}-${i}`} onPress={onPress}>
+          <AnimatedPath d={r.d} fill={animated as any} stroke={T.bg} strokeWidth={1.2} />
+          <AnimatedPath d={r.d} fill={animated as any} stroke={T.bg} strokeWidth={1.2} transform={MIRROR} />
+        </G>
+      );
+    }
+    return (
+      <G key={`${r.group}-${i}`} onPress={onPress}>
+        <Path d={r.d} fill={fill} stroke={T.bg} strokeWidth={1.2} />
+        <Path d={r.d} fill={fill} stroke={T.bg} strokeWidth={1.2} transform={MIRROR} />
+      </G>
+    );
+  };
 
   return (
     <View

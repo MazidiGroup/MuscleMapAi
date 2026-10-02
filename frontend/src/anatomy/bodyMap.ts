@@ -1,4 +1,4 @@
-// Body-map logic for the 2D Today body — v1.5.0.
+// Body-map logic for the 2D Today body and the shareable finish card — v1.5.0.
 //
 // The 2D body draws one region per gym group (chest, back, …), so every input
 // is reduced to group keys here using the SAME mapping the recovery engine
@@ -10,6 +10,7 @@
 import { getExercise } from "./exercises";
 import { GYM_GROUPS } from "./groups";
 import { getMuscleInfo } from "./muscleData";
+import { CountableSet, isWorkingSet } from "./setRules";
 
 /** The five recovery states, named as the 2D body exposes them. */
 export type BodyState = "fatigued" | "recovering" | "ready" | "undertrained" | "untracked";
@@ -74,4 +75,30 @@ export function fitsRecovery(primaryGroups: readonly string[], states: Record<st
     const s = states[g];
     return s === "ready" || s === "recovering" || s === "undertrained";
   });
+}
+
+/** Structural slice of a logged exercise. */
+export type LoggedExerciseLike = { exerciseId: string; sets: readonly CountableSet[] };
+
+/**
+ * Working sets per gym group for one session — countable and not a warm-up,
+ * by setRules. A set counts once toward each PRIMARY group of its exercise.
+ * This is a count of logged sets, not an activation estimate.
+ */
+export function sessionSetsByGroup(exercises: readonly LoggedExerciseLike[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const e of exercises) {
+    const n = e.sets.filter(isWorkingSet).length;
+    if (n === 0) continue;
+    for (const g of primaryGroupsOf(e.exerciseId)) out[g] = (out[g] || 0) + n;
+  }
+  return out;
+}
+
+/** Groups with work, most sets first (ties keep head-to-toe GYM_GROUPS order). */
+export function revealOrder(setsByGroup: Record<string, number>): string[] {
+  const order = Object.keys(GYM_GROUPS);
+  return Object.keys(setsByGroup)
+    .filter((g) => setsByGroup[g] > 0)
+    .sort((a, b) => setsByGroup[b] - setsByGroup[a] || order.indexOf(a) - order.indexOf(b));
 }
