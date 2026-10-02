@@ -165,7 +165,7 @@ export function InsightsView() {
               {/* streak */}
               <View style={styles.streakCard} testID="insights-streak">
                 <View style={styles.streakIcon}>
-                  <Ionicons name="flame" size={22} color="#FF8A3D" />
+                  <Ionicons name="flame" size={22} color={T.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.streakValue}>
@@ -210,7 +210,7 @@ export function InsightsView() {
               {records.map((r) => (
                 <View key={r.exerciseId} style={styles.prRow} testID={`pr-${r.exerciseId}`}>
                   <View style={styles.prBadge}>
-                    <Ionicons name="trophy" size={14} color="#FFB020" />
+                    <Ionicons name="trophy" size={14} color={T.pr} />
                   </View>
                   <Text style={styles.prName} numberOfLines={1}>
                     {r.name}
@@ -328,7 +328,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   periodText: { color: T.textDim, fontSize: 13, fontWeight: "700" },
   periodTextActive: { color: T.accent },
   streakCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,138,61,0.10)", borderWidth: 1, borderColor: "rgba(255,138,61,0.35)", borderRadius: 22, padding: 14, marginTop: 8 },
-  streakIcon: { width: 40, height: 40, borderRadius: 22, backgroundColor: "rgba(255,138,61,0.16)", alignItems: "center", justifyContent: "center" },
+  streakIcon: { width: 40, height: 40, borderRadius: 22, backgroundColor: "rgba(227,154,92,0.16)", alignItems: "center", justifyContent: "center" },
   streakValue: { color: T.text, fontSize: 16, fontWeight: "800" },
   streakNote: { color: T.textFaint, fontSize: 11.5, marginTop: 2 },
   chartHead: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -343,7 +343,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   tableValue: { color: T.text, fontSize: 14, fontWeight: "700", marginTop: 2 },
   streakSub: { color: T.textDim, fontSize: 12, marginTop: 2 },
   prRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: T.bg2, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 7 },
-  prBadge: { width: 30, height: 30, borderRadius: 22, backgroundColor: "rgba(255,176,32,0.14)", alignItems: "center", justifyContent: "center" },
+  prBadge: { width: 30, height: 30, borderRadius: 22, backgroundColor: "rgba(167,139,250,0.14)", alignItems: "center", justifyContent: "center" },
   prName: { color: T.text, fontSize: 14, fontWeight: "700", flex: 1 },
   prWeight: { color: T.accent, fontSize: 15, fontWeight: "800" },
   section: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },

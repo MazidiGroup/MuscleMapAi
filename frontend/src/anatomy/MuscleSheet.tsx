@@ -13,7 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import { legacyPalette, LegacyPalette, GROUP_COLORS } from "./ui";
+import { legacyPalette, LegacyPalette } from "./ui";
 import { getMuscleInfo } from "./muscleData";
 import { prettyName, GYM_GROUPS } from "./groups";
 import { getExercise } from "./exercises";
@@ -61,7 +61,8 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
   const title = info?.label || prettyName(nodeName);
   const groupKey = info?.group;
   const groupLabel = groupKey ? GYM_GROUPS[groupKey]?.label : "Anatomical structure";
-  const accent = groupKey ? GROUP_COLORS[groupKey] || T.accent : T.accent;
+  // The group is named in the tag; it no longer carries its own hue.
+  const accent = T.accent;
   const guide = getGuide(groupKey);
   const summary = MUSCLE_SUMMARY[nodeName] || info?.fn || "";
 
@@ -154,9 +155,9 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
               <Stat icon="layers" label="Volume" value={guide.weeklyVolume} />
             </View>
             <Text style={styles.subLabel}>Best Rep Ranges</Text>
-            <RepRow color="#FF6B5E" label="Strength" value={guide.repRanges.strength} />
-            <RepRow color="#3DDC97" label="Hypertrophy" value={guide.repRanges.hypertrophy} />
-            <RepRow color="#5EA8FF" label="Endurance" value={guide.repRanges.endurance} />
+            <RepRow color={T.accent} label="Strength" value={guide.repRanges.strength} />
+            <RepRow color={T.accent} label="Hypertrophy" value={guide.repRanges.hypertrophy} />
+            <RepRow color={T.accent} label="Endurance" value={guide.repRanges.endurance} />
           </Card>
         )}
 
@@ -165,13 +166,13 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
           <Card>
             <View style={styles.cardHead}>
               <View style={styles.cardHeadLeft}>
-                <Ionicons name="warning" size={18} color={T.secondary} />
+                <Ionicons name="warning" size={18} color={T.accent} />
                 <Text style={styles.cardTitle}>Common Mistakes</Text>
               </View>
             </View>
             {guide.mistakes.map((m) => (
               <View key={m} style={styles.listRow}>
-                <Ionicons name="close-circle" size={16} color={T.primary} style={{ marginTop: 2 }} />
+                <Ionicons name="close-circle" size={16} color={T.textDim} style={{ marginTop: 2 }} />
                 <Text style={styles.listText}>{m}</Text>
               </View>
             ))}
@@ -183,13 +184,13 @@ export function MuscleSheet({ nodeName, onClose, onExercise, showHandle = true, 
           <Card>
             <View style={styles.cardHead}>
               <View style={styles.cardHeadLeft}>
-                <Ionicons name="bulb" size={18} color="#3DDC97" />
+                <Ionicons name="bulb" size={18} color={T.accent} />
                 <Text style={styles.cardTitle}>Coach Tips</Text>
               </View>
             </View>
             {guide.tips.map((tip) => (
               <View key={tip} style={styles.listRow}>
-                <Ionicons name="checkmark-circle" size={16} color="#3DDC97" style={{ marginTop: 2 }} />
+                <Ionicons name="checkmark-circle" size={16} color={T.accent} style={{ marginTop: 2 }} />
                 <Text style={styles.listText}>{tip}</Text>
               </View>
             ))}

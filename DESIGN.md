@@ -23,12 +23,16 @@ beside Night in `tokens.ts`.
 
 ## Colour roles — one hue, one meaning
 
-- **Copper** is the brand. Logo, CTA, selection and links.
+- **Copper** is the brand. Logo, CTA, selection, links, and the 5-step amount ramp
+  `#3a322c → #6b4a33 → #9c6136 → #d0783a → #f5c08c` (`COPPER_RAMP` in
+  `frontend/src/anatomy/ui.ts`) for sets/volume on the body.
 - **Violet `pr`** marks a personal record and nothing else.
 - **Red `#FF4438`, amber `#FFB020`, green `#3DDC97`** are reserved for recovery-state and
   muscle-role legends. They never identify a muscle group or decorate a header.
 - **Status** (`semantic.status`): info is warm copper (`#f2c39a`), not blue. There is no blue
   anywhere in the product.
+- Muscle groups are identified by **position on the body and their text label**, never by
+  hue. Every list uses the one accent tint.
 
 ## Brand mark
 
