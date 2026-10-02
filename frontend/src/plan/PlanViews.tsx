@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { useTheme } from "@/src/theme/ThemeContext";
-import { useSemanticTokens } from "@/src/theme/semantic";
+import { NUMERAL_TYPE, useSemanticTokens } from "@/src/theme/semantic";
 import { R } from "@/src/theme/tokens";
 import { ActionButton, InfoBanner, InterruptedSessionCard, RetryPanel } from "@/src/ui/state";
 import { A11yControl } from "@/src/ui/A11yControl";
@@ -712,7 +712,7 @@ const styles = StyleSheet.create({
   },
   wpTitle: { fontSize: 26, fontWeight: "700" },
   readiness: { alignItems: "flex-end" },
-  readinessValue: { fontSize: 34, lineHeight: 36, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  readinessValue: { ...NUMERAL_TYPE },
   readinessCaps: { fontSize: 10.5, fontWeight: "800", letterSpacing: 1.2, marginTop: 2 },
   bodyCard: { marginTop: 14, borderRadius: R.xl, paddingVertical: 14, paddingHorizontal: 12, alignItems: "center", gap: 10, overflow: "hidden" },
   bodyToggle: { flexDirection: "row", gap: 4, alignSelf: "center" },

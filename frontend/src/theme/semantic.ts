@@ -5,14 +5,33 @@
 // the night theme are taken from the frozen State System authority palette
 // (`MuscleMapAI State System.dc.html`): ok #3DDC97, warn #FFB020, err #EF4444.
 //
-// Screens must read these through `useSemanticTokens()`. Nothing here changes
-// the production font — typography roles only carry
-// size/weight/line-height, never a family.
+// Screens must read these through `useSemanticTokens()`. Typography roles carry
+// size/weight/line-height and inherit the platform font — with ONE exception:
+// `type.numeral`, the condensed display face for big numbers only.
 
 import { useMemo } from "react";
 
 import { useTheme } from "./ThemeContext";
-import { CARD_RADIUS, Palette, R, S, ThemeMode } from "./tokens";
+import { CARD_RADIUS, NUMERAL_FONT, Palette, R, S, ThemeMode } from "./tokens";
+
+export type NumeralType = {
+  fontFamily: string;
+  fontSize: number;
+  lineHeight: number;
+  fontVariant: ["tabular-nums"];
+};
+
+/**
+ * Big numbers only: readiness %, session volume, the rest countdown, streak
+ * counts and Insights stat-card values. Tabular figures so a ticking or
+ * animating value never shifts sideways. No fontWeight — the family is the weight.
+ */
+export const NUMERAL_TYPE: NumeralType = {
+  fontFamily: NUMERAL_FONT,
+  fontSize: 34,
+  lineHeight: 36,
+  fontVariant: ["tabular-nums"],
+};
 
 export type StatusRole = "info" | "success" | "warning" | "error";
 
@@ -63,6 +82,8 @@ export type SemanticTokens = {
     bodyStrong: { fontSize: number; fontWeight: "600"; lineHeight: number };
     caption: { fontSize: number; fontWeight: "500"; lineHeight: number };
     label: { fontSize: number; fontWeight: "700"; lineHeight: number };
+    /** The one role that carries a family — see NUMERAL_TYPE. */
+    numeral: NumeralType;
   };
   elevation: {
     none: Record<string, never>;
@@ -131,6 +152,7 @@ export function semanticTokens(palette: Palette): SemanticTokens {
       bodyStrong: { fontSize: 13, fontWeight: "600", lineHeight: 20 },
       caption: { fontSize: 11.5, fontWeight: "500", lineHeight: 17 },
       label: { fontSize: 12, fontWeight: "700", lineHeight: 16 },
+      numeral: NUMERAL_TYPE,
     },
     elevation: {
       none: {},

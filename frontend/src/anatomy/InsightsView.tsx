@@ -31,6 +31,7 @@ import { usePremium } from "@/src/premium/PremiumContext";
 import { canChartPeriod } from "@/src/premium/freeLimits";
 import { A11yControl } from "@/src/ui/A11yControl";
 import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
+import { NUMERAL_TYPE } from "@/src/theme/semantic";
 
 type Period = "week" | "month";
 
@@ -168,9 +169,12 @@ export function InsightsView() {
                   <Ionicons name="flame" size={22} color={T.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.streakValue}>
-                    {streaks.currentWeeks} week{streaks.currentWeeks === 1 ? "" : "s"} in a row
-                  </Text>
+                  <View style={styles.streakRow}>
+                    <Text style={styles.streakCount}>{streaks.currentWeeks}</Text>
+                    <Text style={styles.streakValue}>
+                      week{streaks.currentWeeks === 1 ? "" : "s"} in a row
+                    </Text>
+                  </View>
                   <Text style={styles.streakSub}>
                     Best: {streaks.bestWeeks} week{streaks.bestWeeks === 1 ? "" : "s"} · {streaks.workoutsThisWeek} workout
                     {streaks.workoutsThisWeek === 1 ? "" : "s"} this Monday–Sunday week
@@ -329,6 +333,8 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   periodTextActive: { color: T.accent },
   streakCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,138,61,0.10)", borderWidth: 1, borderColor: "rgba(255,138,61,0.35)", borderRadius: 22, padding: 14, marginTop: 8 },
   streakIcon: { width: 40, height: 40, borderRadius: 22, backgroundColor: "rgba(227,154,92,0.16)", alignItems: "center", justifyContent: "center" },
+  streakRow: { flexDirection: "row", alignItems: "baseline", gap: 6 },
+  streakCount: { ...NUMERAL_TYPE, color: T.text },
   streakValue: { color: T.text, fontSize: 16, fontWeight: "800" },
   streakNote: { color: T.textFaint, fontSize: 11.5, marginTop: 2 },
   chartHead: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -349,7 +355,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   section: { color: T.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },
   weekStats: { flexDirection: "row", gap: 8, marginBottom: 14 },
   wStat: { flex: 1, backgroundColor: T.bg2, borderRadius: 22, paddingVertical: 12, alignItems: "center", },
-  wValue: { color: T.accent, fontSize: 20, fontWeight: "800" },
+  wValue: { ...NUMERAL_TYPE, color: T.accent },
   wLabel: { color: T.textFaint, fontSize: 11, marginTop: 2 },
   barRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
   barLabel: { color: T.text, fontSize: 13, fontWeight: "600", width: 88 },

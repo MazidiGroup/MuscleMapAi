@@ -42,7 +42,10 @@ ground) are the masters. Re-export the PNG icons with
 
 ## Type
 
-System font for all copy; `semantic.type` carries size, weight and line-height only.
+System font for all copy; `semantic.type` roles carry size, weight and line-height only.
+The one exception is `type.numeral` — Barlow Condensed ExtraBold (SIL OFL,
+`frontend/assets/fonts/`), 34/36 with tabular figures — for big numbers only: readiness %,
+session volume, the rest countdown, streak counts and Insights stat-card values.
 
 ## Shape
 

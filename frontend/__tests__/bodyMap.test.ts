@@ -126,3 +126,23 @@ test("the finish screen shares a 9:16 card and does not bring back activation pe
   assert.ok(!/MUSCLE ACTIVATION|Muscle Activation|activation %|pct\s*\*\s*100/i.test(src));
   assert.ok(src.includes('testID="summary-done"'), "existing testIDs survive");
 });
+
+// --- numeral display face -------------------------------------------------------
+
+test("the numeral face is bundled, loaded before the splash hides, and used only for big numbers", () => {
+  for (const f of ["assets/fonts/BarlowCondensed-ExtraBold.ttf", "assets/fonts/BarlowCondensed-Bold.ttf", "assets/fonts/BarlowCondensed-OFL.txt"]) {
+    assert.ok(fs.existsSync(path.join(ROOT, f)), f);
+  }
+  const layout = read("app/_layout.tsx");
+  assert.ok(layout.includes("useFonts(DISPLAY_FONT_FILES)"));
+  assert.ok(layout.includes("(!displayLoaded && !displayError)) return null"), "nothing renders under the splash until it settles");
+
+  const semantic = read("src/theme/semantic.ts");
+  assert.match(semantic, /fontSize: 34,\s*lineHeight: 36,\s*fontVariant: \["tabular-nums"\]/);
+
+  const users = ["src/plan/PlanViews.tsx", "app/summary.tsx", "src/anatomy/RestTimer.tsx", "src/anatomy/InsightsView.tsx"];
+  for (const f of users) assert.ok(read(f).includes("...NUMERAL_TYPE"), `${f} uses the numeral role`);
+  // Exactly the five sanctioned places, and nowhere else in the app tree.
+  const count = users.reduce((a, f) => a + (read(f).match(/\.\.\.NUMERAL_TYPE/g) || []).length, 0);
+  assert.equal(count, 5, "readiness, summary volume, rest countdown, streak count, stat-card value");
+});

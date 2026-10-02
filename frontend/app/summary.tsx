@@ -24,6 +24,7 @@ import { isCountableSet } from "@/src/anatomy/setRules";
 import { COPPER_RAMP, copperForCount, legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { CARD_RADIUS } from "@/src/theme/tokens";
+import { NUMERAL_TYPE } from "@/src/theme/semantic";
 import { LiquidTouchableOpacity as TouchableOpacity } from "@/src/ui/LiquidTouchableOpacity";
 import { BrandMark } from "@/src/ui/BrandMark";
 
@@ -257,7 +258,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   },
   heroTitle: { color: T.text, fontSize: 19, fontWeight: "800", textAlign: "center" },
   heroBodies: { flexDirection: "row", gap: 8, justifyContent: "center" },
-  heroVolume: { color: T.text, fontSize: 34, lineHeight: 36, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  heroVolume: { ...NUMERAL_TYPE, color: T.text },
   heroVolumeCaps: { color: T.accentDim, fontSize: 10.5, fontWeight: "800", letterSpacing: 1.2, marginTop: 2 },
   heroMeta: { color: T.textDim, fontSize: 13, fontWeight: "600" },
   prChip: {
