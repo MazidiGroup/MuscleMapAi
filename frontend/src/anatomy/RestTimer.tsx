@@ -26,7 +26,6 @@ import {
   setClockTotal,
   startClock,
 } from "./restClock";
-import { NUMERAL_TYPE } from "@/src/theme/semantic";
 
 const PRESETS = [30, 60, 90, 120];
 /** Seconds added by the "+15s" control to a rest period that is already running. */
@@ -275,8 +274,7 @@ const makeStyles = (T: LegacyPalette) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 24 },
   card: { width: "100%", backgroundColor: T.surface, borderRadius: 22, padding: 24, alignItems: "center", overflow: "hidden" },
   label: { color: T.accent, fontSize: 13, fontWeight: "800", letterSpacing: 2 },
-  // The numeral face at countdown size — the one number on this card that matters.
-  time: { ...NUMERAL_TYPE, fontSize: 64, lineHeight: 70, color: T.text, marginVertical: 8 },
+  time: { color: T.text, fontSize: 64, fontWeight: "900", marginVertical: 8 },
   barTrack: { width: "100%", height: 8, borderRadius: 4, backgroundColor: T.surfaceHi, overflow: "hidden", marginBottom: 12 },
   barFill: { height: 8, borderRadius: 4, backgroundColor: T.accent },
   statusLine: { minHeight: 20, marginBottom: 8, justifyContent: "center" },

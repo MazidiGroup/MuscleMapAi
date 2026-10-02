@@ -27,7 +27,7 @@ import { getExerciseMeta } from "@/src/anatomy/gymGuide";
 import { muscleAliasMatches } from "@/src/anatomy/search";
 import { getBookmarks, getRecent } from "@/src/anatomy/storageLists";
 import { ExerciseAnimation } from "@/src/components/ExerciseAnimation";
-import { legacyPalette, LegacyPalette } from "@/src/anatomy/ui";
+import { legacyPalette, LegacyPalette, GROUP_COLORS } from "@/src/anatomy/ui";
 import { useTheme } from "@/src/theme/ThemeContext";
 
 /** The shipped version, straight from app.json. Never hand-typed in a screen. */
@@ -278,12 +278,11 @@ export default function LibraryScreen() {
             )}
 
             {groups.map((g) => {
-              // One accent tint for every group: the heading text names the
-              // group, so the dot is a rhythm mark, not a colour key.
+              const color = GROUP_COLORS[g.key] || T.accent;
               return (
                 <View key={g.key} style={{ marginBottom: 18 }}>
                   <View style={styles.groupHead}>
-                    <View style={[styles.gdot, { backgroundColor: T.accent }]} />
+                    <View style={[styles.gdot, { backgroundColor: color }]} />
                     <Text style={styles.groupTitle}>{g.label}</Text>
                   </View>
                   {g.items.map((n) => {

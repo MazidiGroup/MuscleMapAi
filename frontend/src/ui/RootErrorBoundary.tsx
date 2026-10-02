@@ -64,6 +64,6 @@ export class RootErrorBoundary extends React.Component<Props, State> {
 const styles = StyleSheet.create({
   // Neutral surface so the fallback is legible in light and dark appearance
   // before any theme provider below the boundary has mounted.
-  root: { flex: 1, backgroundColor: "#0d0b0a" },
+  root: { flex: 1, backgroundColor: "#0e1729" },
   scroll: { flexGrow: 1, justifyContent: "center", padding: 24 },
 });

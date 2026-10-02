@@ -212,10 +212,9 @@ test("no Premium lock is attached to an individual exercise row", () => {
 test("no RevenueCat, EAS, version or identifier change was introduced by Phase 3", () => {
   // Identity is pinned to the inherited values and must never be renamed. The
   // marketing version is pinned too, so a bump can only ever happen deliberately
-  // — it moved to 1.2.0 for the progression/recovery release, and to 1.5.0 for
-  // copper unification + body-first Today (1.3.0–1.4.1 shipped from the watch branch).
+  // — it moved to 1.2.0 for the progression/recovery release.
   const app = JSON.parse(fs.readFileSync(path.join(ROOT, "app.json"), "utf8"));
-  assert.equal(app.expo.version, "1.5.0");
+  assert.equal(app.expo.version, "1.2.0");
   assert.equal(app.expo.ios.bundleIdentifier, "com.mazidigroup.apexai");
   assert.equal(app.expo.android.package, "com.mazidigroup.apexai");
   // The pre-existing RevenueCat initialisation in app/_layout.tsx is untouched;

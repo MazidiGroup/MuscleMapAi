@@ -1,0 +1,105 @@
+{
+  "project_name": "Apex AI — AI Gym Companion",
+  "theme": "dark",
+  "archetype": "Archetype 2 (Performance Pro) mixed with Archetype 5 (Luxury) for a premium Apple-level design",
+  "typography": {
+    "heading_font": "Manrope",
+    "body_font": "Inter",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-semibold tracking-tight text-white",
+      "h2": "text-2xl sm:text-3xl font-medium tracking-tight text-white",
+      "h3": "text-xl font-medium text-zinc-100",
+      "h4": "text-lg font-medium text-zinc-200",
+      "body": "text-base leading-relaxed text-zinc-400",
+      "small_labels": "text-xs font-bold tracking-[0.2em] uppercase text-zinc-500"
+    }
+  },
+  "colors": {
+    "background": {
+      "main": "#0A0A0A",
+      "surface": "#141414",
+      "surface_elevated": "#1C1C1C",
+      "glass": "rgba(10, 10, 10, 0.7)"
+    },
+    "brand": {
+      "primary": "#0A84FF",
+      "primary_hover": "#0070E0",
+      "glow": "rgba(10, 132, 255, 0.4)"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "tertiary": "#71717A"
+    },
+    "border": {
+      "subtle": "rgba(255, 255, 255, 0.05)",
+      "default": "rgba(255, 255, 255, 0.1)"
+    }
+  },
+  "visual_enhancers": {
+    "shadows": "None. Rely on 1px subtle borders (Linear style) to define surfaces instead of dropshadows.",
+    "glassmorphism": "Use for sticky navigation or AI chat overlays: backdrop-blur-xl bg-[#0A0A0A]/70 border-t border-white/10.",
+    "gradients": "Minimal. Use subtle radial gradients at the top of the screen (from rgba(10,132,255,0.15) to transparent) for premium feel on key screens like Subscription or AI Insights."
+  },
+  "grids_and_layouts": {
+    "strategy": "Mobile-first responsive app layout. If building for web, use max-w-md mx-auto to simulate a native app frame or strict centered command-center dashboard.",
+    "spacing": "Generous. Use gap-6 or gap-8 between major sections. Inner padding of cards should be p-5 or p-6.",
+    "border_radius": "rounded-2xl for major cards (Apple style), rounded-full for primary action buttons, rounded-xl for inputs."
+  },
+  "components": {
+    "cards": "Flat background (#141414), border-white/5, rounded-2xl.",
+    "buttons": {
+      "primary": "bg-[#0A84FF] text-white rounded-full font-medium py-3 px-6 hover:bg-[#0070E0] active:scale-[0.98] transition-all",
+      "secondary": "bg-white/5 text-white rounded-full font-medium py-3 px-6 hover:bg-white/10 active:scale-[0.98] border border-white/10"
+    },
+    "inputs": "bg-[#1C1C1C] border border-transparent focus:border-[#0A84FF] focus:ring-1 focus:ring-[#0A84FF] rounded-xl px-4 py-3 text-white placeholder-zinc-500",
+    "ai_chat": "Conversational UI mimicking high-end chat. User messages: bg-white/10 rounded-2xl rounded-tr-sm. AI messages: bg-transparent border border-white/10 rounded-2xl rounded-tl-sm. AI avatar should have a subtle electric blue glow.",
+    "workout_logger": "Large touch targets. One-tap '+' buttons for logging sets. Display previous weight suggestions automatically."
+  },
+  "motion": {
+    "interactions": "Micro-interactions on all taps: scale-95 duration-100 ease-in-out.",
+    "page_transitions": "Smooth fade in and upward slide (translate-y-4 to 0) using framer-motion.",
+    "ai_typing": "Subtle pulsing opacity animation for AI typing indicators."
+  },
+  "accessibility": {
+    "contrast": "Ensure primary text meets 4.5:1 ratio against #141414. Use #A1A1AA for secondary text, which passes AA on pure black.",
+    "focus": "All interactive elements must have clear focus-visible rings using the brand primary color.",
+    "testing": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case format."
+  },
+  "media": {
+    "icons": "lucide-react. Stroke width 1.5. Clean and minimal.",
+    "image_urls": [
+      {
+        "category": "premium_background",
+        "url": "https://images.unsplash.com/photo-1597773150796-e5c14ebecbf5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGRhcmslMjBlbGVjdHJpYyUyMGJsdWUlMjB0ZXh0dXJlfGVufDB8fHx8MTc4MjY2NzMxMHww&ixlib=rb-4.1.0&q=85",
+        "description": "Dark electric blue abstract texture for the Subscription paywall or AI Coach intro screen background."
+      },
+      {
+        "category": "workout_card_male",
+        "url": "https://images.pexels.com/photos/11433060/pexels-photo-11433060.jpeg",
+        "description": "Premium dark gym atmosphere, focused weight training for workout plan headers."
+      },
+      {
+        "category": "workout_card_female",
+        "url": "https://images.pexels.com/photos/13219986/pexels-photo-13219986.jpeg",
+        "description": "Premium dark gym atmosphere, female athlete for workout plan headers."
+      },
+      {
+        "category": "equipment_barbell",
+        "url": "https://images.pexels.com/photos/6389516/pexels-photo-6389516.jpeg",
+        "description": "Moody, cinematic barbell shot for empty states or goal setting screens."
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Strictly adhere to the dark-first UI palette (Background: #0A0A0A, Surfaces: #141414, Accent: #0A84FF).",
+    "Use Manrope for headings to impart a premium Apple-like feel, and Inter for body text.",
+    "DO NOT use generic Shadcn cards without stripping out heavy shadows and thick borders. Use bg-[#141414] and border-white/5 for a clean 'Linear' style.",
+    "Every actionable item (button, tab, input, workout log) MUST have a 'data-testid' attribute for testing.",
+    "Make the 'Home Dashboard' a clear, uncluttered command center. Prioritize 'Today's Workout' and the 'AI Coach Message'.",
+    "For the 'Workout Execution Screen', ensure UI components have large, one-tap hit areas. It must feel effortless to log sets while training.",
+    "Implement the 'Subscription Paywall' screen with the 'premium_background' image behind an overlay to sell the luxury aspect.",
+    "Never use placeholder image URLs. Rely on the provided image_urls for all visual needs.",
+    "Keep body text left-aligned for clear functional reading, and avoid center-aligning unless it's a specific hero title or empty state."
+  ]
+}
