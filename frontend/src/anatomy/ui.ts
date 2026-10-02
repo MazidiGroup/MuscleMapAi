@@ -4,8 +4,6 @@
 // the rest of the app, keeping older screens visually connected.
 import { DEFAULT_MODE, PALETTES, type ThemeMode } from "@/src/theme/tokens";
 
-import { GYM_GROUPS } from "./groups";
-
 export type LegacyPalette = {
   bg: string;
   bg2: string;
@@ -56,33 +54,16 @@ export function legacyPalette(mode: ThemeMode = DEFAULT_MODE): LegacyPalette {
 
 export const T: LegacyPalette = legacyPalette(DEFAULT_MODE);
 
-/**
- * The copper ramp — five tonal steps from the idle body (#3a322c) to the
- * brightest gradient stop. It encodes AMOUNT (sets, volume, intensity), never
- * identity: a muscle group is identified by where it sits on the body and by
- * its text label. Red / amber / green stay reserved for the recovery and
- * prime-mover/assist legends.
- */
-export const COPPER_RAMP = ["#3a322c", "#6b4a33", "#9c6136", "#d0783a", "#f5c08c"] as const;
-
-/**
- * Tonal step per gym group, assigned by the group's position in the exercise
- * lists (GYM_GROUPS order, head-to-toe), so neighbouring groups sit on
- * neighbouring steps. Lists themselves use the single accent tint — this is a
- * fallback for surfaces that need a per-group tone, not a hue legend.
- */
-export const GROUP_COLORS: Record<string, string> = (() => {
-  const keys = Object.keys(GYM_GROUPS);
-  const out: Record<string, string> = {};
-  keys.forEach((k, i) => {
-    out[k] = COPPER_RAMP[Math.min(COPPER_RAMP.length - 1, Math.floor((i * COPPER_RAMP.length) / keys.length))];
-  });
-  return out;
-})();
-
-/** Ramp step for a count against the session/period maximum (0 → idle body). */
-export function copperForCount(count: number, max: number): string {
-  if (count <= 0 || max <= 0) return COPPER_RAMP[0];
-  const step = Math.ceil((Math.min(count, max) / max) * (COPPER_RAMP.length - 1));
-  return COPPER_RAMP[Math.max(1, step)];
-}
+export const GROUP_COLORS: Record<string, string> = {
+  chest: "#FF6B5E",
+  back: "#5EA8FF",
+  shoulders: "#FFB020",
+  arms: "#B98BFF",
+  forearms: "#8B9BFF",
+  core: "#FF5EA8",
+  glutes: "#FF8A3D",
+  quads: "#3DDC97",
+  hamstrings: "#36C5C0",
+  adductors: "#9DD63D",
+  calves: "#E0C341",
+};

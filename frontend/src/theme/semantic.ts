@@ -5,33 +5,14 @@
 // the night theme are taken from the frozen State System authority palette
 // (`MuscleMapAI State System.dc.html`): ok #3DDC97, warn #FFB020, err #EF4444.
 //
-// Screens must read these through `useSemanticTokens()`. Typography roles carry
-// size/weight/line-height and inherit the platform font — with ONE exception:
-// `type.numeral`, the condensed display face for big numbers only.
+// Screens must read these through `useSemanticTokens()`. Nothing here changes
+// the production font — typography roles only carry
+// size/weight/line-height, never a family.
 
 import { useMemo } from "react";
 
 import { useTheme } from "./ThemeContext";
-import { CARD_RADIUS, NUMERAL_FONT, Palette, R, S, ThemeMode } from "./tokens";
-
-export type NumeralType = {
-  fontFamily: string;
-  fontSize: number;
-  lineHeight: number;
-  fontVariant: ["tabular-nums"];
-};
-
-/**
- * Big numbers only: readiness %, session volume, the rest countdown, streak
- * counts and Insights stat-card values. Tabular figures so a ticking or
- * animating value never shifts sideways. No fontWeight — the family is the weight.
- */
-export const NUMERAL_TYPE: NumeralType = {
-  fontFamily: NUMERAL_FONT,
-  fontSize: 34,
-  lineHeight: 36,
-  fontVariant: ["tabular-nums"],
-};
+import { CARD_RADIUS, Palette, R, S, ThemeMode } from "./tokens";
 
 export type StatusRole = "info" | "success" | "warning" | "error";
 
@@ -82,8 +63,6 @@ export type SemanticTokens = {
     bodyStrong: { fontSize: number; fontWeight: "600"; lineHeight: number };
     caption: { fontSize: number; fontWeight: "500"; lineHeight: number };
     label: { fontSize: number; fontWeight: "700"; lineHeight: number };
-    /** The one role that carries a family — see NUMERAL_TYPE. */
-    numeral: NumeralType;
   };
   elevation: {
     none: Record<string, never>;
@@ -100,14 +79,14 @@ export type SemanticTokens = {
 };
 
 const NIGHT_STATUS: Record<StatusRole, StatusColors> = {
-  info: { fg: "#f2c39a", text: "#d6cec6", bg: "rgba(227,154,92,0.10)", border: "rgba(227,154,92,0.30)" },
-  success: { fg: "#3DDC97", text: "#d6cec6", bg: "rgba(61,220,151,0.10)", border: "rgba(61,220,151,0.34)" },
+  info: { fg: "#8fd0ff", text: "#c7d6ef", bg: "rgba(47,141,255,0.10)", border: "rgba(47,141,255,0.34)" },
+  success: { fg: "#3DDC97", text: "#c7d6ef", bg: "rgba(61,220,151,0.10)", border: "rgba(61,220,151,0.34)" },
   warning: { fg: "#FFB020", text: "#f2e0b8", bg: "rgba(255,176,32,0.12)", border: "rgba(255,176,32,0.40)" },
   error: { fg: "#EF4444", text: "#fca5a5", bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.42)" },
 };
 
 const DAY_STATUS: Record<StatusRole, StatusColors> = {
-  info: { fg: "#8f4a1e", text: "#4a423b", bg: "rgba(180,98,44,0.08)", border: "rgba(180,98,44,0.24)" },
+  info: { fg: "#175cbf", text: "#293750", bg: "rgba(40,120,232,0.08)", border: "rgba(40,120,232,0.24)" },
   success: { fg: "#087a50", text: "#225846", bg: "rgba(8,122,80,0.08)", border: "rgba(8,122,80,0.24)" },
   warning: { fg: "#9a5a00", text: "#68471c", bg: "rgba(154,90,0,0.08)", border: "rgba(154,90,0,0.24)" },
   error: { fg: "#c73535", text: "#6f3030", bg: "rgba(199,53,53,0.08)", border: "rgba(199,53,53,0.24)" },
@@ -152,7 +131,6 @@ export function semanticTokens(palette: Palette): SemanticTokens {
       bodyStrong: { fontSize: 13, fontWeight: "600", lineHeight: 20 },
       caption: { fontSize: 11.5, fontWeight: "500", lineHeight: 17 },
       label: { fontSize: 12, fontWeight: "700", lineHeight: 16 },
-      numeral: NUMERAL_TYPE,
     },
     elevation: {
       none: {},

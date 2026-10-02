@@ -6,10 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { enableScreens } from "react-native-screens";
 
-import { useFonts } from "expo-font";
-
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
-import { DISPLAY_FONT_FILES } from "@/src/theme/fonts";
 import { WorkoutProvider } from "@/src/anatomy/workoutStore";
 import { PremiumProvider } from "@/src/premium/PremiumContext";
 import { RootErrorBoundary } from "@/src/ui/RootErrorBoundary";
@@ -115,12 +112,8 @@ function ThemedStack() {
 
 export default function RootLayout() {
   const [loaded, error] = useIconFonts();
-  // The numeral face is bundled, so this resolves locally. The native splash
-  // stays up (preventAutoHideAsync above) until both font sets settle; an error
-  // falls back to the system font rather than holding the app on the splash.
-  const [displayLoaded, displayError] = useFonts(DISPLAY_FONT_FILES);
 
-  if ((!loaded && !error) || (!displayLoaded && !displayError)) return null;
+  if (!loaded && !error) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

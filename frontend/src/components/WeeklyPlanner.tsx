@@ -3,11 +3,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import { DEFAULT_MODE, PALETTES, R } from "@/src/theme/tokens";
+import { COLORS, RADIUS } from "@/src/theme";
 import { LiquidSheen } from "@/src/ui/GlassSurface";
-
-const P = PALETTES[DEFAULT_MODE];
-const OK = "#3DDC97";
 
 type Day = {
   day: number;
@@ -28,11 +25,11 @@ type Props = {
 };
 
 const STATUS_STYLE: Record<string, { bg: string; border: string; label: string; icon?: string; iconColor?: string }> = {
-  today: { bg: "rgba(227,154,92,0.18)", border: P.accent, label: "TODAY", icon: "play-circle", iconColor: P.accent },
-  completed: { bg: "rgba(61,220,151,0.12)", border: OK, label: "DONE", icon: "checkmark-circle", iconColor: OK },
-  upcoming: { bg: P.cardSolid, border: P.border, label: "" },
-  missed: { bg: "rgba(239,68,68,0.10)", border: "rgba(239,68,68,0.45)", label: "MISSED", icon: "alert-circle", iconColor: P.focusRed },
-  rest: { bg: P.cardSolid, border: P.border, label: "REST", icon: "moon", iconColor: P.textMuted },
+  today: { bg: "rgba(10,132,255,0.18)", border: COLORS.primary, label: "TODAY", icon: "play-circle", iconColor: COLORS.primary },
+  completed: { bg: "rgba(52,211,153,0.12)", border: COLORS.success, label: "DONE", icon: "checkmark-circle", iconColor: COLORS.success },
+  upcoming: { bg: COLORS.surface, border: COLORS.border, label: "" },
+  missed: { bg: "rgba(239,68,68,0.10)", border: "rgba(239,68,68,0.45)", label: "MISSED", icon: "alert-circle", iconColor: COLORS.danger },
+  rest: { bg: COLORS.surface, border: COLORS.border, label: "REST", icon: "moon", iconColor: COLORS.textSecondary },
 };
 
 export function WeeklyPlanner({ week, onPressDay, variant = "compact" }: Props) {
@@ -69,12 +66,12 @@ export function WeeklyPlanner({ week, onPressDay, variant = "compact" }: Props) 
               ]}
             >
               <LiquidSheen tone={d.status === "today" ? "accent" : d.status === "missed" ? "danger" : "neutral"} />
-              <Text style={[styles.dayShort, d.status === "today" && { color: P.accent }]}>{d.day_short}</Text>
-              <Text style={[styles.dayNum, d.status === "today" && { color: P.accent }]}>
+              <Text style={[styles.dayShort, d.status === "today" && { color: COLORS.primary }]}>{d.day_short}</Text>
+              <Text style={[styles.dayNum, d.status === "today" && { color: COLORS.primary }]}>
                 {new Date(d.date).getDate()}
               </Text>
               {s.icon ? (
-                <Ionicons name={s.icon as any} size={14} color={s.iconColor || P.textMuted} style={{ marginTop: 6 }} />
+                <Ionicons name={s.icon as any} size={14} color={s.iconColor || COLORS.textSecondary} style={{ marginTop: 6 }} />
               ) : (
                 <View style={styles.iconPlaceholder} />
               )}
@@ -95,15 +92,15 @@ const styles = StyleSheet.create({
     width: 56,
     paddingVertical: 10,
     paddingHorizontal: 6,
-    borderRadius: R.md,
+    borderRadius: RADIUS.lg,
     alignItems: "center",
     flexShrink: 0,
     overflow: "hidden",
   },
   cardLarge: { width: 64, paddingVertical: 12 },
   cardToday: { borderWidth: 1.5 },
-  dayShort: { color: P.textMuted, fontSize: 10, fontWeight: "700", letterSpacing: 1 },
-  dayNum: { color: P.text, fontSize: 18, fontWeight: "700", marginTop: 2 },
+  dayShort: { color: COLORS.textSecondary, fontSize: 10, fontWeight: "700", letterSpacing: 1 },
+  dayNum: { color: COLORS.text, fontSize: 18, fontWeight: "700", marginTop: 2 },
   iconPlaceholder: { height: 14, width: 14, marginTop: 6 },
-  workoutName: { color: P.textMuted, fontSize: 9, marginTop: 4, fontWeight: "500", textAlign: "center", maxWidth: 50 },
+  workoutName: { color: COLORS.textSecondary, fontSize: 9, marginTop: 4, fontWeight: "500", textAlign: "center", maxWidth: 50 },
 });

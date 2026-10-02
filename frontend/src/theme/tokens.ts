@@ -146,16 +146,6 @@ const DAY: Palette = {
 export const PALETTES: Record<ThemeMode, Palette> = { day: DAY, night: NIGHT, dim: DIM };
 export const DEFAULT_MODE: ThemeMode = "night";
 
-/**
- * The one display face, Barlow Condensed (SIL OFL, assets/fonts). It is for
- * big numbers ONLY — readiness, session volume, the rest countdown, streak
- * counts and stat-card values — via `type.numeral` in semantic.ts. Every other
- * string stays on the system font. Each weight is its own family, so styles
- * using it set no fontWeight.
- */
-export const NUMERAL_FONT = "BarlowCondensed-ExtraBold";
-export const DISPLAY_FONT_BOLD = "BarlowCondensed-Bold";
-
 /** Common spacing scale (8 pt grid). */
 export const S = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
